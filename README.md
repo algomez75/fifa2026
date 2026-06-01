@@ -70,6 +70,41 @@ assets/animations/         goal · countdown · trophy (Lottie)
 Realtime is enabled on `matches` (migration 005); the client subscribes in
 `useMatchRealtime` and triggers the goal animation on score changes.
 
+## Push notifications (EAS) — final step, needs your Expo account
+
+Push tokens can't be minted in Expo Go (SDK 53+); you need a dev-client build and
+an EAS project. `eas.json` is ready and `useNotifications` already reads the
+project id from `expo.extra.eas.projectId`.
+
+```bash
+npm i -g eas-cli
+eas login                       # your Expo account
+eas init                        # creates the project, writes extra.eas.projectId into app.json
+eas build --profile development --platform android   # or ios
+```
+
+Install the resulting dev build on a real device, run `npx expo start --dev-client`,
+and the app will register a push token → saved to `user_settings.expo_push_token`.
+The deployed `notify-dispatcher` (running every minute via pg_cron) then sends:
+kickoff-soon alerts, goal alerts, and full-time results to subscribed devices.
+
+## Live data & cron (already wired)
+
+- Live scores come from **football-data.org** (free tier covers the FIFA World Cup).
+  The `FOOTBALLDATA_TOKEN` secret is set; `sync-scores` + `notify-dispatcher` run
+  every minute via `pg_cron` (`cron.job`).
+- Each of the 104 matches is linked to its football-data match id via
+  `matches.api_football_fixture_id` (populated by `scripts/map-footballdata.mjs`).
+  `sync-scores` self-throttles — it only calls the API when a match is in its
+  in-progress window, then updates score/minute/status by that id. Supabase Realtime
+  broadcasts the change to the app (triggering the goal animation).
+- Re-map ids (e.g. after a schedule change):
+  `FOOTBALLDATA_TOKEN=... SUPABASE_ACCESS_TOKEN=... SUPABASE_REF=... node scripts/map-footballdata.mjs`
+- Disable a job: `SELECT cron.unschedule('wc26-sync-scores');`
+
+> Note: API-Football's free plan does NOT cover season 2026, which is why live data
+> uses football-data.org instead. `src/lib/apiFootball.ts` is retained but unused.
+
 ## Regenerate seed data
 
 ```bash

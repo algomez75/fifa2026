@@ -28,6 +28,7 @@
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.5",
     "expo-system-ui": "~56.0.5",
+    "expo-updates": "~56.0.17",
     "expo-web-browser": "~56.0.5",
     "i18n-js": "^4.5.3",
     "lottie-react-native": "~7.3.4",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "sharp": "^0.34.5",
     "typescript": "~6.0.3"
   },
   "scripts": {
