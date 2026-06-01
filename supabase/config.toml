@@ -1,0 +1,42 @@
+# Supabase local config for WC26. Set project_id to your linked ref via:
+#   supabase link --project-ref <ref>
+project_id = "wc26"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "wc26://"
+# Anonymous sign-ins let the app persist favorites/push tokens without a login UI.
+enable_anonymous_sign_ins = true
+
+[edge_runtime]
+enabled = true
+
+[functions.sync-scores]
+enabled = true
+verify_jwt = false
+
+[functions.notify-dispatcher]
+enabled = true
+verify_jwt = false
+
+[functions.import-history]
+enabled = true
+verify_jwt = true

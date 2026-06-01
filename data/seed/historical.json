@@ -1,0 +1,40 @@
+{
+  "editions": [
+    { "year": 1930, "host": "Uruguay", "champion": "Uruguay", "runner_up": "Argentina", "third_place": "United States", "total_goals": 70, "total_teams": 13, "final_score": "4–2", "top_scorer": "Guillermo Stábile (8)" },
+    { "year": 1934, "host": "Italy", "champion": "Italy", "runner_up": "Czechoslovakia", "third_place": "Germany", "total_goals": 70, "total_teams": 16, "final_score": "2–1 (a.e.t.)", "top_scorer": "Oldřich Nejedlý (5)" },
+    { "year": 1938, "host": "France", "champion": "Italy", "runner_up": "Hungary", "third_place": "Brazil", "total_goals": 84, "total_teams": 15, "final_score": "4–2", "top_scorer": "Leônidas (7)" },
+    { "year": 1950, "host": "Brazil", "champion": "Uruguay", "runner_up": "Brazil", "third_place": "Sweden", "total_goals": 88, "total_teams": 13, "final_score": "2–1", "top_scorer": "Ademir (8)" },
+    { "year": 1954, "host": "Switzerland", "champion": "West Germany", "runner_up": "Hungary", "third_place": "Austria", "total_goals": 140, "total_teams": 16, "final_score": "3–2", "top_scorer": "Sándor Kocsis (11)" },
+    { "year": 1958, "host": "Sweden", "champion": "Brazil", "runner_up": "Sweden", "third_place": "France", "total_goals": 126, "total_teams": 16, "final_score": "5–2", "top_scorer": "Just Fontaine (13)" },
+    { "year": 1962, "host": "Chile", "champion": "Brazil", "runner_up": "Czechoslovakia", "third_place": "Chile", "total_goals": 89, "total_teams": 16, "final_score": "3–1", "top_scorer": "Six players (4)" },
+    { "year": 1966, "host": "England", "champion": "England", "runner_up": "West Germany", "third_place": "Portugal", "total_goals": 89, "total_teams": 16, "final_score": "4–2 (a.e.t.)", "top_scorer": "Eusébio (9)" },
+    { "year": 1970, "host": "Mexico", "champion": "Brazil", "runner_up": "Italy", "third_place": "West Germany", "total_goals": 95, "total_teams": 16, "final_score": "4–1", "top_scorer": "Gerd Müller (10)" },
+    { "year": 1974, "host": "West Germany", "champion": "West Germany", "runner_up": "Netherlands", "third_place": "Poland", "total_goals": 97, "total_teams": 16, "final_score": "2–1", "top_scorer": "Grzegorz Lato (7)" },
+    { "year": 1978, "host": "Argentina", "champion": "Argentina", "runner_up": "Netherlands", "third_place": "Brazil", "total_goals": 102, "total_teams": 16, "final_score": "3–1 (a.e.t.)", "top_scorer": "Mario Kempes (6)" },
+    { "year": 1982, "host": "Spain", "champion": "Italy", "runner_up": "West Germany", "third_place": "Poland", "total_goals": 146, "total_teams": 24, "final_score": "3–1", "top_scorer": "Paolo Rossi (6)" },
+    { "year": 1986, "host": "Mexico", "champion": "Argentina", "runner_up": "West Germany", "third_place": "France", "total_goals": 132, "total_teams": 24, "final_score": "3–2", "top_scorer": "Gary Lineker (6)" },
+    { "year": 1990, "host": "Italy", "champion": "West Germany", "runner_up": "Argentina", "third_place": "Italy", "total_goals": 115, "total_teams": 24, "final_score": "1–0", "top_scorer": "Salvatore Schillaci (6)" },
+    { "year": 1994, "host": "United States", "champion": "Brazil", "runner_up": "Italy", "third_place": "Sweden", "total_goals": 141, "total_teams": 24, "final_score": "0–0 (3–2 pens)", "top_scorer": "Stoichkov & Salenko (6)" },
+    { "year": 1998, "host": "France", "champion": "France", "runner_up": "Brazil", "third_place": "Croatia", "total_goals": 171, "total_teams": 32, "final_score": "3–0", "top_scorer": "Davor Šuker (6)" },
+    { "year": 2002, "host": "South Korea / Japan", "champion": "Brazil", "runner_up": "Germany", "third_place": "Turkey", "total_goals": 161, "total_teams": 32, "final_score": "2–0", "top_scorer": "Ronaldo (8)" },
+    { "year": 2006, "host": "Germany", "champion": "Italy", "runner_up": "France", "third_place": "Germany", "total_goals": 147, "total_teams": 32, "final_score": "1–1 (5–3 pens)", "top_scorer": "Miroslav Klose (5)" },
+    { "year": 2010, "host": "South Africa", "champion": "Spain", "runner_up": "Netherlands", "third_place": "Germany", "total_goals": 145, "total_teams": 32, "final_score": "1–0 (a.e.t.)", "top_scorer": "Four players (5)" },
+    { "year": 2014, "host": "Brazil", "champion": "Germany", "runner_up": "Argentina", "third_place": "Netherlands", "total_goals": 171, "total_teams": 32, "final_score": "1–0 (a.e.t.)", "top_scorer": "James Rodríguez (6)" },
+    { "year": 2018, "host": "Russia", "champion": "France", "runner_up": "Croatia", "third_place": "Belgium", "total_goals": 169, "total_teams": 32, "final_score": "4–2", "top_scorer": "Harry Kane (6)" },
+    { "year": 2022, "host": "Qatar", "champion": "Argentina", "runner_up": "France", "third_place": "Croatia", "total_goals": 172, "total_teams": 32, "final_score": "3–3 (4–2 pens)", "top_scorer": "Kylian Mbappé (8)" }
+  ],
+  "matches": [
+    { "year": 1954, "stage": "Quarter-final", "home_team": "Austria", "away_team": "Switzerland", "home_score": 7, "away_score": 5, "venue": "Lausanne", "match_date": "1954-06-26" },
+    { "year": 1982, "stage": "Group", "home_team": "Hungary", "away_team": "El Salvador", "home_score": 10, "away_score": 1, "venue": "Elche", "match_date": "1982-06-15" },
+    { "year": 2014, "stage": "Semi-final", "home_team": "Germany", "away_team": "Brazil", "home_score": 7, "away_score": 1, "venue": "Belo Horizonte", "match_date": "2014-07-08" },
+    { "year": 1974, "stage": "Group", "home_team": "Yugoslavia", "away_team": "Zaire", "home_score": 9, "away_score": 0, "venue": "Gelsenkirchen", "match_date": "1974-06-18" },
+    { "year": 1954, "stage": "Group", "home_team": "Hungary", "away_team": "West Germany", "home_score": 8, "away_score": 3, "venue": "Basel", "match_date": "1954-06-20" },
+    { "year": 1938, "stage": "Round of 16", "home_team": "Brazil", "away_team": "Poland", "home_score": 6, "away_score": 5, "venue": "Strasbourg", "match_date": "1938-06-05" },
+    { "year": 1950, "stage": "Final round", "home_team": "Brazil", "away_team": "Sweden", "home_score": 7, "away_score": 1, "venue": "Rio de Janeiro", "match_date": "1950-07-09" },
+    { "year": 1958, "stage": "Quarter-final", "home_team": "France", "away_team": "Northern Ireland", "home_score": 4, "away_score": 0, "venue": "Norrköping", "match_date": "1958-06-19" },
+    { "year": 1986, "stage": "Round of 16", "home_team": "Denmark", "away_team": "Spain", "home_score": 1, "away_score": 5, "venue": "Querétaro", "match_date": "1986-06-18" },
+    { "year": 1994, "stage": "Group", "home_team": "Russia", "away_team": "Cameroon", "home_score": 6, "away_score": 1, "venue": "San Francisco", "match_date": "1994-06-28" },
+    { "year": 2018, "stage": "Final", "home_team": "France", "away_team": "Croatia", "home_score": 4, "away_score": 2, "venue": "Moscow", "match_date": "2018-07-15" },
+    { "year": 1970, "stage": "Final", "home_team": "Brazil", "away_team": "Italy", "home_score": 4, "away_score": 1, "venue": "Mexico City", "match_date": "1970-06-21" }
+  ]
+}

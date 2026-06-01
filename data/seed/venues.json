@@ -1,0 +1,18 @@
+[
+  { "id": "nyc", "name": "MetLife Stadium", "city": "New York / New Jersey", "country": "USA", "capacity": 82500, "lat": 40.813611, "lng": -74.074444, "color": "#185FA5" },
+  { "id": "dal", "name": "AT&T Stadium", "city": "Dallas", "country": "USA", "capacity": 94000, "lat": 32.747778, "lng": -97.092778, "color": "#1E5BB0" },
+  { "id": "atl", "name": "Mercedes-Benz Stadium", "city": "Atlanta", "country": "USA", "capacity": 75000, "lat": 33.755556, "lng": -84.400556, "color": "#A32D2D" },
+  { "id": "kan", "name": "Arrowhead Stadium", "city": "Kansas City", "country": "USA", "capacity": 73000, "lat": 39.048889, "lng": -94.484167, "color": "#C8102E" },
+  { "id": "hou", "name": "NRG Stadium", "city": "Houston", "country": "USA", "capacity": 72000, "lat": 29.684722, "lng": -95.410833, "color": "#2B6CB0" },
+  { "id": "sfo", "name": "Levi's Stadium", "city": "San Francisco Bay Area", "country": "USA", "capacity": 71000, "lat": 37.403, "lng": -121.97, "color": "#C0392B" },
+  { "id": "lax", "name": "SoFi Stadium", "city": "Los Angeles", "country": "USA", "capacity": 70000, "lat": 33.953587, "lng": -118.339254, "color": "#378ADD" },
+  { "id": "phi", "name": "Lincoln Financial Field", "city": "Philadelphia", "country": "USA", "capacity": 69000, "lat": 39.900833, "lng": -75.1675, "color": "#004C54" },
+  { "id": "sea", "name": "Lumen Field", "city": "Seattle", "country": "USA", "capacity": 69000, "lat": 47.595153, "lng": -122.331625, "color": "#1E6E4E" },
+  { "id": "bos", "name": "Gillette Stadium", "city": "Boston", "country": "USA", "capacity": 65000, "lat": 42.090944, "lng": -71.264344, "color": "#0B2A5B" },
+  { "id": "mia", "name": "Hard Rock Stadium", "city": "Miami", "country": "USA", "capacity": 65000, "lat": 25.957958, "lng": -80.238894, "color": "#E24B4A" },
+  { "id": "mex", "name": "Estadio Azteca", "city": "Mexico City", "country": "Mexico", "capacity": 83000, "lat": 19.302889, "lng": -99.150611, "color": "#3B6D11" },
+  { "id": "mty", "name": "Estadio BBVA", "city": "Monterrey", "country": "Mexico", "capacity": 53500, "lat": 25.669, "lng": -100.244, "color": "#639922" },
+  { "id": "gdl", "name": "Estadio Akron", "city": "Guadalajara", "country": "Mexico", "capacity": 48000, "lat": 20.681944, "lng": -103.462778, "color": "#2E7D32" },
+  { "id": "tor", "name": "BMO Field", "city": "Toronto", "country": "Canada", "capacity": 45000, "lat": 43.6332, "lng": -79.4185, "color": "#A32D2D" },
+  { "id": "van", "name": "BC Place", "city": "Vancouver", "country": "Canada", "capacity": 54000, "lat": 49.276667, "lng": -123.111944, "color": "#E24B4A" }
+]

@@ -1,0 +1,42 @@
+-- 006_cron.sql — scheduled edge-function invocations.
+-- APPLY ONLY AFTER the edge functions are deployed and secrets are set.
+-- Requires the pg_cron + pg_net extensions and Vault secrets:
+--   - app.settings.project_url        (https://<ref>.functions.supabase.co)
+--   - app.settings.service_role_key   (for Authorization header)
+--
+-- Uncomment after deploy, replacing <REF> / using Vault as appropriate.
+
+-- CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- -- Live score sync: every minute (the function itself no-ops unless a match is live).
+-- SELECT cron.schedule(
+--   'wc26-sync-scores',
+--   '* * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url     := 'https://<REF>.functions.supabase.co/sync-scores',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
+--     ),
+--     body    := '{}'::jsonb
+--   );
+--   $$
+-- );
+
+-- -- Notification dispatcher: every minute.
+-- SELECT cron.schedule(
+--   'wc26-notify-dispatcher',
+--   '* * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url     := 'https://<REF>.functions.supabase.co/notify-dispatcher',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
+--     ),
+--     body    := '{}'::jsonb
+--   );
+--   $$
+-- );
