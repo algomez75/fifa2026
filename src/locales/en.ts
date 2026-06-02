@@ -215,6 +215,11 @@ export const en = {
     declined: 'declined your challenge',
     respond: 'Respond',
   },
+  celebrate: {
+    goal: 'GOAL!',
+    fullTime: 'FULL TIME',
+    challenge: 'NEW CHALLENGE',
+  },
   stages: {
     group: 'Group Stage',
     r32: 'Round of 32',

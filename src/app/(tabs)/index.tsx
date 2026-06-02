@@ -1,10 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
-import { GoalOverlay } from '@/components/GoalOverlay';
 import { HeaderActions } from '@/components/HeaderActions';
 import { LiveBadge } from '@/components/LiveBadge';
 import { MatchCard } from '@/components/MatchCard';
@@ -17,7 +16,6 @@ import { teamsById } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { palette } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
-import { useMatchRealtime } from '@/hooks/useMatchRealtime';
 import { useAppStore, useTranslation } from '@/store/useAppStore';
 
 export default function HomeScreen() {
@@ -25,14 +23,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const favorites = useAppStore((s) => s.favoriteTeamIds);
   const { data: matches, isLoading, isError, refetch } = useMatches();
-  const [goalLabel, setGoalLabel] = useState<string | null>(null);
-  useMatchRealtime((e) => {
-    const home = e.match.home_team_id ? teamsById[e.match.home_team_id] : undefined;
-    const away = e.match.away_team_id ? teamsById[e.match.away_team_id] : undefined;
-    setGoalLabel(
-      `${home?.name ?? ''} ${e.match.home_score}–${e.match.away_score} ${away?.name ?? ''}`.trim(),
-    );
-  });
 
   const derived = useMemo(() => {
     const all = matches ?? [];
@@ -157,11 +147,6 @@ export default function HomeScreen() {
           )}
         </Section>
       </ScrollView>
-      <GoalOverlay
-        visible={goalLabel != null}
-        label={goalLabel ?? undefined}
-        onDone={() => setGoalLabel(null)}
-      />
     </ScreenFrame>
   );
 

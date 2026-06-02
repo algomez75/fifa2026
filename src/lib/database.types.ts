@@ -133,6 +133,7 @@ export interface NotificationRow {
   actor_id: string | null;
   actor_name: string | null;
   read: boolean;
+  pushed?: boolean;
   created_at: string;
 }
 

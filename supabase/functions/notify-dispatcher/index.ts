@@ -4,6 +4,7 @@
 // Sends:
 //   1. "starting soon" alerts (per-user notify_minutes_before window)
 //   2. final-whistle results
+//   3. pending in-app notifications (challenge received / accepted / declined)
 // to subscribed Expo push tokens via the Expo Push API.
 //
 // Deploy:  supabase functions deploy notify-dispatcher
@@ -101,6 +102,58 @@ Deno.serve(async () => {
     }
   }
 
+  // ── pending in-app notifications → device push ─────────────────────────────
+  // Challenge events live in `notifications`; push each recipient's unpushed
+  // rows once, then mark them so they aren't re-sent.
+  const tokenByUser = new Map(
+    (users ?? []).map((u: any) => [u.user_id, u.expo_push_token as string]),
+  );
+
+  const { data: pending } = await supabase
+    .from('notifications')
+    .select('id, user_id, type, actor_name, challenge_id, match_id')
+    .eq('pushed', false)
+    .order('created_at', { ascending: true })
+    .limit(200);
+
+  const pushedIds: string[] = [];
+
+  for (const n of pending ?? []) {
+    const to = tokenByUser.get(n.user_id);
+    if (!to) continue; // recipient has no device token yet — retry later
+    const actor = n.actor_name ?? 'A player';
+
+    let title: string;
+    let body: string;
+    if (n.type === 'challenge_received') {
+      title = '⚔️ New challenge';
+      body = `${actor} challenged you`;
+    } else if (n.type === 'challenge_accepted') {
+      title = '✅ Challenge accepted';
+      body = `${actor} accepted your challenge`;
+    } else if (n.type === 'challenge_declined') {
+      title = '🚫 Challenge declined';
+      body = `${actor} declined your challenge`;
+    } else {
+      pushedIds.push(n.id); // unknown type — don't keep rescanning it
+      continue;
+    }
+
+    messages.push({
+      to,
+      title,
+      body,
+      sound: 'default',
+      data: { type: 'challenge', notifId: n.id, challengeId: n.challenge_id, matchId: n.match_id },
+    });
+    pushedIds.push(n.id);
+  }
+
   await sendExpoPush(messages);
+
+  if (pushedIds.length) {
+    await supabase.from('notifications').update({ pushed: true }).in('id', pushedIds);
+  }
+
   return Response.json({ sent: messages.length });
 });

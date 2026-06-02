@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useEffect } from 'react';
 
+import { CelebrationOverlay } from '@/components/CelebrationOverlay';
+import { useLiveEvents } from '@/hooks/useLiveEvents';
 import { useNotifications } from '@/hooks/useNotifications';
 import { queryClient } from '@/lib/queryClient';
 import { initAuth } from '@/store/useAuthStore';
@@ -20,8 +22,6 @@ export default function RootLayout() {
   useEffect(() => {
     void initAuth();
   }, []);
-  // Register for push notifications (no-op until permissions/credentials exist).
-  useNotifications();
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.bg }}>
@@ -45,7 +45,7 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="profile"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
             />
             <Stack.Screen
               name="legal/privacy"
@@ -64,8 +64,19 @@ export default function RootLayout() {
               options={{ presentation: 'card', animation: 'slide_from_right' }}
             />
           </Stack>
+          {/* Push registration, live-event → animation bridge, and the root
+              celebration overlay. Inside the provider so they can use the query
+              cache. */}
+          <GlobalServices />
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Lives inside QueryClientProvider so its hooks can touch the query cache. */
+function GlobalServices() {
+  useNotifications(); // register for push + wire notification listeners
+  useLiveEvents(); // live score/result Realtime → celebration overlay
+  return <CelebrationOverlay />;
 }

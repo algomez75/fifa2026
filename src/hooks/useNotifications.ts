@@ -1,11 +1,16 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
+import { queryClient } from '@/lib/queryClient';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { useCelebration } from '@/store/useCelebration';
+import { inboxKey } from './useInbox';
 
+// Show alerts (banner + sound) even while the app is in the foreground.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -15,6 +20,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Asks for notification permission (the startup policy) and returns an Expo
+ *  push token when granted on a real device with EAS credentials. */
 async function registerForPush(): Promise<string | null> {
   if (!Device.isDevice) return null; // simulators can't get a token
 
@@ -26,6 +33,7 @@ async function registerForPush(): Promise<string | null> {
     });
   }
 
+  // Prompt at startup if we don't already have a decision.
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
   if (status !== 'granted') {
@@ -35,18 +43,28 @@ async function registerForPush(): Promise<string | null> {
   if (status !== 'granted') return null;
 
   const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    Constants.easConfig?.projectId;
+    Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) return null; // needs an EAS project to mint a token
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
   return token.data;
 }
 
+type NotifData = {
+  type?: 'kickoff' | 'result' | 'challenge';
+  matchId?: string;
+  challengeId?: string;
+};
+
 /**
- * Registers the device for push and stores the Expo token in `user_settings`
- * when Supabase is configured & the user is signed in. Fails silently in Expo
- * Go / simulators / web — the app keeps working without push.
+ * Registers the device for push (prompting for permission at startup), stores
+ * the Expo token in `user_settings`, and wires the two notification listeners:
+ *
+ *  - **received (foreground):** refresh the inbox badge and play a celebration
+ *    for live results, so on-device alerts feed the in-app animation system.
+ *  - **response (tap):** deep-link to the relevant screen.
+ *
+ * Fails silently in Expo Go / simulators / web — the app keeps working.
  */
 export function useNotifications() {
   const registered = useRef(false);
@@ -69,5 +87,33 @@ export function useNotifications() {
         // best-effort: push is optional
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    const received = Notifications.addNotificationReceivedListener((n) => {
+      // A device alert arrived while the app is open → keep the badge live and
+      // feed the animation system.
+      queryClient.invalidateQueries({ queryKey: inboxKey });
+      const data = (n.request.content.data ?? {}) as NotifData;
+      if (data.type === 'result' && n.request.content.body) {
+        useCelebration.getState().celebrate({
+          kind: 'result',
+          title: n.request.content.title ?? '🏁',
+          label: n.request.content.body,
+          key: data.matchId ? `result:${data.matchId}` : undefined,
+        });
+      }
+    });
+
+    const response = Notifications.addNotificationResponseReceivedListener((r) => {
+      const data = (r.notification.request.content.data ?? {}) as NotifData;
+      queryClient.invalidateQueries({ queryKey: inboxKey });
+      if (data.type === 'challenge') router.push('/notifications');
+    });
+
+    return () => {
+      received.remove();
+      response.remove();
+    };
   }, []);
 }

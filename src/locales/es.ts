@@ -216,6 +216,11 @@ export const es: Translation = {
     declined: 'rechazó tu reto',
     respond: 'Responder',
   },
+  celebrate: {
+    goal: '¡GOL!',
+    fullTime: 'FINAL',
+    challenge: 'NUEVO RETO',
+  },
   stages: {
     group: 'Fase de Grupos',
     r32: 'Dieciseisavos',

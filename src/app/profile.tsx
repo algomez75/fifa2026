@@ -55,7 +55,10 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        delaysContentTouches={false}>
         {msg ? (
           <View style={[styles.alert, msg.type === 'error' ? styles.alertErr : styles.alertOk]}>
             <Text style={styles.alertText}>{msg.text}</Text>
