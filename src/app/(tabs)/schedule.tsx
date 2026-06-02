@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { MatchCard } from '@/components/MatchCard';
-import { ScoreModal } from '@/components/ScoreModal';
+import { PredictionModal } from '@/components/PredictionModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HeaderActions } from '@/components/HeaderActions';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
@@ -12,6 +12,7 @@ import { dayKey, formatMatchDay } from '@/lib/format';
 import { venuesById } from '@/lib/seed';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
+import { usePredictions } from '@/hooks/usePredictions';
 import { type HostFilter, useAppStore, useTranslation } from '@/store/useAppStore';
 
 const STAGE_FILTERS: (Stage | 'all')[] = ['all', 'group', 'r32', 'r16', 'qf', 'sf', 'final'];
@@ -31,7 +32,8 @@ export default function ScheduleScreen() {
   const setFilterHost = useAppStore((s) => s.setFilterHost);
 
   const [showPast, setShowPast] = useState(false);
-  const [scoring, setScoring] = useState<Match | null>(null);
+  const [predicting, setPredicting] = useState<Match | null>(null);
+  const { data: predictions } = usePredictions();
 
   const { upcoming, past } = useMemo(() => {
     const all = matches ?? [];
@@ -119,7 +121,7 @@ export default function ScheduleScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}>
-          <Text style={styles.hint}>{t.schedule.tapToScore}</Text>
+          <Text style={styles.hint}>{t.predict.cta} · +3 / +1 {t.predict.pts}</Text>
           {upcoming.map((group) => (
             <View key={group.key} style={styles.daySection}>
               <Text style={styles.dayHeader}>
@@ -127,7 +129,12 @@ export default function ScheduleScreen() {
               </Text>
               <View style={{ gap: 10 }}>
                 {group.matches.map((m) => (
-                  <MatchCard key={m.id} match={m} onPress={setScoring} />
+                  <MatchCard
+                    key={m.id}
+                    match={m}
+                    prediction={predictions?.[m.id] ?? null}
+                    onPress={setPredicting}
+                  />
                 ))}
               </View>
             </View>
@@ -146,7 +153,12 @@ export default function ScheduleScreen() {
               {showPast ? (
                 <View style={{ gap: 10, marginTop: 10 }}>
                   {past.map((m) => (
-                    <MatchCard key={m.id} match={m} onPress={setScoring} />
+                    <MatchCard
+                      key={m.id}
+                      match={m}
+                      prediction={predictions?.[m.id] ?? null}
+                      onPress={setPredicting}
+                    />
                   ))}
                 </View>
               ) : null}
@@ -155,7 +167,11 @@ export default function ScheduleScreen() {
         </ScrollView>
       )}
 
-      <ScoreModal match={scoring} onClose={() => setScoring(null)} />
+      <PredictionModal
+        match={predicting}
+        prediction={predicting ? predictions?.[predicting.id] ?? null : null}
+        onClose={() => setPredicting(null)}
+      />
     </View>
   );
 }

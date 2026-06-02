@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import CountryFlag from 'react-native-country-flag';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,14 +8,16 @@ import { Avatar } from '@/components/Avatar';
 import { GradientHeader } from '@/components/GradientHeader';
 import { GroupTable } from '@/components/GroupTable';
 import { MatchCard } from '@/components/MatchCard';
+import { PredictionModal } from '@/components/PredictionModal';
 import { EmptyState } from '@/components/States';
 import { ChevronLeftIcon, HeartIcon } from '@/components/icons';
-import type { Player } from '@/lib/database.types';
+import type { Match, Player } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
 import { seedTeams, teamsById } from '@/lib/seed';
 import { confederationColor, palette, radius } from '@/lib/theme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useMatches } from '@/hooks/useMatches';
+import { usePredictions } from '@/hooks/usePredictions';
 import { ageFromDob, useSquad } from '@/hooks/useSquad';
 import { useTranslation } from '@/store/useAppStore';
 
@@ -27,6 +29,14 @@ export default function TeamDetailScreen() {
   const { favorites, toggleFavorite } = useFavorites();
   const { data: matches } = useMatches();
   const { data: squad } = useSquad(id);
+  const { data: predictions } = usePredictions();
+  const [predicting, setPredicting] = useState<Match | null>(null);
+
+  // Back button always returns to the full Teams list (not the previous team).
+  const goToTeams = () => {
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate('/teams');
+  };
 
   const team = id ? teamsById[id] : undefined;
 
@@ -77,10 +87,7 @@ export default function TeamDetailScreen() {
       <GradientHeader color={accent} height={220 + insets.top}>
         <View style={[styles.headerInner, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerTop}>
-            <Pressable
-              style={styles.backBtn}
-              onPress={() => router.back()}
-              hitSlop={8}>
+            <Pressable style={styles.backBtn} onPress={goToTeams} hitSlop={8}>
               <ChevronLeftIcon color={palette.text} size={22} />
             </Pressable>
             <Pressable
@@ -143,11 +150,8 @@ export default function TeamDetailScreen() {
             <MatchCard
               key={m.id}
               match={m}
-              onPress={() => {
-                const other =
-                  m.home_team_id === team.id ? m.away_team_id : m.home_team_id;
-                if (other) router.push(`/team/${other}`);
-              }}
+              prediction={predictions?.[m.id] ?? null}
+              onPress={setPredicting}
             />
           ))}
         </View>
@@ -179,6 +183,12 @@ export default function TeamDetailScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <PredictionModal
+        match={predicting}
+        prediction={predicting ? predictions?.[predicting.id] ?? null : null}
+        onClose={() => setPredicting(null)}
+      />
     </View>
   );
 }

@@ -76,6 +76,26 @@ export function HistoryIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
   );
 }
 
+export function TrophyIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M7 4h10v4a5 5 0 0 1-10 0V4Z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M7 5H4.5v1.5A2.5 2.5 0 0 0 7 9M17 5h2.5v1.5A2.5 2.5 0 0 1 17 9M12 13v3M8.5 20h7M9.5 20l.5-4h4l.5 4"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function HeartIcon({
   color,
   size = 24,
@@ -98,6 +118,14 @@ export function ChevronLeftIcon({ color, size = 24, strokeWidth = 2 }: IconProps
   return (
     <Svg {...base(size)} fill="none">
       <Path d="M15 5l-7 7 7 7" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function ChevronRightIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M9 5l7 7-7 7" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }

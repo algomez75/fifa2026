@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "appName": "WC26",
+    "entity": "Portela 11 LLC",
+    "contact": "info@portela11.com",
+    "location": "Miami, Florida, USA",
+    "updated": "June 2, 2026"
+  },
+  "privacy": {
+    "en": [
+      { "title": "Overview", "body": "WC26 (\"the App\") is operated by Portela 11 LLC (\"we\", \"us\"). This policy explains what data we collect, how we use it, and your choices. We built WC26 to be privacy-respecting: we do not run ads, we do not track you across other apps, and we never sell your data." },
+      { "title": "Information we collect", "body": "• Account: if you create an account, your email address (used only to sign in and recover your account).\n• Profile: an optional display name and avatar photo you choose. These are visible to other users on the leaderboard.\n• Predictions & activity: the match score predictions you make and the points you earn.\n• Preferences: your favorite teams, language, and notification settings.\n• Push token: if you enable notifications, a device push token so we can send match alerts.\n• Guest identifier: if you use the App without an account, a random anonymous identifier so your preferences work on your device.\n• Diagnostics: basic, non-identifying technical information needed to operate the App." },
+      { "title": "How we use your information", "body": "We use your information solely to provide the App: to sign you in, sync your favorites and predictions across devices, calculate the leaderboard, send the match notifications you opt into, and keep the service running and secure. We do not use your data for advertising or profiling." },
+      { "title": "What we do NOT do", "body": "• No advertising and no ad networks.\n• No cross-app or cross-site tracking.\n• No selling or renting of your personal data.\n• No collection of your location, contacts, photos library (beyond a photo you explicitly pick for your avatar), or microphone." },
+      { "title": "Third-party services", "body": "We rely on a small number of providers strictly to operate the App:\n• Supabase — database, authentication and storage (hosts your account and content).\n• Resend — sends transactional emails (e.g. account confirmation).\n• football-data.org — supplies match fixtures, scores and squad data. We send no personal data to them.\n• Expo / Apple / Google — deliver push notifications.\nEach processes data only as needed to provide their function." },
+      { "title": "Data retention & deletion", "body": "We keep your data while your account exists. You can permanently delete your account and all associated data at any time from Profile → Delete account. Guest data stays on your device until you clear it." },
+      { "title": "Security", "body": "Your data is protected with industry-standard measures, including encryption in transit and database-level access controls (row-level security) so users can only access their own private data." },
+      { "title": "Children", "body": "WC26 is not directed to children under 13, and we do not knowingly collect personal information from them. If you believe a child has provided us data, contact us and we will delete it." },
+      { "title": "Your rights", "body": "Depending on where you live (including under GDPR and CCPA), you may have the right to access, correct, export, or delete your personal data, and to object to certain processing. You can exercise deletion directly in the App, or contact us for any other request. We do not sell personal information." },
+      { "title": "Changes to this policy", "body": "We may update this policy as the App evolves. We will revise the date above and, for material changes, notify you in the App." },
+      { "title": "Contact", "body": "Questions about privacy? Email us at info@portela11.com. Portela 11 LLC, Miami, Florida, USA." }
+    ],
+    "es": [
+      { "title": "Resumen", "body": "WC26 (\"la App\") es operada por Portela 11 LLC (\"nosotros\"). Esta política explica qué datos recopilamos, cómo los usamos y tus opciones. Diseñamos WC26 respetando tu privacidad: no mostramos anuncios, no te rastreamos en otras apps y nunca vendemos tus datos." },
+      { "title": "Información que recopilamos", "body": "• Cuenta: si creas una cuenta, tu correo electrónico (solo para iniciar sesión y recuperar tu cuenta).\n• Perfil: un nombre visible y una foto de avatar opcionales que tú eliges. Son visibles para otros usuarios en el ranking.\n• Predicciones y actividad: los marcadores que predices y los puntos que ganas.\n• Preferencias: tus equipos favoritos, idioma y ajustes de notificaciones.\n• Token de notificaciones: si las activas, un token del dispositivo para enviarte alertas de partidos.\n• Identificador de invitado: si usas la App sin cuenta, un identificador anónimo aleatorio para que tus preferencias funcionen en tu dispositivo.\n• Diagnóstico: información técnica básica y no identificable necesaria para operar la App." },
+      { "title": "Cómo usamos tu información", "body": "Usamos tu información únicamente para ofrecer la App: iniciar sesión, sincronizar tus favoritos y predicciones entre dispositivos, calcular el ranking, enviarte las notificaciones que elijas y mantener el servicio funcionando y seguro. No usamos tus datos para publicidad ni perfilado." },
+      { "title": "Lo que NO hacemos", "body": "• Sin publicidad ni redes de anuncios.\n• Sin rastreo entre apps o sitios.\n• Sin vender ni alquilar tus datos personales.\n• Sin recopilar tu ubicación, contactos, galería de fotos (más allá de la foto que elijas para tu avatar) ni micrófono." },
+      { "title": "Servicios de terceros", "body": "Usamos un número reducido de proveedores estrictamente para operar la App:\n• Supabase — base de datos, autenticación y almacenamiento.\n• Resend — envía correos transaccionales (ej. confirmación de cuenta).\n• football-data.org — provee partidos, marcadores y plantillas. No les enviamos datos personales.\n• Expo / Apple / Google — entregan las notificaciones push.\nCada uno procesa datos solo según lo necesario para su función." },
+      { "title": "Retención y eliminación de datos", "body": "Conservamos tus datos mientras exista tu cuenta. Puedes eliminar permanentemente tu cuenta y todos los datos asociados cuando quieras desde Perfil → Eliminar cuenta. Los datos de invitado permanecen en tu dispositivo hasta que los borres." },
+      { "title": "Seguridad", "body": "Tus datos están protegidos con medidas estándar de la industria, incluyendo cifrado en tránsito y controles de acceso a nivel de base de datos (seguridad por fila) para que cada usuario solo acceda a sus propios datos privados." },
+      { "title": "Menores", "body": "WC26 no está dirigida a menores de 13 años y no recopilamos conscientemente su información personal. Si crees que un menor nos proporcionó datos, contáctanos y los eliminaremos." },
+      { "title": "Tus derechos", "body": "Según dónde vivas (incluyendo bajo GDPR y CCPA), puedes tener derecho a acceder, corregir, exportar o eliminar tus datos personales y a oponerte a ciertos tratamientos. Puedes eliminar tus datos directamente en la App o contactarnos para cualquier otra solicitud. No vendemos información personal." },
+      { "title": "Cambios a esta política", "body": "Podemos actualizar esta política a medida que la App evoluciona. Actualizaremos la fecha anterior y, para cambios importantes, te avisaremos en la App." },
+      { "title": "Contacto", "body": "¿Dudas sobre privacidad? Escríbenos a info@portela11.com. Portela 11 LLC, Miami, Florida, EE. UU." }
+    ]
+  },
+  "terms": {
+    "en": [
+      { "title": "Acceptance", "body": "By downloading or using WC26 you agree to these Terms. If you do not agree, do not use the App. The App is provided by Portela 11 LLC." },
+      { "title": "The service", "body": "WC26 is a companion app for the FIFA World Cup 2026: schedules, scores, group standings, team squads, and a score-prediction game with a leaderboard. Predictions are for entertainment only — WC26 is not a betting, wagering, or real-money gambling service and offers no monetary prizes unless explicitly stated in a separate promotion." },
+      { "title": "Accounts", "body": "You may use the App as a guest or create an account. You are responsible for keeping your credentials secure and for activity under your account. Provide accurate information when creating an account." },
+      { "title": "Acceptable use", "body": "Do not misuse the App: no unlawful, abusive, or infringing content (including in your display name or avatar), no attempts to break security or disrupt the service, and no automated scraping or overloading of our systems." },
+      { "title": "Your content", "body": "You retain ownership of the display name and avatar you upload. You grant us a limited license to store and display them within the App (e.g. on the leaderboard). You are responsible for the content you provide and confirm you have the right to use it." },
+      { "title": "Predictions & leaderboard", "body": "Predictions and points are for fun and community ranking. We may recalculate or correct points if match data is updated or an error is found. Rankings carry no monetary value." },
+      { "title": "Data accuracy", "body": "Match fixtures, scores and squad data come from third-party sources and may be delayed, incomplete, or inaccurate. WC26 is provided for informational and entertainment purposes and should not be relied upon for any decision." },
+      { "title": "Intellectual property & affiliation", "body": "WC26 is an independent application and is NOT affiliated with, endorsed by, or sponsored by FIFA or any football association, team, or competition. \"FIFA World Cup\" and related names and marks are the property of their respective owners and are used for identification and descriptive purposes only." },
+      { "title": "Disclaimers", "body": "The App is provided \"as is\" and \"as available\" without warranties of any kind, to the maximum extent permitted by law." },
+      { "title": "Limitation of liability", "body": "To the maximum extent permitted by law, Portela 11 LLC will not be liable for any indirect, incidental, or consequential damages arising from your use of the App." },
+      { "title": "Termination", "body": "You may stop using the App and delete your account at any time. We may suspend or terminate access if you violate these Terms." },
+      { "title": "Governing law", "body": "These Terms are governed by the laws of the State of Florida, USA, without regard to conflict-of-laws rules." },
+      { "title": "Changes", "body": "We may update these Terms as the App evolves; continued use after changes means you accept them." },
+      { "title": "Contact", "body": "Questions about these Terms? Email info@portela11.com." }
+    ],
+    "es": [
+      { "title": "Aceptación", "body": "Al descargar o usar WC26 aceptas estos Términos. Si no estás de acuerdo, no uses la App. La App es ofrecida por Portela 11 LLC." },
+      { "title": "El servicio", "body": "WC26 es una app complementaria para la Copa Mundial 2026: calendario, marcadores, posiciones, plantillas y un juego de predicciones con ranking. Las predicciones son solo para entretenimiento — WC26 no es un servicio de apuestas ni de juego con dinero real, y no ofrece premios monetarios salvo que se indique explícitamente en una promoción aparte." },
+      { "title": "Cuentas", "body": "Puedes usar la App como invitado o crear una cuenta. Eres responsable de mantener seguras tus credenciales y de la actividad en tu cuenta. Proporciona información veraz al registrarte." },
+      { "title": "Uso aceptable", "body": "No hagas mal uso de la App: nada de contenido ilegal, abusivo o que infrinja derechos (incluyendo tu nombre visible o avatar), ni intentos de vulnerar la seguridad o interrumpir el servicio, ni scraping automatizado o sobrecarga de nuestros sistemas." },
+      { "title": "Tu contenido", "body": "Conservas la propiedad del nombre visible y el avatar que subes. Nos otorgas una licencia limitada para almacenarlos y mostrarlos dentro de la App (ej. en el ranking). Eres responsable del contenido que proporcionas y confirmas que tienes derecho a usarlo." },
+      { "title": "Predicciones y ranking", "body": "Las predicciones y los puntos son por diversión y ranking comunitario. Podemos recalcular o corregir puntos si los datos del partido se actualizan o se detecta un error. Las posiciones no tienen valor monetario." },
+      { "title": "Exactitud de los datos", "body": "Los partidos, marcadores y plantillas provienen de fuentes de terceros y pueden estar retrasados, incompletos o ser inexactos. WC26 se ofrece con fines informativos y de entretenimiento y no debe usarse para tomar decisiones." },
+      { "title": "Propiedad intelectual y afiliación", "body": "WC26 es una aplicación independiente y NO está afiliada, avalada ni patrocinada por la FIFA ni ninguna asociación, equipo o competición de fútbol. \"Copa Mundial de la FIFA\" y nombres y marcas relacionados son propiedad de sus respectivos dueños y se usan solo con fines de identificación y descripción." },
+      { "title": "Renuncias", "body": "La App se ofrece \"tal cual\" y \"según disponibilidad\", sin garantías de ningún tipo, en la máxima medida permitida por la ley." },
+      { "title": "Limitación de responsabilidad", "body": "En la máxima medida permitida por la ley, Portela 11 LLC no será responsable de daños indirectos, incidentales o consecuentes derivados de tu uso de la App." },
+      { "title": "Terminación", "body": "Puedes dejar de usar la App y eliminar tu cuenta cuando quieras. Podemos suspender o terminar el acceso si incumples estos Términos." },
+      { "title": "Ley aplicable", "body": "Estos Términos se rigen por las leyes del Estado de Florida, EE. UU., sin considerar normas de conflicto de leyes." },
+      { "title": "Cambios", "body": "Podemos actualizar estos Términos a medida que la App evoluciona; el uso continuado tras los cambios implica que los aceptas." },
+      { "title": "Contacto", "body": "¿Dudas sobre estos Términos? Escribe a info@portela11.com." }
+    ]
+  }
+}

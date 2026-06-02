@@ -11,6 +11,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="schedule" />
       <Tabs.Screen name="groups" />
       <Tabs.Screen name="teams" />
+      <Tabs.Screen name="leaderboard" />
       <Tabs.Screen name="history" />
     </Tabs>
   );

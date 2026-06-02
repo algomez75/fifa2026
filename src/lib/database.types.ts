@@ -69,6 +69,73 @@ export interface Player {
   shirt_number: number | null;
 }
 
+export interface Prediction {
+  user_id: string;
+  match_id: string;
+  home_pred: number;
+  away_pred: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LeaderboardRow {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  points: number;
+  predicted: number;
+  exact: number;
+  total: number;
+}
+
+export interface UserPredictionRow {
+  match_id: string;
+  home_pred: number | null;
+  away_pred: number | null;
+  kickoff_utc: string;
+  status: MatchStatus;
+  home_score: number | null;
+  away_score: number | null;
+  points: number;
+  revealed: boolean;
+}
+
+export type ChallengeSide = 'home' | 'away' | 'draw';
+export type ChallengeStatus = 'pending' | 'accepted' | 'declined';
+export type ChallengeOutcome = 'won' | 'lost' | 'tie' | 'pending';
+
+export interface MyChallengeRow {
+  id: string;
+  match_id: string;
+  status: ChallengeStatus;
+  role: 'challenger' | 'opponent';
+  other_id: string;
+  other_name: string;
+  other_avatar: string | null;
+  my_side: ChallengeSide | null;
+  my_margin: number | null;
+  their_side: ChallengeSide | null;
+  their_margin: number | null;
+  match_status: MatchStatus;
+  home_score: number | null;
+  away_score: number | null;
+  kickoff_utc: string;
+  outcome: ChallengeOutcome;
+  created_at: string;
+}
+
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  type: 'challenge_received' | 'challenge_accepted' | 'challenge_declined' | string;
+  challenge_id: string | null;
+  match_id: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export interface UserSettings {
   user_id: string;
   favorite_team_ids: string[];

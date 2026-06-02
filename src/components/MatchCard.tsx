@@ -7,8 +7,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import type { Match } from '@/lib/database.types';
+import type { Match, Prediction } from '@/lib/database.types';
 import { formatKickoffTime, sideName } from '@/lib/format';
+import { scorePrediction } from '@/lib/scoring';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { teamsById, venuesById } from '@/lib/seed';
 import { useTranslation } from '@/store/useAppStore';
@@ -19,10 +20,13 @@ interface Props {
   match: Match;
   onPress?: (m: Match) => void;
   compact?: boolean;
+  /** Optional: the current user's prediction for this match (shows a badge). */
+  prediction?: Prediction | null;
 }
 
-export function MatchCard({ match, onPress, compact }: Props) {
+export function MatchCard({ match, onPress, compact, prediction }: Props) {
   const { t, language } = useTranslation();
+  const predResult = prediction ? scorePrediction(prediction, match) : null;
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
 
@@ -127,6 +131,26 @@ export function MatchCard({ match, onPress, compact }: Props) {
             {venue.name} · {venue.city}
           </Text>
         ) : null}
+
+        {prediction ? (
+          <View style={styles.predRow}>
+            <Text style={styles.predLabel}>{t.predict.title}</Text>
+            <Text style={styles.predScore}>
+              {prediction.home_pred}–{prediction.away_pred}
+            </Text>
+            {predResult && predResult.outcome !== 'pending' ? (
+              <Text
+                style={[
+                  styles.predPts,
+                  predResult.outcome === 'exact' && { color: palette.gold },
+                  predResult.outcome === 'result' && { color: palette.success },
+                  predResult.outcome === 'miss' && { color: palette.textTertiary },
+                ]}>
+                +{predResult.points}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </Animated.View>
     </Pressable>
   );
@@ -189,4 +213,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 12,
   },
+  predRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+  },
+  predLabel: {
+    color: palette.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  predScore: { color: palette.text, fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  predPts: { fontSize: 13, fontWeight: '900' },
 });
+

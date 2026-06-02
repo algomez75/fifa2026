@@ -1,8 +1,10 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -73,7 +75,42 @@ export default function ProfileScreen() {
             onDone={() => router.back()}
           />
         )}
+
+        <AboutSection />
       </ScrollView>
+    </View>
+  );
+}
+
+function AboutSection() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+
+  const Item = ({ label, onPress }: { label: string; onPress: () => void }) => (
+    <Pressable style={styles.aboutItem} onPress={onPress}>
+      <Text style={styles.aboutLabel}>{label}</Text>
+      <Text style={styles.aboutChevron}>›</Text>
+    </Pressable>
+  );
+
+  return (
+    <View style={styles.aboutWrap}>
+      <Text style={styles.aboutTitle}>{t.account.about}</Text>
+      <View style={styles.aboutCard}>
+        <Item label={t.account.privacyPolicy} onPress={() => router.push('/legal/privacy')} />
+        <View style={styles.aboutDivider} />
+        <Item label={t.account.termsOfService} onPress={() => router.push('/legal/terms')} />
+        <View style={styles.aboutDivider} />
+        <Item
+          label={t.account.support}
+          onPress={() => Linking.openURL('mailto:info@portela11.com')}
+        />
+      </View>
+      <Text style={styles.aboutMeta}>
+        {t.account.version} {version}
+      </Text>
+      <Text style={styles.aboutAttribution}>{t.account.attribution}</Text>
     </View>
   );
 }
@@ -377,4 +414,31 @@ const styles = StyleSheet.create({
   alertErr: { backgroundColor: palette.liveDim, borderColor: palette.live },
   alertOk: { backgroundColor: palette.goldDim, borderColor: palette.gold },
   alertText: { color: palette.text, fontSize: 13, fontWeight: '600' },
+  aboutWrap: { marginTop: 24, gap: 8 },
+  aboutTitle: {
+    color: palette.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  aboutCard: {
+    backgroundColor: palette.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    overflow: 'hidden',
+  },
+  aboutItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  aboutLabel: { color: palette.text, fontSize: 15, fontWeight: '600' },
+  aboutChevron: { color: palette.textTertiary, fontSize: 20, fontWeight: '300' },
+  aboutDivider: { height: 1, backgroundColor: palette.border, marginLeft: 16 },
+  aboutMeta: { color: palette.textTertiary, fontSize: 12, marginTop: 8 },
+  aboutAttribution: { color: palette.textTertiary, fontSize: 11, lineHeight: 16 },
 });

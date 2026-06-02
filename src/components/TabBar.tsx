@@ -16,6 +16,7 @@ import {
   type IconProps,
   ScheduleIcon,
   TeamsIcon,
+  TrophyIcon,
 } from '@/components/icons';
 import { palette, radius } from '@/lib/theme';
 import { useTranslation } from '@/store/useAppStore';
@@ -26,6 +27,7 @@ const ICONS: Record<string, (p: IconProps) => React.ReactNode> = {
   groups: GroupsIcon,
   teams: TeamsIcon,
   history: HistoryIcon,
+  leaderboard: TrophyIcon,
 };
 
 /** Minimal shape of the props Expo Router's `Tabs` passes to a custom tabBar. */
@@ -54,6 +56,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
     groups: t.tabs.groups,
     teams: t.tabs.teams,
     history: t.tabs.history,
+    leaderboard: t.tabs.leaderboard,
   };
 
   return (
