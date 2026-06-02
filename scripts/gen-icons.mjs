@@ -1,5 +1,8 @@
 // Generates app icon / splash / favicon / adaptive icons from the provided
-// WC26 brand art. Run: node scripts/gen-icons.mjs
+// WC26 brand art.
+// `sharp` is intentionally NOT a project dependency (it's a heavy native module
+// that breaks EAS builds). Install it only when regenerating icons:
+//   npm i -D sharp && node scripts/gen-icons.mjs && npm uninstall sharp
 import sharp from 'sharp';
 
 const DIR = 'assets/images';
