@@ -11,6 +11,7 @@ import { ChevronLeftIcon } from '@/components/icons';
 import type { Match, Prediction, UserPredictionRow } from '@/lib/database.types';
 import { palette, radius } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
+import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { useUserPredictions } from '@/hooks/useUserPredictions';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTranslation } from '@/store/useAppStore';
@@ -30,6 +31,7 @@ export default function UserPredictionsScreen() {
   const { data: rows, isLoading } = useUserPredictions(id);
   const { data: matches } = useMatches();
   const myId = useAuthStore((s) => s.user?.id);
+  const { requireAccount } = useRequireAccount();
   const [challenge, setChallenge] = useState<ChallengeTarget | null>(null);
   const isSelf = myId === id;
 
@@ -77,14 +79,15 @@ export default function UserPredictionsScreen() {
               userId={id}
               canChallenge={!isSelf}
               challengeLabel={t.challenge.cta}
-              onChallenge={(m) =>
+              onChallenge={(m) => {
+                if (!requireAccount()) return;
                 setChallenge({
                   match: m,
                   mode: 'create',
                   opponentId: id,
                   opponentName: name || 'Player',
-                })
-              }
+                });
+              }}
             />
           )}
         />

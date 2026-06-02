@@ -18,6 +18,7 @@ import { confederationColor, palette, radius } from '@/lib/theme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
+import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { ageFromDob, useSquad } from '@/hooks/useSquad';
 import { useTranslation } from '@/store/useAppStore';
 
@@ -30,7 +31,19 @@ export default function TeamDetailScreen() {
   const { data: matches } = useMatches();
   const { data: squad } = useSquad(id);
   const { data: predictions } = usePredictions();
+  const { requireAccount } = useRequireAccount();
   const [predicting, setPredicting] = useState<Match | null>(null);
+
+  // Favorites/predictions need a real account; prompt guests to sign in.
+  const onToggleFavorite = (teamId: string) => {
+    if (requireAccount()) void toggleFavorite(teamId);
+  };
+  const openPrediction = (m: Match) => {
+    const predictable =
+      m.status === 'scheduled' && new Date(m.kickoff_utc).getTime() > Date.now();
+    if (predictable && !requireAccount()) return;
+    setPredicting(m);
+  };
 
   // Back button always returns to the full Teams list (not the previous team).
   const goToTeams = () => {
@@ -92,7 +105,7 @@ export default function TeamDetailScreen() {
             </Pressable>
             <Pressable
               style={styles.favBtn}
-              onPress={() => toggleFavorite(team.id)}
+              onPress={() => onToggleFavorite(team.id)}
               hitSlop={8}>
               <HeartIcon
                 color={isFav ? palette.gold : palette.text}
@@ -151,7 +164,7 @@ export default function TeamDetailScreen() {
               key={m.id}
               match={m}
               prediction={predictions?.[m.id] ?? null}
-              onPress={setPredicting}
+              onPress={openPrediction}
             />
           ))}
         </View>

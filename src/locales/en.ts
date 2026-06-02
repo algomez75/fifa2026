@@ -173,6 +173,9 @@ export const en = {
     attribution: 'Match & squad data by football-data.org. WC26 is not affiliated with FIFA.',
     invalidEmail: 'Enter a valid email address.',
     weakPassword: 'Password must be at least 8 characters.',
+    signInRequiredTitle: 'Create an account',
+    signInRequiredBody:
+      'Sign in or create a free account to pick favorite teams, make predictions, and challenge other players.',
   },
   challenge: {
     title: 'Challenge',

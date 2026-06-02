@@ -29,6 +29,15 @@ interface Edition {
 }
 
 Deno.serve(async (req) => {
+  // Admin-only. `verify_jwt = true` only proves the caller has *some* valid JWT —
+  // and the app issues anonymous-user JWTs to everyone, which would otherwise let
+  // any client wipe/overwrite the public historical data. Require the service-role
+  // key itself as the bearer token (matches the documented curl usage above).
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  if (!token || token !== SERVICE_ROLE) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   let editions: Edition[] = [];
@@ -36,8 +45,8 @@ Deno.serve(async (req) => {
 
   if (req.method === 'POST') {
     const body = await req.json().catch(() => ({}));
-    editions = body.editions ?? [];
-    matches = body.matches ?? [];
+    editions = Array.isArray(body.editions) ? body.editions : [];
+    matches = Array.isArray(body.matches) ? body.matches : [];
   }
 
   // Fallback: pull a compact history from openfootball if nothing was posted.
@@ -68,6 +77,11 @@ Deno.serve(async (req) => {
       { error: 'No editions to import (post historical.json or check openfootball).' },
       { status: 400 },
     );
+  }
+
+  // Basic shape validation — every edition must at least carry a numeric year.
+  if (!editions.every((ed) => ed && typeof ed.year === 'number')) {
+    return Response.json({ error: 'Invalid editions payload' }, { status: 400 });
   }
 
   const e = await supabase.from('historical_editions').upsert(editions);

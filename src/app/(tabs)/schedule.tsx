@@ -13,6 +13,7 @@ import { venuesById } from '@/lib/seed';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
+import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { type HostFilter, useAppStore, useTranslation } from '@/store/useAppStore';
 
 const STAGE_FILTERS: (Stage | 'all')[] = ['all', 'group', 'r32', 'r16', 'qf', 'sf', 'final'];
@@ -34,6 +35,16 @@ export default function ScheduleScreen() {
   const [showPast, setShowPast] = useState(false);
   const [predicting, setPredicting] = useState<Match | null>(null);
   const { data: predictions } = usePredictions();
+  const { requireAccount } = useRequireAccount();
+
+  // Predicting needs a real account; let guests still open finished matches to
+  // view the result, but prompt them to sign in before an upcoming pick.
+  const openPrediction = (m: Match) => {
+    const predictable =
+      m.status === 'scheduled' && new Date(m.kickoff_utc).getTime() > Date.now();
+    if (predictable && !requireAccount()) return;
+    setPredicting(m);
+  };
 
   const { upcoming, past } = useMemo(() => {
     const all = matches ?? [];
@@ -133,7 +144,7 @@ export default function ScheduleScreen() {
                     key={m.id}
                     match={m}
                     prediction={predictions?.[m.id] ?? null}
-                    onPress={setPredicting}
+                    onPress={openPrediction}
                   />
                 ))}
               </View>
@@ -157,7 +168,7 @@ export default function ScheduleScreen() {
                       key={m.id}
                       match={m}
                       prediction={predictions?.[m.id] ?? null}
-                      onPress={setPredicting}
+                      onPress={openPrediction}
                     />
                   ))}
                 </View>

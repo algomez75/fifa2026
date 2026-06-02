@@ -55,10 +55,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        delaysContentTouches={false}>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {msg ? (
           <View style={[styles.alert, msg.type === 'error' ? styles.alertErr : styles.alertOk]}>
             <Text style={styles.alertText}>{msg.text}</Text>
@@ -174,11 +171,19 @@ function GuestView({
 
   const submit = async () => {
     if (!email || !password) return;
+    const trimmedEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return flash('error', t.account.invalidEmail);
+    }
+    // Only enforce a minimum on account creation; sign-in just forwards to Supabase.
+    if (mode === 'create' && password.length < 8) {
+      return flash('error', t.account.weakPassword);
+    }
     setBusy(true);
     const res =
       mode === 'create'
-        ? await upgradeWithEmail(email.trim(), password)
-        : await signInWithEmail(email.trim(), password);
+        ? await upgradeWithEmail(trimmedEmail, password)
+        : await signInWithEmail(trimmedEmail, password);
     setBusy(false);
     if (!res.ok) return flash('error', res.error ?? 'Error');
     if (res.needsConfirmation) flash('ok', t.account.checkEmail);

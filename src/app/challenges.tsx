@@ -14,6 +14,7 @@ import { teamsById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { useChallenges, useRespondChallenge } from '@/hooks/useChallenges';
 import { useMatches } from '@/hooks/useMatches';
+import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { useTranslation } from '@/store/useAppStore';
 
 export default function ChallengesScreen() {
@@ -23,6 +24,7 @@ export default function ChallengesScreen() {
   const { data: rows, isLoading } = useChallenges();
   const respond = useRespondChallenge();
   const { data: matches } = useMatches();
+  const { requireAccount } = useRequireAccount();
   const [accept, setAccept] = useState<ChallengeTarget | null>(null);
 
   const matchesById = useMemo(() => {
@@ -56,7 +58,8 @@ export default function ChallengesScreen() {
               match={matchesById[item.match_id]}
               language={language}
               t={t}
-              onAccept={() =>
+              onAccept={() => {
+                if (!requireAccount()) return;
                 setAccept({
                   match: matchesById[item.match_id],
                   mode: 'accept',
@@ -64,8 +67,8 @@ export default function ChallengesScreen() {
                   opponentName: item.other_name,
                   opponentSide: item.their_side,
                   opponentMargin: item.their_margin,
-                })
-              }
+                });
+              }}
               onDecline={() => respond.mutate({ id: item.id, accept: false })}
             />
           )}

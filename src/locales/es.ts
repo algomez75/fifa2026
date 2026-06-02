@@ -174,6 +174,9 @@ export const es: Translation = {
     attribution: 'Datos de partidos y plantillas por football-data.org. WC26 no está afiliada a la FIFA.',
     invalidEmail: 'Introduce un correo electrónico válido.',
     weakPassword: 'La contraseña debe tener al menos 8 caracteres.',
+    signInRequiredTitle: 'Crea una cuenta',
+    signInRequiredBody:
+      'Inicia sesión o crea una cuenta gratis para elegir equipos favoritos, hacer predicciones y retar a otros jugadores.',
   },
   challenge: {
     title: 'Reto',

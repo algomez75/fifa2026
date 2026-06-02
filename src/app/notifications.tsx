@@ -12,6 +12,7 @@ import { palette, radius } from '@/lib/theme';
 import { useChallenges } from '@/hooks/useChallenges';
 import { useInbox, useMarkRead } from '@/hooks/useInbox';
 import { useMatches } from '@/hooks/useMatches';
+import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { useTranslation } from '@/store/useAppStore';
 
 export default function NotificationsScreen() {
@@ -22,6 +23,7 @@ export default function NotificationsScreen() {
   const { data: challenges } = useChallenges();
   const markRead = useMarkRead();
   const { data: matches } = useMatches();
+  const { requireAccount } = useRequireAccount();
   const [accept, setAccept] = useState<ChallengeTarget | null>(null);
 
   const matchesById = useMemo(() => {
@@ -87,6 +89,7 @@ export default function NotificationsScreen() {
 
             const open = () => {
               if (!canRespond || !match) return;
+              if (!requireAccount()) return;
               setAccept({
                 match,
                 mode: 'accept',

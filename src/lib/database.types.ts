@@ -14,7 +14,7 @@ export type Confederation =
   | 'AFC'
   | 'OFC';
 
-export interface Team {
+export type Team = {
   id: string;
   name: string;
   name_es: string | null;
@@ -30,7 +30,7 @@ export interface Team {
   fd_team_id?: number | null;
 }
 
-export interface Venue {
+export type Venue = {
   id: string;
   name: string;
   city: string;
@@ -40,7 +40,7 @@ export interface Venue {
   lng: number | null;
 }
 
-export interface Match {
+export type Match = {
   id: string;
   stage: Stage;
   group_letter: string | null;
@@ -62,7 +62,7 @@ export interface Match {
   updated_at: string;
 }
 
-export interface Player {
+export type Player = {
   id: number;
   team_id: string;
   fd_player_id: number | null;
@@ -73,7 +73,7 @@ export interface Player {
   shirt_number: number | null;
 }
 
-export interface Profile {
+export type Profile = {
   user_id: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -82,7 +82,7 @@ export interface Profile {
   updated_at?: string;
 }
 
-export interface Prediction {
+export type Prediction = {
   user_id: string;
   match_id: string;
   home_pred: number;
@@ -91,7 +91,7 @@ export interface Prediction {
   updated_at?: string;
 }
 
-export interface LeaderboardRow {
+export type LeaderboardRow = {
   user_id: string;
   display_name: string;
   avatar_url: string | null;
@@ -103,7 +103,7 @@ export interface LeaderboardRow {
   challenge_points?: number;
 }
 
-export interface UserPredictionRow {
+export type UserPredictionRow = {
   match_id: string;
   home_pred: number | null;
   away_pred: number | null;
@@ -120,7 +120,7 @@ export type ChallengeStatus = 'pending' | 'accepted' | 'declined';
 export type ChallengeOutcome = 'won' | 'lost' | 'tie' | 'pending';
 
 /** A head-to-head challenge row (table `challenges`, migration 013). */
-export interface Challenge {
+export type Challenge = {
   id: string;
   match_id: string;
   challenger_id: string;
@@ -134,7 +134,7 @@ export interface Challenge {
   updated_at?: string;
 }
 
-export interface MyChallengeRow {
+export type MyChallengeRow = {
   id: string;
   match_id: string;
   status: ChallengeStatus;
@@ -154,7 +154,7 @@ export interface MyChallengeRow {
   created_at: string;
 }
 
-export interface NotificationRow {
+export type NotificationRow = {
   id: string;
   user_id: string;
   type: 'challenge_received' | 'challenge_accepted' | 'challenge_declined' | string;
@@ -167,7 +167,7 @@ export interface NotificationRow {
   created_at: string;
 }
 
-export interface UserSettings {
+export type UserSettings = {
   user_id: string;
   favorite_team_ids: string[];
   notify_favorites: boolean;
@@ -179,7 +179,7 @@ export interface UserSettings {
   created_at: string;
 }
 
-export interface HistoricalEdition {
+export type HistoricalEdition = {
   year: number;
   host: string | null;
   champion: string | null;
@@ -191,7 +191,7 @@ export interface HistoricalEdition {
   top_scorer: string | null;
 }
 
-export interface HistoricalMatch {
+export type HistoricalMatch = {
   id: number;
   year: number;
   stage: string | null;
@@ -207,23 +207,26 @@ export interface HistoricalMatch {
 export interface Database {
   public: {
     Tables: {
-      teams: { Row: Team; Insert: Team; Update: Partial<Team> };
-      venues: { Row: Venue; Insert: Venue; Update: Partial<Venue> };
-      matches: { Row: Match; Insert: Match; Update: Partial<Match> };
+      teams: { Row: Team; Insert: Team; Update: Partial<Team>; Relationships: [] };
+      venues: { Row: Venue; Insert: Venue; Update: Partial<Venue>; Relationships: [] };
+      matches: { Row: Match; Insert: Match; Update: Partial<Match>; Relationships: [] };
       players: {
         Row: Player;
         Insert: Omit<Player, 'id'> & { id?: number };
         Update: Partial<Player>;
+        Relationships: [];
       };
       profiles: {
         Row: Profile;
         Insert: Partial<Profile> & { user_id: string };
         Update: Partial<Profile>;
+        Relationships: [];
       };
       predictions: {
         Row: Prediction;
         Insert: Prediction;
         Update: Partial<Prediction>;
+        Relationships: [];
       };
       challenges: {
         Row: Challenge;
@@ -233,26 +236,31 @@ export interface Database {
         > &
           Partial<Challenge>;
         Update: Partial<Challenge>;
+        Relationships: [];
       };
       notifications: {
         Row: NotificationRow;
         Insert: Partial<NotificationRow> & { user_id: string; type: string };
         Update: Partial<NotificationRow>;
+        Relationships: [];
       };
       user_settings: {
         Row: UserSettings;
         Insert: Partial<UserSettings> & { user_id: string };
         Update: Partial<UserSettings>;
+        Relationships: [];
       };
       historical_editions: {
         Row: HistoricalEdition;
         Insert: HistoricalEdition;
         Update: Partial<HistoricalEdition>;
+        Relationships: [];
       };
       historical_matches: {
         Row: HistoricalMatch;
         Insert: Omit<HistoricalMatch, 'id'>;
         Update: Partial<HistoricalMatch>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
