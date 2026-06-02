@@ -1,5 +1,6 @@
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -102,7 +103,9 @@ function TabItem({
   label: string;
 }) {
   const active = useSharedValue(focused ? 1 : 0);
-  active.value = withTiming(focused ? 1 : 0, { duration: 220 });
+  useEffect(() => {
+    active.value = withTiming(focused ? 1 : 0, { duration: 220 });
+  }, [focused, active]);
 
   const pillStyle = useAnimatedStyle(() => ({
     opacity: active.value,
