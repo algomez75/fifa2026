@@ -17,6 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.portela11.wc26",
+      "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -43,6 +44,7 @@
     "plugins": [
       "expo-router",
       "expo-localization",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {
