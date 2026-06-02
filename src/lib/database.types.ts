@@ -24,6 +24,10 @@ export interface Team {
   host_country: boolean;
   api_football_id: number | null;
   confederation: Confederation | null;
+  // football-data.org metadata (migration 010) — absent from bundled seed JSON.
+  crest_url?: string | null;
+  coach?: string | null;
+  fd_team_id?: number | null;
 }
 
 export interface Venue {
@@ -69,6 +73,15 @@ export interface Player {
   shirt_number: number | null;
 }
 
+export interface Profile {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  country: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Prediction {
   user_id: string;
   match_id: string;
@@ -86,6 +99,8 @@ export interface LeaderboardRow {
   predicted: number;
   exact: number;
   total: number;
+  /** Points earned from head-to-head challenges (get_leaderboard, migration 013). */
+  challenge_points?: number;
 }
 
 export interface UserPredictionRow {
@@ -103,6 +118,21 @@ export interface UserPredictionRow {
 export type ChallengeSide = 'home' | 'away' | 'draw';
 export type ChallengeStatus = 'pending' | 'accepted' | 'declined';
 export type ChallengeOutcome = 'won' | 'lost' | 'tie' | 'pending';
+
+/** A head-to-head challenge row (table `challenges`, migration 013). */
+export interface Challenge {
+  id: string;
+  match_id: string;
+  challenger_id: string;
+  opponent_id: string;
+  challenger_side: ChallengeSide;
+  challenger_margin: number;
+  opponent_side: ChallengeSide | null;
+  opponent_margin: number | null;
+  status: ChallengeStatus;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface MyChallengeRow {
   id: string;
@@ -180,6 +210,35 @@ export interface Database {
       teams: { Row: Team; Insert: Team; Update: Partial<Team> };
       venues: { Row: Venue; Insert: Venue; Update: Partial<Venue> };
       matches: { Row: Match; Insert: Match; Update: Partial<Match> };
+      players: {
+        Row: Player;
+        Insert: Omit<Player, 'id'> & { id?: number };
+        Update: Partial<Player>;
+      };
+      profiles: {
+        Row: Profile;
+        Insert: Partial<Profile> & { user_id: string };
+        Update: Partial<Profile>;
+      };
+      predictions: {
+        Row: Prediction;
+        Insert: Prediction;
+        Update: Partial<Prediction>;
+      };
+      challenges: {
+        Row: Challenge;
+        Insert: Pick<
+          Challenge,
+          'match_id' | 'challenger_id' | 'opponent_id' | 'challenger_side' | 'challenger_margin'
+        > &
+          Partial<Challenge>;
+        Update: Partial<Challenge>;
+      };
+      notifications: {
+        Row: NotificationRow;
+        Insert: Partial<NotificationRow> & { user_id: string; type: string };
+        Update: Partial<NotificationRow>;
+      };
       user_settings: {
         Row: UserSettings;
         Insert: Partial<UserSettings> & { user_id: string };
@@ -197,7 +256,20 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_leaderboard: {
+        Args: Record<PropertyKey, never>;
+        Returns: LeaderboardRow[];
+      };
+      get_my_challenges: {
+        Args: Record<PropertyKey, never>;
+        Returns: MyChallengeRow[];
+      };
+      get_user_predictions: {
+        Args: { target: string };
+        Returns: UserPredictionRow[];
+      };
+    };
     Enums: Record<string, never>;
   };
 }

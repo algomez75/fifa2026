@@ -52,9 +52,10 @@ export async function signInWithApple(): Promise<AuthResult> {
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
-  } catch (e: any) {
-    if (e?.code === 'ERR_REQUEST_CANCELED') return { ok: false };
-    return { ok: false, error: e?.message ?? 'Apple Sign-In failed' };
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    if (err?.code === 'ERR_REQUEST_CANCELED') return { ok: false };
+    return { ok: false, error: err?.message ?? 'Apple Sign-In failed' };
   }
 }
 
@@ -114,13 +115,24 @@ export async function pickAndUploadAvatar(): Promise<AvatarResult> {
   try {
     const resp = await fetch(asset.uri);
     const arrayBuffer = await resp.arrayBuffer();
-    const ext = asset.mimeType?.includes('png') ? 'png' : 'jpg';
+
+    // Reject oversized uploads (storage abuse) — the picker already downscales
+    // (aspect 1:1, quality 0.6), so a legit avatar is well under this.
+    const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
+    if (arrayBuffer.byteLength > MAX_AVATAR_BYTES) {
+      return { ok: false, error: 'Image too large (max 5 MB)' };
+    }
+
+    // Force a known image content-type instead of trusting the picker's mimeType.
+    const isPng = asset.mimeType?.includes('png') ?? false;
+    const ext = isPng ? 'png' : 'jpg';
+    const contentType = isPng ? 'image/png' : 'image/jpeg';
     const path = `${userId}/avatar.${ext}`;
 
     const up = await supabase.storage
       .from('avatars')
       .upload(path, arrayBuffer, {
-        contentType: asset.mimeType ?? 'image/jpeg',
+        contentType,
         upsert: true,
       });
     if (up.error) return { ok: false, error: up.error.message };
@@ -132,8 +144,9 @@ export async function pickAndUploadAvatar(): Promise<AvatarResult> {
     const prof = await upsertProfile({ avatar_url: url });
     if (!prof.ok) return prof;
     return { ok: true, url };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? 'Upload failed' };
+  } catch (e) {
+    const err = e as { message?: string };
+    return { ok: false, error: err?.message ?? 'Upload failed' };
   }
 }
 

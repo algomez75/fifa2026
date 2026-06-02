@@ -6,7 +6,7 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: '#0A0E1A' } }}
-      tabBar={(props) => <TabBar {...(props as any)} />}>
+      tabBar={(props) => <TabBar {...props} />}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="schedule" />
       <Tabs.Screen name="groups" />

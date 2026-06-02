@@ -171,6 +171,8 @@ export const en = {
     support: 'Contact support',
     version: 'Version',
     attribution: 'Match & squad data by football-data.org. WC26 is not affiliated with FIFA.',
+    invalidEmail: 'Enter a valid email address.',
+    weakPassword: 'Password must be at least 8 characters.',
   },
   challenge: {
     title: 'Challenge',

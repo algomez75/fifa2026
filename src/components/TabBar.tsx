@@ -1,3 +1,4 @@
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
@@ -30,24 +31,9 @@ const ICONS: Record<string, (p: IconProps) => React.ReactNode> = {
   leaderboard: TrophyIcon,
 };
 
-/** Minimal shape of the props Expo Router's `Tabs` passes to a custom tabBar. */
-interface TabBarProps {
-  state: {
-    index: number;
-    routes: { key: string; name: string }[];
-  };
-  navigation: {
-    emit: (event: {
-      type: 'tabPress';
-      target: string;
-      canPreventDefault: boolean;
-    }) => { defaultPrevented: boolean };
-    navigate: (name: string) => void;
-  };
-}
-
-/** Floating glass tab bar with an animated active pill + label reveal. */
-export function TabBar({ state, navigation }: TabBarProps) {
+/** Floating glass tab bar with an animated active pill + label reveal.
+ *  Receives the standard React Navigation bottom-tab bar props from Expo Router. */
+export function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const labels: Record<string, string> = {

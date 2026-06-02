@@ -12,6 +12,9 @@ async function fetchInbox(): Promise<NotificationRow[]> {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
+    // RLS already scopes this to the caller; the explicit filter is
+    // defense-in-depth so a future RLS regression can't leak others' rows.
+    .eq('user_id', u.user.id)
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;

@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
 import { useLiveEvents } from '@/hooks/useLiveEvents';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useSilentUpdate } from '@/hooks/useSilentUpdate';
 import { queryClient } from '@/lib/queryClient';
 import { initAuth } from '@/store/useAuthStore';
 import { palette } from '@/lib/theme';
@@ -78,5 +79,6 @@ export default function RootLayout() {
 function GlobalServices() {
   useNotifications(); // register for push + wire notification listeners
   useLiveEvents(); // live score/result Realtime → celebration overlay
+  useSilentUpdate(); // download OTA updates in the background, apply next launch (no visible reload)
   return <CelebrationOverlay />;
 }

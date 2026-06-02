@@ -60,8 +60,8 @@ export function useRespondChallenge() {
   return useMutation({
     mutationFn: async ({ id, accept, side, margin }: RespondChallengeInput) => {
       const patch = accept
-        ? { status: 'accepted', opponent_side: side, opponent_margin: margin }
-        : { status: 'declined' };
+        ? { status: 'accepted' as const, opponent_side: side, opponent_margin: margin }
+        : { status: 'declined' as const };
       const { error } = await supabase.from('challenges').update(patch).eq('id', id);
       if (error) throw error;
     },
