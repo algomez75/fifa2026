@@ -11,7 +11,7 @@ import {
 import CountryFlag from 'react-native-country-flag';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LangToggle } from '@/components/LangToggle';
+import { HeaderActions } from '@/components/HeaderActions';
 import { EmptyState } from '@/components/States';
 import { HeartIcon, SearchIcon } from '@/components/icons';
 import type { Team } from '@/lib/database.types';
@@ -47,7 +47,7 @@ export default function TeamsScreen() {
       <ScreenHeader
         eyebrow={t.teams.eyebrow}
         title={t.teams.title}
-        right={<LangToggle />}
+        right={<HeaderActions />}
       />
 
       <View style={styles.searchWrap}>

@@ -6,7 +6,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { BracketTree } from '@/components/BracketTree';
 import { GroupTable } from '@/components/GroupTable';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LangToggle } from '@/components/LangToggle';
+import { HeaderActions } from '@/components/HeaderActions';
 import { ErrorState, LoadingState } from '@/components/States';
 import { groupLetters, seedTeams } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
@@ -43,7 +43,7 @@ export default function GroupsScreen() {
       <ScreenHeader
         eyebrow={t.groups.eyebrow}
         title={t.groups.title}
-        right={<LangToggle />}
+        right={<HeaderActions />}
       />
 
       <View style={styles.segment}>

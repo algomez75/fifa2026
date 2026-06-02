@@ -40,3 +40,7 @@ verify_jwt = false
 [functions.import-history]
 enabled = true
 verify_jwt = true
+
+[functions.delete-account]
+enabled = true
+verify_jwt = true

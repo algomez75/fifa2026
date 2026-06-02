@@ -5,7 +5,7 @@ import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 
 import { GlassCard } from '@/components/GlassCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LangToggle } from '@/components/LangToggle';
+import { HeaderActions } from '@/components/HeaderActions';
 import type { HistoricalEdition } from '@/lib/database.types';
 import { seedHistory } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
@@ -47,7 +47,7 @@ export default function HistoryScreen() {
       <ScreenHeader
         eyebrow={t.history.eyebrow}
         title={t.history.title}
-        right={<LangToggle />}
+        right={<HeaderActions />}
       />
       <ScrollView
         showsVerticalScrollIndicator={false}

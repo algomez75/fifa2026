@@ -4,16 +4,19 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import CountryFlag from 'react-native-country-flag';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/Avatar';
 import { GradientHeader } from '@/components/GradientHeader';
 import { GroupTable } from '@/components/GroupTable';
 import { MatchCard } from '@/components/MatchCard';
 import { EmptyState } from '@/components/States';
 import { ChevronLeftIcon, HeartIcon } from '@/components/icons';
+import type { Player } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
 import { seedTeams, teamsById } from '@/lib/seed';
 import { confederationColor, palette, radius } from '@/lib/theme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useMatches } from '@/hooks/useMatches';
+import { ageFromDob, useSquad } from '@/hooks/useSquad';
 import { useTranslation } from '@/store/useAppStore';
 
 export default function TeamDetailScreen() {
@@ -23,6 +26,7 @@ export default function TeamDetailScreen() {
   const { t, language } = useTranslation();
   const { favorites, toggleFavorite } = useFavorites();
   const { data: matches } = useMatches();
+  const { data: squad } = useSquad(id);
 
   const team = id ? teamsById[id] : undefined;
 
@@ -147,13 +151,88 @@ export default function TeamDetailScreen() {
             />
           ))}
         </View>
+
+        {/* Squad */}
+        {squad && squad.count > 0 ? (
+          <View style={{ marginTop: 24 }}>
+            <View style={styles.squadHeader}>
+              <Text style={styles.sectionTitle}>{t.team.squad}</Text>
+              {squad.coach ? (
+                <Text style={styles.coach}>
+                  {t.team.coach}: <Text style={styles.coachName}>{squad.coach}</Text>
+                </Text>
+              ) : null}
+            </View>
+            {squad.groups.map((g) => (
+              <View key={g.position} style={{ marginBottom: 16 }}>
+                <Text style={styles.posTitle}>
+                  {(t.team.positions as Record<string, string>)[g.position] ?? g.position}
+                  <Text style={styles.posCount}> · {g.players.length}</Text>
+                </Text>
+                <View style={styles.playerGrid}>
+                  {g.players.map((p) => (
+                    <PlayerRow key={p.id} player={p} yrsLabel={t.team.years} />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
+    </View>
+  );
+}
+
+function PlayerRow({ player, yrsLabel }: { player: Player; yrsLabel: string }) {
+  const age = ageFromDob(player.date_of_birth);
+  return (
+    <View style={styles.playerRow}>
+      <Avatar name={player.name} size={36} ring={false} />
+      <Text style={styles.playerName} numberOfLines={1}>
+        {player.name}
+      </Text>
+      {age != null ? (
+        <Text style={styles.playerAge}>
+          {age} {yrsLabel}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },
+  squadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  coach: { color: palette.textSecondary, fontSize: 12, marginBottom: 12 },
+  coachName: { color: palette.text, fontWeight: '800' },
+  posTitle: {
+    color: palette.gold,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  posCount: { color: palette.textTertiary, fontWeight: '700' },
+  playerGrid: { gap: 8 },
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: palette.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  playerName: { flex: 1, color: palette.text, fontSize: 14, fontWeight: '600' },
+  playerAge: { color: palette.textSecondary, fontSize: 12, fontWeight: '600' },
   headerInner: { paddingHorizontal: 20, paddingBottom: 16 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between' },
   backBtn: {

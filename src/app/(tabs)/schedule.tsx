@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { MatchCard } from '@/components/MatchCard';
 import { ScoreModal } from '@/components/ScoreModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LangToggle } from '@/components/LangToggle';
+import { HeaderActions } from '@/components/HeaderActions';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
 import type { Match, Stage } from '@/lib/database.types';
 import { dayKey, formatMatchDay } from '@/lib/format';
@@ -65,7 +65,7 @@ export default function ScheduleScreen() {
       <ScreenHeader
         eyebrow={t.schedule.eyebrow}
         title={t.schedule.title}
-        right={<LangToggle />}
+        right={<HeaderActions />}
       />
 
       {/* Filters */}

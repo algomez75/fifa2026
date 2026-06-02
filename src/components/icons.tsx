@@ -102,6 +102,20 @@ export function ChevronLeftIcon({ color, size = 24, strokeWidth = 2 }: IconProps
   );
 }
 
+export function UserIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Circle cx={12} cy={8} r={4} stroke={color} strokeWidth={strokeWidth} />
+      <Path
+        d="M4.5 20a7.5 7.5 0 0 1 15 0"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 export function SearchIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">

@@ -1,14 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
 import { GoalOverlay } from '@/components/GoalOverlay';
+import { HeaderActions } from '@/components/HeaderActions';
 import { LiveBadge } from '@/components/LiveBadge';
 import { MatchCard } from '@/components/MatchCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LangToggle } from '@/components/LangToggle';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
 import type { Match } from '@/lib/database.types';
@@ -109,9 +109,19 @@ export default function HomeScreen() {
               <MatchCard key={m.id} match={m} onPress={() => openMatchTeam(m)} />
             ))
           ) : (
-            <GlassCard>
-              <Text style={styles.emptyInline}>{t.home.yourTeamsEmpty}</Text>
-            </GlassCard>
+            <Pressable
+              onPress={() => router.push('/teams')}
+              style={({ pressed }) => pressed && { opacity: 0.85 }}>
+              <GlassCard accent={palette.gold}>
+                <View style={styles.ctaRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ctaTitle}>{t.home.yourTeamsEmpty}</Text>
+                    <Text style={styles.ctaAction}>{t.home.chooseTeams}</Text>
+                  </View>
+                  <Text style={styles.ctaChevron}>›</Text>
+                </View>
+              </GlassCard>
+            </Pressable>
           )}
         </Section>
 
@@ -165,7 +175,11 @@ function ScreenFrame({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   return (
     <View style={styles.screen}>
-      <ScreenHeader eyebrow={t.home.eyebrow} title={t.home.title} right={<LangToggle />} />
+      <ScreenHeader
+        eyebrow={t.home.eyebrow}
+        title={t.home.title}
+        right={<HeaderActions />}
+      />
       {children}
     </View>
   );
@@ -212,4 +226,8 @@ const styles = StyleSheet.create({
   },
   hScroll: { gap: 12, paddingRight: 8 },
   emptyInline: { color: palette.textSecondary, fontSize: 14, textAlign: 'center', paddingVertical: 8 },
+  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  ctaTitle: { color: palette.text, fontSize: 15, fontWeight: '700' },
+  ctaAction: { color: palette.gold, fontSize: 13, fontWeight: '700', marginTop: 2 },
+  ctaChevron: { color: palette.gold, fontSize: 28, fontWeight: '300' },
 });

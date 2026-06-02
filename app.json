@@ -59,6 +59,12 @@
         {
           "color": "#D4AF37"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "WC26 uses your photos so you can set a profile avatar."
+        }
       ]
     ],
     "experiments": {

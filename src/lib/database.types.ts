@@ -58,6 +58,17 @@ export interface Match {
   updated_at: string;
 }
 
+export interface Player {
+  id: number;
+  team_id: string;
+  fd_player_id: number | null;
+  name: string;
+  position: 'Goalkeeper' | 'Defence' | 'Midfield' | 'Offence' | string | null;
+  date_of_birth: string | null;
+  nationality: string | null;
+  shirt_number: number | null;
+}
+
 export interface UserSettings {
   user_id: string;
   favorite_team_ids: string[];

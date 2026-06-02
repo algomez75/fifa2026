@@ -40,21 +40,11 @@ export interface ScoreUpdate {
 export function useUpdateScore() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (update: ScoreUpdate) => {
-      if (isSupabaseConfigured) {
-        const { error } = await supabase
-          .from('matches')
-          .update({
-            home_score: update.home_score,
-            away_score: update.away_score,
-            status: update.status ?? 'finished',
-            minute: update.minute ?? null,
-          })
-          .eq('id', update.id);
-        if (error) throw error;
-      }
-      return update;
-    },
+    // NOTE: official match scores are READ-ONLY (RLS) — only the live-sync cron
+    // writes them. This is a LOCAL-ONLY preview. Phase 2 replaces it with
+    // per-user predictions (a `predictions` table), so we do not write to the
+    // shared `matches` table here.
+    mutationFn: async (update: ScoreUpdate) => update,
     onMutate: async (update) => {
       await qc.cancelQueries({ queryKey: matchesKey });
       const prev = qc.getQueryData<Match[]>(matchesKey);
