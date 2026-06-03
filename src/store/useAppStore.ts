@@ -24,6 +24,9 @@ interface AppState {
   setLanguage: (lang: Language) => void;
   toggleLanguage: () => void;
   toggleFavorite: (teamId: string) => boolean; // returns true if now favorited
+  /** Replace the whole favorites list — used to load a user's own favorites on
+   *  login and to reset to empty for a fresh guest on logout. */
+  setFavorites: (ids: string[]) => void;
   isFavorite: (teamId: string) => boolean;
   setOnlyMyTeams: (v: boolean) => void;
   setFilterStage: (s: Stage | 'all') => void;
@@ -58,6 +61,8 @@ export const useAppStore = create<AppState>()(
         set({ favoriteTeamIds: [...current, teamId] });
         return true;
       },
+      setFavorites: (favoriteTeamIds) =>
+        set({ favoriteTeamIds: favoriteTeamIds.slice(0, MAX_FAVORITES) }),
       isFavorite: (teamId) => get().favoriteTeamIds.includes(teamId),
       setOnlyMyTeams: (onlyMyTeams) => set({ onlyMyTeams }),
       setFilterStage: (filterStage) => set({ filterStage }),

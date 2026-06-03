@@ -2,6 +2,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { useAppStore } from './useAppStore';
 import { useProfileStore } from './useProfileStore';
 
 interface AuthState {
@@ -31,6 +32,38 @@ export function selectIsAnonymous(s: AuthState): boolean {
 }
 
 let initialized = false;
+/** The user id whose favorites are currently loaded into the local store. Lets
+ *  us reload favorites only when the active user actually changes (login /
+ *  logout / account switch) and skip no-op events like token refreshes. */
+let favoritesUserId: string | null | undefined = undefined;
+
+/**
+ * Load the given user's favorite teams from `user_settings` into the local
+ * store so each account (guest or member) sees only its own favorites. On sign
+ * out (no user) we reset to empty; if the remote read fails (offline) we keep
+ * the existing local cache rather than wiping it.
+ */
+async function loadFavoritesForUser(userId: string | null) {
+  favoritesUserId = userId;
+  if (!isSupabaseConfigured) return;
+  if (!userId) {
+    useAppStore.getState().setFavorites([]);
+    return;
+  }
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('favorite_team_ids')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) return; // offline / failed — keep the local cache, don't clobber
+  useAppStore.getState().setFavorites(data?.favorite_team_ids ?? []);
+}
+
+/** Reload favorites only when the active user id changed. */
+function syncFavoritesOnAuthChange(userId: string | null) {
+  if (userId === favoritesUserId) return;
+  void loadFavoritesForUser(userId);
+}
 
 /**
  * One-time auth bootstrap: restore session, keep the store in sync via
@@ -45,6 +78,7 @@ export async function initAuth() {
 
   supabase.auth.onAuthStateChange((_event, session) => {
     useAuthStore.getState().setSession(session);
+    syncFavoritesOnAuthChange(session?.user?.id ?? null);
     void useProfileStore.getState().loadProfile();
   });
 
@@ -55,6 +89,7 @@ export async function initAuth() {
     const { data: anon } = await supabase.auth.signInAnonymously();
     useAuthStore.getState().setSession(anon.session ?? null);
   }
+  syncFavoritesOnAuthChange(useAuthStore.getState().user?.id ?? null);
   await useProfileStore.getState().loadProfile();
   useAuthStore.getState().setReady(true);
 }

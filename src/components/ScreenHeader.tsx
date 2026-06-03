@@ -16,7 +16,9 @@ export function ScreenHeader({ eyebrow, title, right }: Props) {
     <View style={[styles.wrap, { paddingTop: insets.top + 12 }]}>
       <View style={{ flex: 1 }}>
         <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          {title}
+        </Text>
       </View>
       {right}
     </View>

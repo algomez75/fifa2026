@@ -17,7 +17,7 @@ export function useFavorites() {
     if (!isSupabaseConfigured) return;
     const { data } = await supabase.auth.getUser();
     const userId = data.user?.id;
-    if (!userId) return; // anonymous — local only
+    if (!userId) return; // no session — local only (each user, incl. guests, has its own row)
     await supabase
       .from('user_settings')
       .upsert({ user_id: userId, favorite_team_ids: ids });
