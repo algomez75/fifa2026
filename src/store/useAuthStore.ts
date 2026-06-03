@@ -21,9 +21,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   setReady: (ready) => set({ ready }),
 }));
 
-/** Is the current user anonymous (not yet a real account)? */
+/** Is the current user a guest (not a real, email/Apple account)? */
 export function selectIsAnonymous(s: AuthState): boolean {
-  return !!s.user?.is_anonymous || (!!s.user && !s.user.email);
+  // No user yet — bootstrap still running, or anonymous sign-in failed/disabled
+  // on the project — counts as a guest so the account screen offers sign-up /
+  // Sign in with Apple instead of stranding the user on the logged-in member UI.
+  if (!s.user) return true;
+  return !!s.user.is_anonymous || !s.user.email;
 }
 
 let initialized = false;

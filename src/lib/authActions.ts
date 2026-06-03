@@ -64,10 +64,14 @@ export async function isAppleAuthAvailable(): Promise<boolean> {
   return AppleAuthentication.isAvailableAsync();
 }
 
-/** Sign out and return to a fresh anonymous session. */
+/** Sign out and return to a fresh anonymous session (best-effort). */
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
-  await supabase.auth.signInAnonymously();
+  // Try to land back on a guest session. If anonymous sign-ins are disabled on
+  // the project this fails — that's fine: the session is now null and the UI
+  // falls back to the guest sign-in screen instead of getting stuck.
+  const { error } = await supabase.auth.signInAnonymously();
+  if (error) console.warn('signInAnonymously failed after sign out:', error.message);
 }
 
 /** Read/update the public profile row for the current user. */
