@@ -1,4 +1,4 @@
-# WC26 — FIFA World Cup 2026 Companion App
+# 11 Gol — FIFA World Cup 2026 Companion App
 
 A dark-first, bilingual (EN/ES) React Native app for the 2026 World Cup
 (48 teams · 12 groups · 16 venues · 104 matches · USA / Mexico / Canada).

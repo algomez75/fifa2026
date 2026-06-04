@@ -132,7 +132,7 @@ function Row({
         text: t.leaderboard.report,
         style: 'destructive',
         onPress: () => {
-          const subject = encodeURIComponent(`WC26 report: ${row.user_id}`);
+          const subject = encodeURIComponent(`11 Gol report: ${row.user_id}`);
           const body = encodeURIComponent(
             `Reporting player "${row.display_name}" (id ${row.user_id}) for inappropriate name/photo.`,
           );

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>11 Gol — World Cup 2026 Companion App</title>
+  <meta name="description" content="11 Gol — the companion app for the 2026 FIFA World Cup. Schedule, live scores, squads, predictions and 1v1 challenges. Free, dark, bilingual." />
+  <meta name="theme-color" content="#0A0E1A" />
+  <meta property="og:title" content="11 Gol — World Cup 2026 Companion App" />
+  <meta property="og:description" content="Schedule, live scores, squads, predictions and 1v1 challenges. Free, dark, bilingual." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- NAV -->
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="11 Gol home">
+      <span class="ball" aria-hidden="true"></span>
+      <span>11&nbsp;Gol</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#matches" data-i18n="nav_matches">Matches</a>
+      <a href="#features" data-i18n="nav_features">Features</a>
+      <a href="#download" data-i18n="nav_download">Download</a>
+      <button id="lang" class="lang" type="button" aria-label="Toggle language">
+        <span class="on">EN</span> · <span>ES</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy reveal">
+        <p class="eyebrow" data-i18n="hero_eyebrow">World Cup 2026 · USA · MEX · CAN</p>
+        <h1 data-i18n="hero_title">The 2026 World Cup,<br />in your pocket.</h1>
+        <p class="tagline" data-i18n="tagline">Predict · Compete · Win</p>
+        <p class="lead" data-i18n="hero_lead">
+          Schedule, live scores, squads, and a prediction game with friends.
+          Free, dark, and bilingual.
+        </p>
+
+        <div class="cta" id="download">
+          <a class="store" href="#" aria-label="Download on the App Store">
+            <span class="store-ic apple" aria-hidden="true"></span>
+            <span class="store-txt"><small data-i18n="store_apple_small">Download on the</small><b>App Store</b></span>
+          </a>
+        </div>
+
+        <div class="countdown" aria-live="polite">
+          <p class="cd-label" data-i18n="cd_label">Kickoff in</p>
+          <div class="cd-grid" id="cd">
+            <div><b data-cd="d">00</b><span data-i18n="cd_d">Days</span></div>
+            <div><b data-cd="h">00</b><span data-i18n="cd_h">Hours</span></div>
+            <div><b data-cd="m">00</b><span data-i18n="cd_m">Min</span></div>
+            <div><b data-cd="s">00</b><span data-i18n="cd_s">Sec</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHONE MOCKUP -->
+      <div class="phone reveal" aria-hidden="true">
+        <div class="phone-screen">
+          <div class="p-eyebrow">11 GOL · WORLD CUP 2026</div>
+          <div class="p-title">11&nbsp;Gol</div>
+          <div class="p-card glow">
+            <div class="p-row"><span><img class="fl-img sm" src="https://flagcdn.com/w20/mx.png" alt="">Mexico</span><b class="live"><i></i>LIVE 67'</b></div>
+            <div class="p-score">1 : 1</div>
+            <div class="p-row right"><span>South Africa<img class="fl-img sm" src="https://flagcdn.com/w20/za.png" alt=""></span></div>
+          </div>
+          <div class="p-card">
+            <div class="p-row"><span><img class="fl-img sm" src="https://flagcdn.com/w20/br.png" alt="">Brazil</span><span class="muted">19:00</span></div>
+            <div class="p-row right"><span>Morocco<img class="fl-img sm" src="https://flagcdn.com/w20/ma.png" alt=""></span></div>
+            <div class="p-pred">Your pick · 2–1 <b>+3</b></div>
+          </div>
+          <div class="p-tabbar">
+            <span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS STRIP -->
+    <section class="stats reveal">
+      <div><b>48</b><span data-i18n="st_teams">Teams</span></div>
+      <div><b>104</b><span data-i18n="st_matches">Matches</span></div>
+      <div><b>16</b><span data-i18n="st_venues">Venues</span></div>
+      <div><b>3</b><span data-i18n="st_hosts">Host nations</span></div>
+    </section>
+
+    <!-- UPCOMING MATCHES (live from API) -->
+    <section class="matches" id="matches">
+      <div class="sec-head reveal">
+        <h2 data-i18n="up_title">Upcoming matches</h2>
+        <span class="livechip"><i></i><span data-i18n="up_live">Live from the app</span></span>
+      </div>
+      <div class="match-list" id="matchList">
+        <div class="m-skel"></div><div class="m-skel"></div><div class="m-skel"></div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features" id="features">
+      <h2 class="reveal" data-i18n="feat_title">Everything for the tournament</h2>
+      <div class="grid">
+        <article class="feature reveal"><div class="fi">⚽</div><h3 data-i18n="f1_t">Live scores</h3><p data-i18n="f1_d">Real-time updates with a breathing LIVE badge and goal animations.</p></article>
+        <article class="feature reveal"><div class="fi">📅</div><h3 data-i18n="f2_t">Full schedule</h3><p data-i18n="f2_d">All 104 matches in your local time, with filters by stage, group and host.</p></article>
+        <article class="feature reveal"><div class="fi">🎯</div><h3 data-i18n="f3_t">Predictions</h3><p data-i18n="f3_d">Call the score before kickoff. Exact = 3 pts, right result = 1 pt.</p></article>
+        <article class="feature reveal"><div class="fi">⚔️</div><h3 data-i18n="f4_t">1v1 Challenges</h3><p data-i18n="f4_d">Challenge a friend on a match — closest pick wins ranking points.</p></article>
+        <article class="feature reveal"><div class="fi">🏆</div><h3 data-i18n="f5_t">Leaderboard</h3><p data-i18n="f5_d">Climb the global ranking with predictions and challenge wins.</p></article>
+        <article class="feature reveal"><div class="fi">🧑‍🤝‍🧑</div><h3 data-i18n="f6_t">Teams & squads</h3><p data-i18n="f6_d">All 48 nations, full squads by position, and coaches.</p></article>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="how">
+      <h2 class="reveal" data-i18n="how_title">Play in 3 steps</h2>
+      <div class="steps">
+        <div class="step reveal"><span class="num">1</span><h3 data-i18n="s1_t">Predict</h3><p data-i18n="s1_d">Pick the score of any match before it kicks off.</p></div>
+        <div class="step reveal"><span class="num">2</span><h3 data-i18n="s2_t">Challenge</h3><p data-i18n="s2_d">Dare a friend head-to-head: who wins and by how many.</p></div>
+        <div class="step reveal"><span class="num">3</span><h3 data-i18n="s3_t">Climb</h3><p data-i18n="s3_d">Earn points and rise on the global leaderboard.</p></div>
+      </div>
+    </section>
+
+    <!-- CTA BANNER -->
+    <section class="banner reveal">
+      <h2 data-i18n="banner_title">Ready for June 11?</h2>
+      <p data-i18n="banner_sub">Download 11 Gol and don't miss a single match.</p>
+      <div class="cta center">
+        <a class="store" href="#"><span class="store-ic apple"></span><span class="store-txt"><small data-i18n="store_apple_small">Download on the</small><b>App Store</b></span></a>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="foot-brand"><span class="ball small"></span> 11&nbsp;Gol</div>
+    <nav class="foot-links">
+      <a href="https://xqjupomaqomneqiugbft.supabase.co/storage/v1/object/public/legal/privacy.txt" data-i18n="foot_privacy">Privacy</a>
+      <a href="https://xqjupomaqomneqiugbft.supabase.co/storage/v1/object/public/legal/terms.txt" data-i18n="foot_terms">Terms</a>
+      <a href="mailto:info@portela11.com" data-i18n="foot_contact">Contact</a>
+    </nav>
+    <p class="disclaimer">
+      © <span id="year"></span> Portela 11 LLC ·
+      <span data-i18n="foot_disclaimer">An independent app, not affiliated with or endorsed by FIFA. Match data by football-data.org.</span>
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

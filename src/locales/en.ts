@@ -1,7 +1,7 @@
 /* eslint-disable */
 export const en = {
   common: {
-    appName: 'WC26',
+    appName: '11 Gol',
     loading: 'Loading…',
     retry: 'Retry',
     errorTitle: 'Something went wrong',
@@ -61,7 +61,7 @@ export const en = {
   },
   home: {
     eyebrow: 'World Cup 2026 · USA · MEX · CAN',
-    title: 'WORLD CUP',
+    title: '11 GOL',
     nextMatch: 'Next match',
     liveNow: 'LIVE NOW',
     kickoffIn: 'Kicks off in',
@@ -170,7 +170,7 @@ export const en = {
     termsOfService: 'Terms of Service',
     support: 'Contact support',
     version: 'Version',
-    attribution: 'Match & squad data by football-data.org. WC26 is not affiliated with FIFA.',
+    attribution: 'Match & squad data by football-data.org. 11 Gol is not affiliated with FIFA.',
     invalidEmail: 'Enter a valid email address.',
     weakPassword: 'Password must be at least 8 characters.',
     signInRequiredTitle: 'Create an account',

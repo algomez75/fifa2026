@@ -27,7 +27,7 @@ async function registerForPush(): Promise<string | null> {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'WC26 alerts',
+      name: '11 Gol alerts',
       importance: Notifications.AndroidImportance.HIGH,
       lightColor: '#D4AF37',
     });

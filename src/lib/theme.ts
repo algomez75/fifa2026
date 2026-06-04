@@ -1,5 +1,5 @@
 /**
- * WC26 — FIFA World Cup 2026 design system.
+ * 11 Gol — FIFA World Cup 2026 design system.
  * Dark-first palette. Tournament brand: black / white / gold (#D4AF37)
  * with per-host-country accent families (USA blue, Mexico green, Canada red).
  */

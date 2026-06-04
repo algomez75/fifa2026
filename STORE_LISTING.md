@@ -1,4 +1,4 @@
-# WC26 — App Store / Google Play listing
+# 11 Gol — App Store / Google Play listing
 
 Copy-paste ready. Publisher: **Portela 11 LLC** · Support: **info@portela11.com**
 Bundle/Package id: **com.portela11.wc26**
@@ -11,7 +11,7 @@ Bundle/Package id: **com.portela11.wc26**
 
 ## Names & text
 
-**App name (≤30):** `WC26: World Cup 2026`
+**App name (≤30):** `11 Gol: World Cup 2026`
 **Subtitle / short description (≤30):** `Scores, squads & predictions`
 **Promotional text (≤170):** `Follow every match of the 2026 World Cup — live scores, full schedule, group tables, squads, and a prediction game with friends. Free, dark, bilingual.`
 
@@ -22,7 +22,7 @@ Bundle/Package id: **com.portela11.wc26**
 
 ### Description (English)
 ```
-WC26 is your companion for the FIFA World Cup 2026 across the USA, Mexico & Canada.
+11 Gol is your companion for the FIFA World Cup 2026 across the USA, Mexico & Canada.
 
 ⚽ FULL SCHEDULE — All 104 matches with dates in your local time, venues, and live status.
 📊 LIVE SCORES — Real-time score updates and a breathing "LIVE" indicator during matches.
@@ -35,12 +35,12 @@ WC26 is your companion for the FIFA World Cup 2026 across the USA, Mexico & Cana
 
 Dark, fast, and privacy-friendly: no ads, no tracking. Play as a guest or create an account to sync across devices.
 
-WC26 is an independent app and is not affiliated with or endorsed by FIFA.
+11 Gol is an independent app and is not affiliated with or endorsed by FIFA.
 ```
 
 ### Description (Español)
 ```
-WC26 es tu app para la Copa Mundial 2026 en Estados Unidos, México y Canadá.
+11 Gol es tu app para la Copa Mundial 2026 en Estados Unidos, México y Canadá.
 
 ⚽ CALENDARIO COMPLETO — Los 104 partidos con fecha en tu hora local, sedes y estado en vivo.
 📊 MARCADORES EN VIVO — Actualización en tiempo real e indicador "EN VIVO".
@@ -53,7 +53,7 @@ WC26 es tu app para la Copa Mundial 2026 en Estados Unidos, México y Canadá.
 
 Oscura, rápida y respetuosa con tu privacidad: sin anuncios ni rastreo. Juega como invitado o crea una cuenta para sincronizar.
 
-WC26 es una app independiente y no está afiliada ni avalada por la FIFA.
+11 Gol es una app independiente y no está afiliada ni avalada por la FIFA.
 ```
 
 ---
@@ -87,7 +87,7 @@ Data NOT collected: location, contacts, browsing history, financial info, health
 - Google: **Everyone**.
 - ⚠️ The app has **user-generated content** (display names + avatars visible on the leaderboard).
   See LAUNCH_CHECKLIST.md → "UGC moderation" — Apple guideline 1.2 requires a way to
-  report/block. WC26 includes a "Report player" action on the leaderboard + account deletion.
+  report/block. 11 Gol includes a "Report player" action on the leaderboard + account deletion.
 
 ## URLs to enter in the console
 - Support URL: `mailto:info@portela11.com` (or a simple support page)

@@ -2,7 +2,7 @@ import type { Translation } from './en';
 
 export const es: Translation = {
   common: {
-    appName: 'WC26',
+    appName: '11 Gol',
     loading: 'Cargando…',
     retry: 'Reintentar',
     errorTitle: 'Algo salió mal',
@@ -62,7 +62,7 @@ export const es: Translation = {
   },
   home: {
     eyebrow: 'Mundial 2026 · EE.UU. · MÉX · CAN',
-    title: 'MUNDIAL',
+    title: '11 GOL',
     nextMatch: 'Próximo partido',
     liveNow: 'EN VIVO',
     kickoffIn: 'Comienza en',
@@ -171,7 +171,7 @@ export const es: Translation = {
     termsOfService: 'Términos de Servicio',
     support: 'Contactar soporte',
     version: 'Versión',
-    attribution: 'Datos de partidos y plantillas por football-data.org. WC26 no está afiliada a la FIFA.',
+    attribution: 'Datos de partidos y plantillas por football-data.org. 11 Gol no está afiliada a la FIFA.',
     invalidEmail: 'Introduce un correo electrónico válido.',
     weakPassword: 'La contraseña debe tener al menos 8 caracteres.',
     signInRequiredTitle: 'Crea una cuenta',

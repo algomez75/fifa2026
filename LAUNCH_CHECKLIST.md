@@ -1,4 +1,4 @@
-# WC26 — Launch Checklist
+# 11 Gol — Launch Checklist
 
 Legend: ✅ done in code/backend · ⬜ you must do (account/console/payment)
 
@@ -51,7 +51,7 @@ Legend: ✅ done in code/backend · ⬜ you must do (account/console/payment)
 - ⬜ Verify the Privacy URL opens and reads correctly on a phone browser
 
 ## Notes
-- WC26 declares **non-affiliation with FIFA** in the Terms and listing — keep that.
+- 11 Gol declares **non-affiliation with FIFA** in the Terms and listing — keep that.
 - Predictions are entertainment only (no real-money gambling) — stated in Terms to avoid
   the stores' gambling category.
 - If a future EAS build flags a missing iOS *privacy manifest* reason (e.g. for
