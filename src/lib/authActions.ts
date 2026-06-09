@@ -60,8 +60,10 @@ export async function signInWithApple(): Promise<AuthResult> {
 }
 
 export async function isAppleAuthAvailable(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
-  return AppleAuthentication.isAvailableAsync();
+  // Sign in with Apple is disabled for now (the capability/entitlement was
+  // removed). Keep this returning false so the Apple button stays hidden; the
+  // email account flow remains available.
+  return false;
 }
 
 /** Sign out and return to a fresh anonymous session (best-effort). */

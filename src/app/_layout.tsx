@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { type ErrorBoundaryProps, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Pressable, ScrollView, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -17,6 +18,34 @@ import { palette } from '@/lib/theme';
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+/**
+ * Root error boundary. In a production build an uncaught render error would
+ * otherwise show a blank white screen with no info; this surfaces the message
+ * + stack on-device (selectable, so it can be copied) and offers a retry.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: '#0A0E1A' }}
+      contentContainerStyle={{ padding: 24, paddingTop: 80 }}>
+      <Text style={{ color: '#D4AF37', fontSize: 22, fontWeight: '800', marginBottom: 12 }}>
+        Something broke at startup
+      </Text>
+      <Text selectable style={{ color: '#fff', fontSize: 14, marginBottom: 12 }}>
+        {error?.message ?? 'Unknown error'}
+      </Text>
+      <Text selectable style={{ color: '#8A93A6', fontSize: 11 }}>
+        {error?.stack ?? ''}
+      </Text>
+      <Pressable
+        onPress={retry}
+        style={{ marginTop: 24, alignSelf: 'flex-start', backgroundColor: '#D4AF37', paddingVertical: 12, paddingHorizontal: 22, borderRadius: 12 }}>
+        <Text style={{ color: '#0A0E1A', fontWeight: '800' }}>Retry</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
 
 export default function RootLayout() {
   // Bootstrap auth: restore session or sign in anonymously; keep store in sync.
