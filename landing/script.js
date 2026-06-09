@@ -11,8 +11,8 @@
   var I18N = {
     en: {
       nav_matches: 'Matches', nav_features: 'Features', nav_download: 'Download',
-      hero_eyebrow: 'World Cup 2026 · USA · MEX · CAN',
-      hero_title: 'The 2026 World Cup,<br>in your pocket.',
+      hero_eyebrow: 'Football 2026 · USA · MEX · CAN',
+      hero_title: 'The 2026 tournament,<br>in your pocket.',
       tagline: 'Predict · Compete · Win',
       hero_lead: 'Schedule, live scores, squads, and a prediction game with friends. Free, dark, and bilingual.',
       store_apple_small: 'Download on the', store_google_small: 'Get it on',
@@ -32,18 +32,18 @@
       s3_t: 'Climb', s3_d: 'Earn points and rise on the global leaderboard.',
       banner_title: 'Ready for June 11?', banner_sub: "Download 11 Gol and don't miss a single match.",
       foot_privacy: 'Privacy', foot_terms: 'Terms', foot_contact: 'Contact',
-      foot_disclaimer: 'An independent app, not affiliated with or endorsed by FIFA. Match data by football-data.org.',
+      foot_disclaimer: 'An independent app, not affiliated with any football organization or competition. Match data by football-data.org.',
       live: 'The tournament is on!', vs: 'vs', noData: 'Schedule loads in the app.',
       stages: { group: 'Group', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-final', sf: 'Semi-final', third: 'Third place', final: 'Final' }
     },
     es: {
       nav_matches: 'Partidos', nav_features: 'Funciones', nav_download: 'Descargar',
-      hero_eyebrow: 'Mundial 2026 · EE.UU. · MÉX · CAN',
-      hero_title: 'El Mundial 2026,<br>en tu bolsillo.',
+      hero_eyebrow: 'Fútbol 2026 · EE.UU. · MÉX · CAN',
+      hero_title: 'El torneo 2026,<br>en tu bolsillo.',
       tagline: 'Predice · Compite · Gana',
       hero_lead: 'Calendario, marcadores en vivo, plantillas y un juego de predicciones con amigos. Gratis, oscuro y bilingüe.',
       store_apple_small: 'Descarga en el', store_google_small: 'Disponible en',
-      cd_label: 'El Mundial arranca en', cd_d: 'Días', cd_h: 'Horas', cd_m: 'Min', cd_s: 'Seg',
+      cd_label: 'El torneo arranca en', cd_d: 'Días', cd_h: 'Horas', cd_m: 'Min', cd_s: 'Seg',
       st_teams: 'Equipos', st_matches: 'Partidos', st_venues: 'Sedes', st_hosts: 'Anfitriones',
       up_title: 'Próximos partidos', up_live: 'En vivo desde la app',
       feat_title: 'Todo para el torneo',
@@ -59,7 +59,7 @@
       s3_t: 'Sube', s3_d: 'Gana puntos y escala en el ranking global.',
       banner_title: '¿Listo para el 11 de junio?', banner_sub: 'Descarga 11 Gol y no te pierdas ni un partido.',
       foot_privacy: 'Privacidad', foot_terms: 'Términos', foot_contact: 'Contacto',
-      foot_disclaimer: 'App independiente, no afiliada ni avalada por la FIFA. Datos de partidos por football-data.org.',
+      foot_disclaimer: 'App independiente, no afiliada a ninguna organización ni competición de fútbol. Datos de partidos por football-data.org.',
       live: '¡El torneo está en marcha!', vs: 'vs', noData: 'El calendario carga en la app.',
       stages: { group: 'Grupo', r32: 'Dieciseisavos', r16: 'Octavos', qf: 'Cuartos', sf: 'Semifinal', third: 'Tercer puesto', final: 'Final' }
     }
