@@ -11,18 +11,21 @@ Bundle/Package id: **com.portela11.wc26**
 
 ## Names & text
 
-**App name (≤30):** `11 Gol: World Cup 2026`
+> ⚠️ Guideline 5.2.1 (IP): keep ALL metadata free of "FIFA", "World Cup", "Mundial",
+> "Copa Mundial". Present 11 Gol as an independent, generic football app for 2026.
+
+**App name (≤30):** `11 Gol`
 **Subtitle / short description (≤30):** `Scores, squads & predictions`
-**Promotional text (≤170):** `Follow every match of the 2026 World Cup — live scores, full schedule, group tables, squads, and a prediction game with friends. Free, dark, bilingual.`
+**Promotional text (≤170):** `Follow every match of the 2026 tournament — live scores, full schedule, group tables, squads, and a prediction game with friends. Free, dark, bilingual.`
 
 **Keywords (≤100):**
-`world cup,2026,soccer,football,fixtures,schedule,scores,predictions,mundial,bracket,teams,groups`
+`soccer,football,2026,fixtures,schedule,scores,predictions,bracket,teams,groups,lineups,standings`
 
 **Category:** Sports · **Secondary:** Entertainment
 
 ### Description (English)
 ```
-11 Gol is your companion for the FIFA World Cup 2026 across the USA, Mexico & Canada.
+11 Gol is your companion for the 2026 international football tournament across the USA, Mexico & Canada.
 
 ⚽ FULL SCHEDULE — All 104 matches with dates in your local time, venues, and live status.
 📊 LIVE SCORES — Real-time score updates and a breathing "LIVE" indicator during matches.
@@ -35,12 +38,12 @@ Bundle/Package id: **com.portela11.wc26**
 
 Dark, fast, and privacy-friendly: no ads, no tracking. Play as a guest or create an account to sync across devices.
 
-11 Gol is an independent app and is not affiliated with or endorsed by FIFA.
+11 Gol is an independent app. It is not affiliated with, endorsed by, or sponsored by any football organization, association, team, or competition. All team names are the property of their respective owners.
 ```
 
 ### Description (Español)
 ```
-11 Gol es tu app para la Copa Mundial 2026 en Estados Unidos, México y Canadá.
+11 Gol es tu app para el torneo internacional de fútbol 2026 en Estados Unidos, México y Canadá.
 
 ⚽ CALENDARIO COMPLETO — Los 104 partidos con fecha en tu hora local, sedes y estado en vivo.
 📊 MARCADORES EN VIVO — Actualización en tiempo real e indicador "EN VIVO".
@@ -53,7 +56,7 @@ Dark, fast, and privacy-friendly: no ads, no tracking. Play as a guest or create
 
 Oscura, rápida y respetuosa con tu privacidad: sin anuncios ni rastreo. Juega como invitado o crea una cuenta para sincronizar.
 
-11 Gol es una app independiente y no está afiliada ni avalada por la FIFA.
+11 Gol es una app independiente. No está afiliada, avalada ni patrocinada por ninguna organización, asociación, equipo o competición de fútbol. Los nombres de las selecciones son propiedad de sus respectivos dueños.
 ```
 
 ---
@@ -90,6 +93,22 @@ Data NOT collected: location, contacts, browsing history, financial info, health
   report/block. 11 Gol includes a "Report player" action on the leaderboard + account deletion.
 
 ## URLs to enter in the console
-- Support URL: `mailto:info@portela11.com` (or a simple support page)
-- Marketing URL (optional): your site
-- Privacy Policy URL: (privacy.txt link above) — required in both stores.
+- Support URL: an `https://` page (Apple often rejects `mailto:`) — e.g. your site or a simple support page.
+- Marketing URL (optional): your site — make sure it has NO "FIFA / World Cup / Mundial" either.
+- Privacy Policy URL: (privacy.txt link above) — required in both stores. Re-host after editing
+  `data/legal.json` with `node scripts/host-legal.mjs`.
+
+## Screenshots (Guideline 5.2.1)
+- Re-capture from the NEW build — they must show "11 GOL", never "WORLD CUP".
+- Replace all sizes (6.7" + 6.1" iPhone, iPad if offered). The old screenshots showed "WORLD CUP".
+
+## Reply to App Review (paste in the resolution thread)
+```
+Hello,
+Thank you for the review. We removed all third-party content and trademarks from the app and its metadata:
+- Removed every reference to "FIFA" and "World Cup" from the UI, app name, description, keywords, and the Privacy Policy / Terms.
+- The app is presented as "11 Gol", an independent football companion for the 2026 tournament.
+- It only displays factual match data (dates, venues, national team names, scores) plus a score-prediction game. No official emblem, logo, trophy, mascot, or trademarked name is used.
+- Added a clear statement that 11 Gol is independent and not affiliated with, endorsed by, or sponsored by any football organization, association, team, or competition.
+A new build and updated screenshots/metadata reflecting these changes have been submitted.
+```

@@ -60,7 +60,7 @@ export const en = {
     predictionsBy: 'Predictions',
   },
   home: {
-    eyebrow: 'World Cup 2026 · USA · MEX · CAN',
+    eyebrow: '11 GOL · 2026',
     title: '11 GOL',
     nextMatch: 'Next match',
     liveNow: 'LIVE NOW',
@@ -128,7 +128,7 @@ export const en = {
   },
   history: {
     title: 'HISTORY',
-    eyebrow: '1930 — 2022 · 22 editions',
+    eyebrow: '1930 — 2022 · Past champions',
     champion: 'Champion',
     runnerUp: 'Runner-up',
     topScorer: 'Top scorer',
@@ -170,7 +170,7 @@ export const en = {
     termsOfService: 'Terms of Service',
     support: 'Contact support',
     version: 'Version',
-    attribution: 'Match & squad data by football-data.org. 11 Gol is not affiliated with FIFA.',
+    attribution: 'Match & squad data by football-data.org. 11 Gol is an independent app.',
     invalidEmail: 'Enter a valid email address.',
     weakPassword: 'Password must be at least 8 characters.',
     signInRequiredTitle: 'Create an account',

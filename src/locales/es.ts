@@ -61,7 +61,7 @@ export const es: Translation = {
     predictionsBy: 'Predicciones',
   },
   home: {
-    eyebrow: 'Mundial 2026 · EE.UU. · MÉX · CAN',
+    eyebrow: '11 GOL · 2026',
     title: '11 GOL',
     nextMatch: 'Próximo partido',
     liveNow: 'EN VIVO',
@@ -129,7 +129,7 @@ export const es: Translation = {
   },
   history: {
     title: 'HISTORIA',
-    eyebrow: '1930 — 2022 · 22 ediciones',
+    eyebrow: '1930 — 2022 · Campeones',
     champion: 'Campeón',
     runnerUp: 'Subcampeón',
     topScorer: 'Goleador',
@@ -171,7 +171,7 @@ export const es: Translation = {
     termsOfService: 'Términos de Servicio',
     support: 'Contactar soporte',
     version: 'Versión',
-    attribution: 'Datos de partidos y plantillas por football-data.org. 11 Gol no está afiliada a la FIFA.',
+    attribution: 'Datos de partidos y plantillas por football-data.org. 11 Gol es una app independiente.',
     invalidEmail: 'Introduce un correo electrónico válido.',
     weakPassword: 'La contraseña debe tener al menos 8 caracteres.',
     signInRequiredTitle: 'Crea una cuenta',

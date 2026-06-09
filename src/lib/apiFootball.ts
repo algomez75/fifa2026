@@ -1,7 +1,7 @@
 /**
  * API-Football (api-sports.io) typed helpers.
  * Used by the sync-scores edge function and any future client-side fallback.
- * Free tier: 100 req/day — cache aggressively. League 1 = FIFA World Cup.
+ * Free tier: 100 req/day — cache aggressively. League 1 = the 2026 tournament.
  */
 const BASE = 'https://v3.football.api-sports.io';
 

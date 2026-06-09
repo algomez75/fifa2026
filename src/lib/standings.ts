@@ -70,7 +70,7 @@ export function computeStandings(
     row.goalDiff = row.goalsFor - row.goalsAgainst;
   }
 
-  // FIFA tiebreak (simplified): points → goal diff → goals for → name order.
+  // Tiebreak (simplified): points → goal diff → goals for → name order.
   return Array.from(table.values()).sort(
     (a, b) =>
       b.points - a.points ||
