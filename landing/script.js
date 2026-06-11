@@ -2,6 +2,11 @@
 (function () {
   'use strict';
 
+  // App Store listing — fill the numeric Apple ID from App Store Connect
+  // (Apps → 11 Gol → App Information → "Apple ID"). Every element with
+  // [data-store-link] gets this href.
+  var APP_STORE_URL = 'https://apps.apple.com/app/id0000000000';
+
   // Public Supabase REST (anon key is safe to expose; RLS protects the data).
   // Football data lives in Supabase, populated from football-data.org — the app's API.
   var SB_URL = 'https://xqjupomaqomneqiugbft.supabase.co';
@@ -147,6 +152,13 @@
       .then(function (data) { window.__matches = data; renderMatches(data); })
       .catch(function () { renderMatches([]); });
   }
+
+  // ── App Store links ──────────────────────────────────────────────────────
+  document.querySelectorAll('[data-store-link]').forEach(function (a) {
+    a.setAttribute('href', APP_STORE_URL);
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener');
+  });
 
   // ── init ─────────────────────────────────────────────────────────────────
   document.getElementById('year').textContent = new Date().getFullYear();
