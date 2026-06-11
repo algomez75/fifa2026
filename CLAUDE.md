@@ -302,6 +302,29 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-10 — Fixed the release-build white screen (app-name Swift module bug)
+
+- **Root cause:** the Jun-4 rename "WC26" → **"11 Gol"** silently killed every EAS
+  release build (TestFlight builds 4–8 opened to a blank screen). A project name
+  starting with a digit makes Xcode sanitize the Swift module to `_11Gol`, but
+  ExpoModulesCore resolves the generated provider via
+  `NSClassFromString("\(CFBundleName).ExpoModulesProvider")` with the raw name —
+  not found → **silently falls back to an empty modules provider** → zero native
+  modules → the standard SDK 56 eager startup chain throws
+  `Cannot find native module 'ExpoAsset'` before any app code runs. Dev client /
+  Expo Go / Metro were unaffected (no prebuild), which is why it only broke
+  standalone builds.
+- **Fix:** `expo.name` is now **`OnceGol`** (valid identifier). Users still see
+  **"11 Gol"**: iOS via `ios.infoPlist.CFBundleDisplayName`, Android via
+  `plugins/withAndroidAppName.js` (sets `app_name` in strings.xml).
+- **Hardening kept:** `expo-asset` as a direct dependency + config plugin; SDK
+  patches aligned (`npx expo install --fix`, expo-doctor 21/21); custom entry
+  `index.js` loads the app inside try/catch and renders any startup error as
+  selectable text via bare `AppRegistry` (no expo imports); `expo-asset-guard.js`
+  stubs `ExpoAsset.downloadAsync` if the registry ever misses it again.
+- **Lesson on OTAs:** a build that fatals at JS startup also never completes an
+  expo-updates check — OTA updates cannot rescue a launch-crashing binary.
+
 ### 2026-06-01 — Social: 1v1 challenges, notifications, player profiles
 
 - **Leaderboard v2 + player profiles (Phase 4, migration 012):** `get_leaderboard()`
@@ -376,6 +399,10 @@ development-simulator / preview / production profiles).
 
 ## Gotchas / decisions
 
+- **`expo.name` must NEVER start with a digit** (`"OnceGol"`, displayed as
+  "11 Gol" via `CFBundleDisplayName` + `withAndroidAppName.js`). A leading digit
+  silently breaks ExpoModulesCore's provider lookup in release builds → blank
+  screen at launch (see 2026-06-10 change-log entry).
 - **Managed workflow + dev client + EAS** (not bare) — no Mac needed.
 - **Matches are read-only for users** since migration 008 — scores come only from
   the live-sync cron (service role). Don't add client write paths to `matches`.

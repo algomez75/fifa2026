@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "11 Gol",
+    "name": "OnceGol",
     "slug": "fifa2026",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,6 +21,7 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
+        "CFBundleDisplayName": "11 Gol",
         "UIBackgroundModes": [
           "remote-notification"
         ]
@@ -65,7 +66,10 @@
         {
           "photosPermission": "11 Gol uses your photos so you can set a profile avatar."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-image",
+      "./plugins/withAndroidAppName.js"
     ],
     "experiments": {
       "typedRoutes": true,
