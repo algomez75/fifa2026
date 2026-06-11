@@ -19,7 +19,12 @@ Bundle/Package id: **com.portela11.wc26**
 **Promotional text (≤170):** `Follow every match of the 2026 tournament — live scores, full schedule, group tables, squads, and a prediction game with friends. Free, dark, bilingual.`
 
 **Keywords (≤100):**
-`soccer,football,2026,fixtures,schedule,scores,predictions,bracket,teams,groups,lineups,standings`
+EN (English U.S.):
+`soccer,football,2026,fixtures,schedule,scores,predictions,bracket,teams,groups,futbol,quiniela`
+ES (Spanish MX / ES localization, if enabled):
+`futbol,2026,calendario,marcadores,resultados,quiniela,porra,predicciones,grupos,equipos`
+> Never include: FIFA, World Cup, Mundial, Copa Mundial, WC. "quiniela"/"porra" are
+> generic prediction-pool terms with high search volume and zero trademark risk.
 
 **Category:** Sports · **Secondary:** Entertainment
 
