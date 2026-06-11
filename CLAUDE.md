@@ -302,6 +302,35 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-11 — Live scores fixed + goal pushes with scorer names (migration 015)
+
+- **Root causes of "no live scores" on opening day:** (1) football-data.org's
+  free tier publishes `score.fullTime` minutes AFTER `FINISHED` — and the
+  sync-scores guard excluded `finished` rows, so GS-A1 got written as
+  `finished` + null scores once and was never re-fetched; (2) free tier carries
+  no in-play scores at all (user upgraded to the paid tier for live data).
+- **sync-scores v2:** guard now also re-syncs `finished AND home_score IS NULL`
+  (12h backfill window); fetches `/v4/matches/{id}` detail for every in-window
+  match and upserts its `goals[]` (scorer, minute, running score) into the new
+  **`match_events`** table (idempotent on `(match_id, seq)`); honest
+  updated-row accounting + error reporting.
+- **Migration 015:** `match_events` (public-read RLS, service-role-only write,
+  in the `supabase_realtime` publication) + `matches.result_pushed` (robust
+  full-time push dedupe, replacing the fragile 90s `updated_at` window that
+  pushed "null–null" for GS-A1 and would re-fire on backfills; pre-set true for
+  already-finished matches so nothing retro-pushes).
+- **notify-dispatcher v2:** new GOAL push from unpushed `match_events`
+  ("⚽ GOAL! Raúl Jiménez 67' — Mexico 2–0 South Africa", respects
+  notify_all/favorites); full-time push now requires non-null scores +
+  `result_pushed=false`.
+- **App (JS-only → shipped via OTA):** `useMatchRealtime` also subscribes to
+  `match_events` INSERTs; rich goal events (scorer + minute) win over the
+  score-diff fallback (3.5s grace, deduped); celebrations show
+  "Player 67′ · Team 2–0 Team"; foreground goal pushes feed the same overlay;
+  `MatchEventRow` type added. Standings already guarded null scores.
+- Group standings need no work: computed client-side from `matches`, they
+  update automatically as Realtime patches the cache.
+
 ### 2026-06-10 — Fixed the release-build white screen (app-name Swift module bug)
 
 - **Root cause:** the Jun-4 rename "WC26" → **"11 Gol"** silently killed every EAS

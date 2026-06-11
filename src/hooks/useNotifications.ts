@@ -51,8 +51,9 @@ async function registerForPush(): Promise<string | null> {
 }
 
 type NotifData = {
-  type?: 'kickoff' | 'result' | 'challenge';
+  type?: 'kickoff' | 'result' | 'goal' | 'challenge';
   matchId?: string;
+  eventId?: string;
   challengeId?: string;
 };
 
@@ -101,6 +102,15 @@ export function useNotifications() {
           title: n.request.content.title ?? '🏁',
           label: n.request.content.body,
           key: data.matchId ? `result:${data.matchId}` : undefined,
+        });
+      } else if (data.type === 'goal' && n.request.content.body) {
+        // Goal push while the app is open → same celebration the Realtime
+        // event triggers; the store's key dedupe keeps it from playing twice.
+        useCelebration.getState().celebrate({
+          kind: 'goal',
+          title: n.request.content.title ?? '⚽',
+          label: n.request.content.body,
+          key: data.eventId ? `goal-ev:${data.eventId}` : undefined,
         });
       }
     });

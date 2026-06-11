@@ -59,7 +59,25 @@ export type Match = {
   venue_id: string | null;
   api_football_fixture_id: number | null;
   minute: number | null;
+  /** Full-time push already sent (server-side dedupe; app never writes it). */
+  result_pushed?: boolean;
   updated_at: string;
+}
+
+/** A single goal within a match (scorer + minute), synced from football-data
+ *  by the sync-scores edge function. Public-read; drives live celebrations. */
+export type MatchEventRow = {
+  id: string;
+  match_id: string;
+  seq: number;
+  type: string;
+  minute: number | null;
+  team_id: string | null;
+  player_name: string | null;
+  score_home: number | null;
+  score_away: number | null;
+  pushed: boolean;
+  created_at: string;
 }
 
 export type Player = {
@@ -210,6 +228,12 @@ export interface Database {
       teams: { Row: Team; Insert: Team; Update: Partial<Team>; Relationships: [] };
       venues: { Row: Venue; Insert: Venue; Update: Partial<Venue>; Relationships: [] };
       matches: { Row: Match; Insert: Match; Update: Partial<Match>; Relationships: [] };
+      match_events: {
+        Row: MatchEventRow;
+        Insert: Partial<MatchEventRow> & { match_id: string; seq: number };
+        Update: Partial<MatchEventRow>;
+        Relationships: [];
+      };
       players: {
         Row: Player;
         Insert: Omit<Player, 'id'> & { id?: number };

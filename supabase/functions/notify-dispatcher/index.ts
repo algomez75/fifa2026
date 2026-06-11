@@ -3,8 +3,10 @@
 // Push notification dispatcher. Runs every minute via pg_cron.
 // Sends:
 //   1. "starting soon" alerts (per-user notify_minutes_before window)
-//   2. final-whistle results
-//   3. pending in-app notifications (challenge received / accepted / declined)
+//   2. GOAL alerts with scorer name (from `match_events`, written by sync-scores)
+//   3. final-whistle results (deduped via matches.result_pushed; only fires
+//      once scores are non-null — late backfills no longer push "null–null")
+//   4. pending in-app notifications (challenge received / accepted / declined)
 // to subscribed Expo push tokens via the Expo Push API.
 //
 // Deploy:  supabase functions deploy notify-dispatcher
@@ -50,16 +52,18 @@ Deno.serve(async () => {
   const now = Date.now();
   const horizon = new Date(now + 60 * 60_000).toISOString();
 
-  // Matches kicking off within the next hour, plus those just finished.
+  // Matches kicking off within the next hour, plus finished ones whose
+  // full-time push hasn't gone out yet.
   const { data: matches } = await supabase
     .from('matches')
-    .select('id, home_team_id, away_team_id, kickoff_utc, status, home_score, away_score, updated_at')
-    .or(`and(status.eq.scheduled,kickoff_utc.lte.${horizon}),status.eq.finished`);
+    .select('id, home_team_id, away_team_id, kickoff_utc, status, home_score, away_score, result_pushed, updated_at')
+    .or(`and(status.eq.scheduled,kickoff_utc.lte.${horizon}),and(status.eq.finished,result_pushed.eq.false)`);
 
   const { data: teams } = await supabase.from('teams').select('id, name, flag_emoji');
   const teamMap = new Map((teams ?? []).map((t: any) => [t.id, t]));
 
   const messages: PushMessage[] = [];
+  const resultPushedIds: string[] = [];
 
   for (const m of matches ?? []) {
     const home = teamMap.get(m.home_team_id);
@@ -89,7 +93,9 @@ Deno.serve(async () => {
         });
       } else if (
         m.status === 'finished' &&
-        now - new Date(m.updated_at).getTime() < 90_000
+        !m.result_pushed &&
+        m.home_score != null &&
+        m.away_score != null
       ) {
         messages.push({
           to: u.expo_push_token!,
@@ -97,6 +103,66 @@ Deno.serve(async () => {
           body: `${home?.name ?? 'TBD'} ${m.home_score}–${m.away_score} ${away?.name ?? 'TBD'}`,
           sound: 'default',
           data: { matchId: m.id, type: 'result' },
+        });
+        if (!resultPushedIds.includes(m.id)) resultPushedIds.push(m.id);
+      }
+    }
+    // Mark even when nobody subscribes, so the row stops matching the query.
+    if (
+      m.status === 'finished' &&
+      !m.result_pushed &&
+      m.home_score != null &&
+      m.away_score != null &&
+      !resultPushedIds.includes(m.id)
+    ) {
+      resultPushedIds.push(m.id);
+    }
+  }
+
+  // ── goal events → device push (scorer + minute + running score) ────────────
+  const { data: goalEvents } = await supabase
+    .from('match_events')
+    .select('id, match_id, minute, team_id, player_name, score_home, score_away')
+    .eq('pushed', false)
+    .eq('type', 'goal')
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  const goalEventIds: string[] = [];
+  if (goalEvents && goalEvents.length) {
+    // Need team context for matches not already loaded above.
+    const { data: goalMatches } = await supabase
+      .from('matches')
+      .select('id, home_team_id, away_team_id')
+      .in('id', [...new Set(goalEvents.map((e: any) => e.match_id))]);
+    const matchById = new Map((goalMatches ?? []).map((m: any) => [m.id, m]));
+
+    for (const ev of goalEvents) {
+      const m = matchById.get(ev.match_id);
+      goalEventIds.push(ev.id);
+      if (!m) continue;
+      const home = teamMap.get(m.home_team_id);
+      const away = teamMap.get(m.away_team_id);
+      const scorerTeam = teamMap.get(ev.team_id);
+      const who = ev.player_name ?? scorerTeam?.name ?? 'Goal';
+      const minute = ev.minute != null ? ` ${ev.minute}'` : '';
+      const score =
+        ev.score_home != null && ev.score_away != null
+          ? ` — ${home?.name ?? 'TBD'} ${ev.score_home}–${ev.score_away} ${away?.name ?? 'TBD'}`
+          : ` — ${home?.name ?? 'TBD'} vs ${away?.name ?? 'TBD'}`;
+
+      for (const u of users) {
+        const followsTeam =
+          u.favorite_team_ids?.includes(m.home_team_id) ||
+          u.favorite_team_ids?.includes(m.away_team_id);
+        const wants = u.notify_all || (u.notify_favorites && followsTeam);
+        if (!wants) continue;
+        messages.push({
+          to: u.expo_push_token!,
+          title: `⚽ GOAL!${scorerTeam?.flag_emoji ? ' ' + scorerTeam.flag_emoji : ''}`,
+          body: `${who}${minute}${score}`,
+          sound: 'default',
+          data: { matchId: ev.match_id, type: 'goal', eventId: ev.id },
         });
       }
     }
@@ -154,6 +220,16 @@ Deno.serve(async () => {
   if (pushedIds.length) {
     await supabase.from('notifications').update({ pushed: true }).in('id', pushedIds);
   }
+  if (goalEventIds.length) {
+    await supabase.from('match_events').update({ pushed: true }).in('id', goalEventIds);
+  }
+  if (resultPushedIds.length) {
+    await supabase.from('matches').update({ result_pushed: true }).in('id', resultPushedIds);
+  }
 
-  return Response.json({ sent: messages.length });
+  return Response.json({
+    sent: messages.length,
+    goals: goalEventIds.length,
+    results: resultPushedIds.length,
+  });
 });
