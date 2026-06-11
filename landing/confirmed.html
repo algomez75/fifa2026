@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" data-active="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Account confirmed — 11 Gol</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0A0E1A" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .confirm-wrap{max-width:560px;margin:0 auto;padding:clamp(48px,10vw,110px) clamp(18px,5vw,40px);text-align:center}
+    .confirm-icon{font-size:64px;line-height:1;margin-bottom:18px}
+    .confirm-wrap h1{font-size:clamp(28px,5vw,40px);font-weight:900;letter-spacing:-.5px;margin-bottom:12px}
+    .confirm-wrap p{color:var(--muted);font-size:16px;margin-bottom:8px}
+    .confirm-card{background:var(--surface);border:1px solid var(--line);border-radius:20px;
+      padding:clamp(26px,5vw,42px);box-shadow:0 18px 60px rgba(0,0,0,.35)}
+    .confirm-cta{margin-top:26px;display:flex;justify-content:center}
+    .confirm-err{color:#E24B4A;font-size:14px;margin-top:10px;word-break:break-word}
+    [data-lang]{display:none}
+    html[data-active="en"] [data-lang="en"]{display:block}
+    html[data-active="es"] [data-lang="es"]{display:block}
+    [data-state]{display:none}
+    html[data-result="ok"] [data-state="ok"]{display:block}
+    html[data-result="err"] [data-state="err"]{display:block}
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="index.html" aria-label="11 Gol home">
+      <span class="ball" aria-hidden="true"></span>
+      <span>11&nbsp;Gol</span>
+    </a>
+    <nav class="nav-links">
+      <button id="lang" class="lang" type="button" aria-label="Toggle language">
+        <span class="on">EN</span> · <span>ES</span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="confirm-wrap">
+      <div class="confirm-card">
+        <!-- SUCCESS -->
+        <div data-state="ok">
+          <div data-lang="en">
+            <div class="confirm-icon">✅</div>
+            <h1>You're all set!</h1>
+            <p>Your account has been confirmed.</p>
+            <p>Go back to the <b>11 Gol</b> app on your phone and sign in — your favorites and predictions are waiting.</p>
+          </div>
+          <div data-lang="es">
+            <div class="confirm-icon">✅</div>
+            <h1>¡Cuenta confirmada!</h1>
+            <p>Tu correo fue verificado correctamente.</p>
+            <p>Vuelve a la app <b>11 Gol</b> en tu teléfono e inicia sesión — tus favoritos y predicciones te esperan.</p>
+          </div>
+        </div>
+
+        <!-- ERROR (expired / invalid link) -->
+        <div data-state="err">
+          <div data-lang="en">
+            <div class="confirm-icon">⚠️</div>
+            <h1>Link expired</h1>
+            <p>This confirmation link is invalid or has expired.</p>
+            <p>Open the <b>11 Gol</b> app and request a new confirmation email from your profile.</p>
+          </div>
+          <div data-lang="es">
+            <div class="confirm-icon">⚠️</div>
+            <h1>Enlace caducado</h1>
+            <p>Este enlace de confirmación no es válido o ya expiró.</p>
+            <p>Abre la app <b>11 Gol</b> y solicita un nuevo correo de confirmación desde tu perfil.</p>
+          </div>
+          <p class="confirm-err" id="errDetail"></p>
+        </div>
+
+        <div class="confirm-cta">
+          <a class="store" href="https://apps.apple.com/app/11-gol/id6775887761" target="_blank" rel="noopener">
+            <span class="store-ic apple" aria-hidden="true"></span>
+            <span class="store-txt"><small data-i18n="store_small">Get the app on the</small><b>App Store</b></span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="foot-brand"><span class="ball small"></span> 11&nbsp;Gol</div>
+    <nav class="foot-links">
+      <a href="privacy.html" data-i18n="foot_privacy">Privacy</a>
+      <a href="terms.html" data-i18n="foot_terms">Terms</a>
+      <a href="mailto:info@portela11.com" data-i18n="foot_contact">Contact</a>
+    </nav>
+    <p class="disclaimer">© <span id="year"></span> Portela 11 LLC</p>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+      // Supabase appends errors to the URL hash (or query) when a link is
+      // invalid/expired: #error=...&error_description=... Otherwise: success.
+      const params = new URLSearchParams(
+        (location.hash || '').replace(/^#/, '') + '&' + location.search.replace(/^\?/, ''),
+      );
+      const errDesc = params.get('error_description') || params.get('error');
+      document.documentElement.setAttribute('data-result', errDesc ? 'err' : 'ok');
+      if (errDesc) document.getElementById('errDetail').textContent = errDesc.replace(/\+/g, ' ');
+
+      const I18N = {
+        en: { store_small: 'Get the app on the', foot_privacy: 'Privacy', foot_terms: 'Terms', foot_contact: 'Contact' },
+        es: { store_small: 'Descarga la app en el', foot_privacy: 'Privacidad', foot_terms: 'Términos', foot_contact: 'Contacto' }
+      };
+      let lang = (navigator.language || 'en').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
+      function apply(l) {
+        lang = l;
+        document.documentElement.lang = l;
+        document.documentElement.setAttribute('data-active', l);
+        const d = I18N[l];
+        document.querySelectorAll('[data-i18n]').forEach(function (el) {
+          const k = el.getAttribute('data-i18n');
+          if (d[k] != null) el.innerHTML = d[k];
+        });
+        const btn = document.getElementById('lang');
+        btn.querySelectorAll('span').forEach(function (s) { s.classList.remove('on'); });
+        btn.querySelectorAll('span')[l === 'en' ? 0 : 1].classList.add('on');
+      }
+      document.getElementById('lang').addEventListener('click', function () {
+        apply(lang === 'en' ? 'es' : 'en');
+      });
+      document.getElementById('year').textContent = new Date().getFullYear();
+      apply(lang);
+    })();
+  </script>
+</body>
+</html>

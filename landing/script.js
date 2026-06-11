@@ -2,18 +2,16 @@
 (function () {
   'use strict';
 
-  // App Store listing — fill the numeric Apple ID from App Store Connect
-  // (Apps → 11 Gol → App Information → "Apple ID"). Every element with
-  // [data-store-link] gets this href.
-  var APP_STORE_URL = 'https://apps.apple.com/app/id0000000000';
+  // App Store listing — every element with [data-store-link] gets this href.
+  const APP_STORE_URL = 'https://apps.apple.com/app/11-gol/id6775887761';
 
   // Public Supabase REST (anon key is safe to expose; RLS protects the data).
   // Football data lives in Supabase, populated from football-data.org — the app's API.
-  var SB_URL = 'https://xqjupomaqomneqiugbft.supabase.co';
-  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxanVwb21hcW9tbmVxaXVnYmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjM1MjcsImV4cCI6MjA5NTg5OTUyN30.NsDoA5OKf3id16fPZHf4b8TaoHExbTOiejNl4ULTf5k';
+  const SB_URL = 'https://xqjupomaqomneqiugbft.supabase.co';
+  const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxanVwb21hcW9tbmVxaXVnYmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjM1MjcsImV4cCI6MjA5NTg5OTUyN30.NsDoA5OKf3id16fPZHf4b8TaoHExbTOiejNl4ULTf5k';
 
   // ── i18n ────────────────────────────────────────────────────────────────
-  var I18N = {
+  const I18N = {
     en: {
       nav_matches: 'Matches', nav_features: 'Features', nav_download: 'Download',
       hero_eyebrow: 'Football 2026 · USA · MEX · CAN',
@@ -70,17 +68,17 @@
     }
   };
 
-  var lang = (navigator.language || 'en').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
-  var locale = lang === 'es' ? 'es' : 'en';
+  let lang = (navigator.language || 'en').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
+  let locale = lang === 'es' ? 'es' : 'en';
 
   function apply(l) {
     lang = l; locale = l; document.documentElement.lang = l;
-    var d = I18N[l];
+    const d = I18N[l];
     document.querySelectorAll('[data-i18n]').forEach(function (el) {
-      var k = el.getAttribute('data-i18n');
+      const k = el.getAttribute('data-i18n');
       if (d[k] != null) el.innerHTML = d[k];
     });
-    var btn = document.getElementById('lang');
+    const btn = document.getElementById('lang');
     btn.querySelectorAll('span').forEach(function (s) { s.classList.remove('on'); });
     btn.querySelectorAll('span')[l === 'en' ? 0 : 1].classList.add('on');
     if (window.__matches) renderMatches(window.__matches); // re-render in new lang
@@ -90,27 +88,27 @@
   });
 
   // ── countdown ──────────────────────────────────────────────────────────
-  var TARGET = Date.UTC(2026, 5, 11, 16, 0, 0);
-  var cd = document.getElementById('cd');
+  const TARGET = Date.UTC(2026, 5, 11, 16, 0, 0);
+  const cd = document.getElementById('cd');
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function tick() {
-    var diff = TARGET - Date.now();
+    const diff = TARGET - Date.now();
     if (diff <= 0) { cd.innerHTML = '<div style="min-width:auto;padding:14px 22px"><b style="font-size:20px">⚽ ' + I18N[lang].live + '</b></div>'; return; }
-    var s = Math.floor(diff / 1000);
+    const s = Math.floor(diff / 1000);
     set('d', Math.floor(s / 86400)); set('h', Math.floor((s % 86400) / 3600));
     set('m', Math.floor((s % 3600) / 60)); set('s', s % 60);
   }
-  function set(k, v) { var el = cd.querySelector('[data-cd="' + k + '"]'); if (el) el.textContent = pad(v); }
+  function set(k, v) { const el = cd.querySelector('[data-cd="' + k + '"]'); if (el) el.textContent = pad(v); }
 
   // ── reveal on scroll ─────────────────────────────────────────────────────
-  var io = new IntersectionObserver(function (entries) {
+  const io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
   }, { threshold: 0.12 });
   document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
 
   // ── live matches from the app's API (Supabase REST) ──────────────────────
   function stageLabel(m) {
-    var s = I18N[lang].stages;
+    const s = I18N[lang].stages;
     if (m.stage === 'group') return (s.group + ' ' + (m.group_letter || '')).trim();
     return s[m.stage] || m.stage;
   }
@@ -118,7 +116,7 @@
 
   // Real flag image via flagcdn (by ISO-3166 code); falls back to emoji.
   function flag(team) {
-    var iso = team && team.iso2;
+    const iso = team && team.iso2;
     if (iso) return '<img class="fl-img" loading="lazy" alt="" ' +
       'src="https://flagcdn.com/w40/' + iso.toLowerCase() + '.png" ' +
       'srcset="https://flagcdn.com/w80/' + iso.toLowerCase() + '.png 2x">';
@@ -126,13 +124,13 @@
   }
 
   function renderMatches(list) {
-    var box = document.getElementById('matchList');
+    const box = document.getElementById('matchList');
     if (!list || !list.length) { box.innerHTML = '<p class="muted" style="grid-column:1/-1">' + I18N[lang].noData + '</p>'; return; }
     box.innerHTML = list.map(function (m, i) {
-      var d = new Date(m.kickoff_utc);
-      var day = d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
-      var time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-      var venue = m.venue ? (m.venue.name + ' · ' + m.venue.city) : '';
+      const d = new Date(m.kickoff_utc);
+      const day = d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+      const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+      const venue = m.venue ? (m.venue.name + ' · ' + m.venue.city) : '';
       return '<div class="m-card" style="animation-delay:' + (i * 70) + 'ms">' +
         '<div class="m-top"><span>' + esc(stageLabel(m)) + '</span><span class="tag">' + day + '</span></div>' +
         '<div class="m-team">' + flag(m.home) + esc(m.home && m.home.name || 'TBD') + '</div>' +
@@ -144,7 +142,7 @@
   }
 
   function loadMatches() {
-    var q = '/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,' +
+    const q = '/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,' +
       'home:teams!home_team_id(name,flag_emoji,iso2),away:teams!away_team_id(name,flag_emoji,iso2),' +
       'venue:venues(name,city)&status=eq.scheduled&order=kickoff_utc.asc&limit=6';
     fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
