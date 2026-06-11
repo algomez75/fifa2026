@@ -89,6 +89,8 @@ export type Player = {
   date_of_birth: string | null;
   nationality: string | null;
   shirt_number: number | null;
+  /** Headshot from the API-Football CDN (migration 016); null → initials avatar. */
+  photo_url?: string | null;
 }
 
 export type Profile = {

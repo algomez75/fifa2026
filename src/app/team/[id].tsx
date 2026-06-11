@@ -210,7 +210,7 @@ function PlayerRow({ player, yrsLabel }: { player: Player; yrsLabel: string }) {
   const age = ageFromDob(player.date_of_birth);
   return (
     <View style={styles.playerRow}>
-      <Avatar name={player.name} size={36} ring={false} />
+      <Avatar url={player.photo_url} name={player.name} size={36} ring={false} />
       <Text style={styles.playerName} numberOfLines={1}>
         {player.name}
       </Text>
