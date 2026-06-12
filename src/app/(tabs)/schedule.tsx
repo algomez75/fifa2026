@@ -1,3 +1,4 @@
+import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -20,6 +21,7 @@ const HOST_FILTERS: HostFilter[] = ['all', 'USA', 'Mexico', 'Canada'];
 
 export default function ScheduleScreen() {
   const { t, language } = useTranslation();
+  const router = useRouter();
   const { data: matches, isLoading, isError, refetch } = useMatches();
 
   const onlyMyTeams = useAppStore((s) => s.onlyMyTeams);
@@ -35,11 +37,14 @@ export default function ScheduleScreen() {
   const { data: predictions } = usePredictions();
   const { requireAccount } = useRequireAccount();
 
-  // Predicting needs a real account; let guests still open finished matches to
-  // view the result, but prompt them to sign in before an upcoming pick.
+  // Upcoming matches open the prediction sheet (account required); live and
+  // finished ones open the full match detail (stats, lineups, events).
   const openPrediction = (m: Match) => {
-    const predictable =
-      m.status === 'scheduled' && new Date(m.kickoff_utc).getTime() > Date.now();
+    if (m.status !== 'scheduled') {
+      router.push(`/match/${m.id}` as Href);
+      return;
+    }
+    const predictable = new Date(m.kickoff_utc).getTime() > Date.now();
     if (predictable && !requireAccount()) return;
     setPredicting(m);
   };

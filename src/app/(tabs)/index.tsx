@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -177,6 +177,12 @@ export default function HomeScreen() {
   );
 
   function openMatchTeam(m: Match) {
+    // Live/finished matches open the full detail (stats, lineups, events);
+    // upcoming ones go to the team page as before.
+    if (m.status !== 'scheduled') {
+      router.push(`/match/${m.id}` as Href);
+      return;
+    }
     const id = m.home_team_id ?? m.away_team_id;
     if (id) router.push(`/team/${id}`);
   }

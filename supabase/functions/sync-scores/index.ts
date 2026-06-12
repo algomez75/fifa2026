@@ -47,7 +47,8 @@ Deno.serve(async () => {
   const now = Date.now();
   const windowStart = new Date(now - 4 * 60 * 60_000).toISOString();
   const backfillStart = new Date(now - 12 * 60 * 60_000).toISOString();
-  const soon = new Date(now + 10 * 60_000).toISOString();
+  // 90 min ahead: football-data publishes starting lineups ~1h before kickoff.
+  const soon = new Date(now + 90 * 60_000).toISOString();
   const { data: active, error: gErr } = await supabase
     .from('matches')
     .select('id, api_football_fixture_id, status, home_score')
@@ -153,6 +154,49 @@ Deno.serve(async () => {
       errors.push(`detail ${row.api_football_fixture_id}: fetch failed`);
       continue;
     }
+    // Rich detail (lineups, formations, stats, referee) → match_details.
+    const mapPlayers = (teamId: string | null, list: any[] | undefined) =>
+      (list ?? []).map((p) => ({
+        name: p.name ?? null,
+        position: p.position ?? null,
+        shirtNumber: p.shirtNumber ?? null,
+        fd_id: p.id ?? null,
+        player_id: resolvePlayer(teamId, p.name ?? null),
+      }));
+    const homeTeamId = teamByFdId.get(detail.homeTeam?.id) ?? null;
+    const awayTeamId = teamByFdId.get(detail.awayTeam?.id) ?? null;
+    const statsOf = (t: any) =>
+      t?.statistics && typeof t.statistics === 'object' && !('msg' in t.statistics)
+        ? t.statistics
+        : null;
+    if (detail.homeTeam?.lineup?.length || statsOf(detail.homeTeam)) {
+      const { error: dErr } = await supabase.from('match_details').upsert(
+        {
+          match_id: row.id,
+          home_formation: detail.homeTeam?.formation ?? null,
+          away_formation: detail.awayTeam?.formation ?? null,
+          home_lineup: mapPlayers(homeTeamId, detail.homeTeam?.lineup),
+          away_lineup: mapPlayers(awayTeamId, detail.awayTeam?.lineup),
+          home_bench: mapPlayers(homeTeamId, detail.homeTeam?.bench),
+          away_bench: mapPlayers(awayTeamId, detail.awayTeam?.bench),
+          home_stats: statsOf(detail.homeTeam),
+          away_stats: statsOf(detail.awayTeam),
+          substitutions: (detail.substitutions ?? []).map((s: any) => ({
+            minute: s.minute ?? null,
+            team_id: teamByFdId.get(s.team?.id) ?? null,
+            out_name: s.playerOut?.name ?? null,
+            in_name: s.playerIn?.name ?? null,
+          })),
+          referee: detail.referees?.[0]?.name ?? null,
+          attendance: detail.attendance ?? null,
+          injury_time: detail.injuryTime ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'match_id' },
+      );
+      if (dErr) errors.push(`details ${row.id}: ${dErr.message}`);
+    }
+
     const goals = (detail.goals ?? []) as any[];
     const bookings = (detail.bookings ?? []) as any[];
     if (!goals.length && !bookings.length) continue;
