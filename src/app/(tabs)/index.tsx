@@ -10,6 +10,7 @@ import { MatchCard } from '@/components/MatchCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
+import { TopScorersCard } from '@/components/TopScorersCard';
 import type { Match } from '@/lib/database.types';
 import { formatMatchDay, isMatchToday, nextMatch } from '@/lib/format';
 import { teamsById } from '@/lib/seed';
@@ -31,6 +32,15 @@ export default function HomeScreen() {
       (m) => isMatchToday(m.kickoff_utc) && m.status !== 'finished',
     );
     const upNext = nextMatch(all);
+    // Scheduled matches beyond today are inherently in the future (past
+    // matches are live/finished), so no clock check is needed here.
+    const upcomingNext = all
+      .filter((m) => m.status === 'scheduled' && !isMatchToday(m.kickoff_utc))
+      .sort(
+        (a, b) =>
+          new Date(a.kickoff_utc).getTime() - new Date(b.kickoff_utc).getTime(),
+      )
+      .slice(0, 6);
     const favMatches = favorites
       .map((teamId) =>
         all.find(
@@ -40,13 +50,13 @@ export default function HomeScreen() {
         ),
       )
       .filter(Boolean) as Match[];
-    return { live, today, upNext, favMatches };
+    return { live, today, upNext, upcomingNext, favMatches };
   }, [matches, favorites]);
 
   if (isLoading) return <ScreenFrame><LoadingState /></ScreenFrame>;
   if (isError) return <ScreenFrame><ErrorState onRetry={refetch} /></ScreenFrame>;
 
-  const { live, today, upNext, favMatches } = derived;
+  const { live, today, upNext, upcomingNext, favMatches } = derived;
   const hasLive = live.length > 0;
 
   return (
@@ -137,6 +147,30 @@ export default function HomeScreen() {
               <Text style={styles.emptyInline}>{t.home.noMatchesToday}</Text>
             </GlassCard>
           )}
+        </Section>
+
+        {/* Coming up (beyond today) */}
+        {upcomingNext.length ? (
+          <Section title={t.schedule.upcoming}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.hScroll}>
+              {upcomingNext.map((m) => (
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  compact
+                  onPress={() => openMatchTeam(m)}
+                />
+              ))}
+            </ScrollView>
+          </Section>
+        ) : null}
+
+        {/* Golden boot */}
+        <Section title={`👟 ${t.home.topScorers}`}>
+          <TopScorersCard limit={5} />
         </Section>
       </ScrollView>
     </ScreenFrame>

@@ -5,7 +5,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 export const matchEventsKey = ['match-events'] as const;
 
-/** Goal event enriched with the scorer's photo (when the player is linked). */
+/** Match event (goal/card) enriched with the player's photo when linked. */
 export type GoalEvent = MatchEventRow & { player_photo: string | null };
 
 async function fetchMatchEvents(): Promise<GoalEvent[]> {
@@ -13,7 +13,6 @@ async function fetchMatchEvents(): Promise<GoalEvent[]> {
   const { data, error } = await supabase
     .from('match_events')
     .select('*, player:players(photo_url)')
-    .eq('type', 'goal')
     .order('seq', { ascending: true });
   if (error) throw error;
   return (
@@ -24,10 +23,10 @@ async function fetchMatchEvents(): Promise<GoalEvent[]> {
 }
 
 /**
- * All goal events of the tournament in one shared query (a few hundred rows at
- * most). Realtime INSERTs are patched into this cache by `useMatchRealtime`,
- * and the foreground/polling refetches keep it honest. Cards select their own
- * match's slice via `useMatchGoals`.
+ * All match events of the tournament (goals + cards) in one shared query.
+ * Realtime INSERTs are patched into this cache by `useMatchRealtime`, and the
+ * foreground/polling refetches keep it honest. Cards/screens select their own
+ * slice via `useMatchGoals` / `useMatchCards`.
  */
 export function useMatchEvents() {
   return useQuery({
@@ -41,10 +40,28 @@ export function useMatchEvents() {
 /** Goals of one match, home/away split, ready for rendering. */
 export function useMatchGoals(matchId: string, homeTeamId: string | null) {
   const { data } = useMatchEvents();
-  const goals = (data ?? []).filter((e) => e.match_id === matchId) as GoalEvent[];
+  const goals = (data ?? []).filter((e) => e.match_id === matchId && e.type === 'goal');
   return {
     home: goals.filter((g) => g.team_id != null && g.team_id === homeTeamId),
     away: goals.filter((g) => g.team_id == null || g.team_id !== homeTeamId),
     all: goals,
+  };
+}
+
+/** Cards of one match: red cards individually, yellows as per-side counts. */
+export function useMatchCards(matchId: string, homeTeamId: string | null) {
+  const { data } = useMatchEvents();
+  const cards = (data ?? []).filter(
+    (e) => e.match_id === matchId && (e.type === 'red' || e.type === 'yellow'),
+  );
+  const side = (g: GoalEvent) =>
+    g.team_id != null && g.team_id === homeTeamId ? 'home' : 'away';
+  return {
+    reds: cards.filter((c) => c.type === 'red'),
+    homeReds: cards.filter((c) => c.type === 'red' && side(c) === 'home'),
+    awayReds: cards.filter((c) => c.type === 'red' && side(c) === 'away'),
+    homeYellows: cards.filter((c) => c.type === 'yellow' && side(c) === 'home').length,
+    awayYellows: cards.filter((c) => c.type === 'yellow' && side(c) === 'away').length,
+    any: cards.length > 0,
   };
 }

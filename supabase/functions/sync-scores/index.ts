@@ -154,7 +154,8 @@ Deno.serve(async () => {
       continue;
     }
     const goals = (detail.goals ?? []) as any[];
-    if (!goals.length) continue;
+    const bookings = (detail.bookings ?? []) as any[];
+    if (!goals.length && !bookings.length) continue;
     const rows = goals.map((g, i) => {
       const teamId = teamByFdId.get(g.team?.id) ?? null;
       return {
@@ -169,11 +170,53 @@ Deno.serve(async () => {
         score_away: g.score?.away ?? null,
       };
     });
+    // Cards: seq namespace 1000+ so they never collide with goal seqs.
+    for (const [i, b] of bookings.entries()) {
+      const teamId = teamByFdId.get(b.team?.id) ?? null;
+      rows.push({
+        match_id: row.id,
+        seq: 1000 + i,
+        type: b.card === 'RED' || b.card === 'YELLOW_RED' ? 'red' : 'yellow',
+        minute: typeof b.minute === 'number' ? b.minute : null,
+        team_id: teamId,
+        player_id: resolvePlayer(teamId, b.player?.name ?? null),
+        player_name: b.player?.name ?? null,
+        score_home: null,
+        score_away: null,
+      });
+    }
     const { error } = await supabase
       .from('match_events')
       .upsert(rows, { onConflict: 'match_id,seq', ignoreDuplicates: true });
     if (error) errors.push(`events ${row.id}: ${error.message}`);
     else events += rows.length;
+  }
+
+  // 4. Golden boot — refresh the tournament top scorers when anything changed.
+  if (updated > 0 || events > 0) {
+    const scorers = await fd('/competitions/WC/scorers?limit=20');
+    const list = (scorers?.scorers ?? []) as any[];
+    if (list.length) {
+      const rows = list.map((s, i) => {
+        const teamId = teamByFdId.get(s.team?.id) ?? null;
+        return {
+          rank: i + 1,
+          fd_player_id: s.player?.id ?? null,
+          player_id: resolvePlayer(teamId, s.player?.name ?? null),
+          player_name: s.player?.name ?? 'Unknown',
+          team_id: teamId,
+          goals: s.goals ?? 0,
+          assists: s.assists ?? null,
+          penalties: s.penalties ?? null,
+          played: s.playedMatches ?? null,
+          updated_at: new Date().toISOString(),
+        };
+      });
+      const del = await supabase.from('top_scorers').delete().gte('rank', 0);
+      if (del.error) errors.push(`scorers clear: ${del.error.message}`);
+      const ins = await supabase.from('top_scorers').insert(rows);
+      if (ins.error) errors.push(`scorers insert: ${ins.error.message}`);
+    }
   }
 
   return Response.json({

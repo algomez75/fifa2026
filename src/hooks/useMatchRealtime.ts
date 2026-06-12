@@ -108,16 +108,16 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
 
     const onEventInsert = (payload: { new: unknown }) => {
       const ev = payload.new as MatchEventRow;
-      if (ev.type !== 'goal') return;
 
-      // Keep the shared goal-events cache fresh for match cards (the photo
-      // joins in on the next refetch; until then the initials avatar shows).
+      // Keep the shared events cache (goals + cards) fresh for match cards
+      // (the photo joins in on the next refetch; initials show until then).
       qc.setQueryData<GoalEvent[]>(matchEventsKey, (old) =>
         old && !old.some((e) => e.id === ev.id)
           ? [...old, { ...ev, player_photo: null }]
           : old,
       );
 
+      if (ev.type !== 'goal') return; // celebrations are goal-only
       const match = findMatch(ev.match_id);
       if (!match) return;
       const scoreKey = `${ev.match_id}:${ev.score_home ?? 0}-${ev.score_away ?? 0}`;

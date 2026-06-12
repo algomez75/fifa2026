@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -21,7 +20,6 @@ const HOST_FILTERS: HostFilter[] = ['all', 'USA', 'Mexico', 'Canada'];
 
 export default function ScheduleScreen() {
   const { t, language } = useTranslation();
-  const router = useRouter();
   const { data: matches, isLoading, isError, refetch } = useMatches();
 
   const onlyMyTeams = useAppStore((s) => s.onlyMyTeams);
@@ -32,7 +30,7 @@ export default function ScheduleScreen() {
   const filterHost = useAppStore((s) => s.filterHost);
   const setFilterHost = useAppStore((s) => s.setFilterHost);
 
-  const [showPast, setShowPast] = useState(false);
+  const [view, setView] = useState<'upcoming' | 'results'>('upcoming');
   const [predicting, setPredicting] = useState<Match | null>(null);
   const { data: predictions } = usePredictions();
   const { requireAccount } = useRequireAccount();
@@ -46,7 +44,7 @@ export default function ScheduleScreen() {
     setPredicting(m);
   };
 
-  const { upcoming, past } = useMemo(() => {
+  const { liveNow, upcoming, past, pastCount } = useMemo(() => {
     const all = matches ?? [];
     const filtered = all.filter((m) => {
       if (filterStage !== 'all' && m.stage !== filterStage) return false;
@@ -63,14 +61,20 @@ export default function ScheduleScreen() {
       }
       return true;
     });
-    const upcomingM = filtered.filter((m) => m.status !== 'finished');
+    const liveM = filtered.filter((m) => m.status === 'live');
+    const upcomingM = filtered.filter((m) => m.status === 'scheduled');
     const pastM = filtered
       .filter((m) => m.status === 'finished')
       .sort(
         (a, b) =>
           new Date(b.kickoff_utc).getTime() - new Date(a.kickoff_utc).getTime(),
       );
-    return { upcoming: groupByDay(upcomingM), past: pastM };
+    return {
+      liveNow: liveM,
+      upcoming: groupByDay(upcomingM),
+      past: groupByDayDesc(pastM),
+      pastCount: pastM.length,
+    };
   }, [matches, filterStage, filterHost, onlyMyTeams, favorites]);
 
   return (
@@ -122,48 +126,82 @@ export default function ScheduleScreen() {
         </View>
       </View>
 
+      {/* Upcoming ↔ Results segmented control */}
+      <View style={styles.segmentRow}>
+        <Pressable
+          onPress={() => setView('upcoming')}
+          style={[styles.segment, view === 'upcoming' && styles.segmentOn]}>
+          <Text style={[styles.segmentText, view === 'upcoming' && styles.segmentTextOn]}>
+            {t.schedule.upcoming}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setView('results')}
+          style={[styles.segment, view === 'results' && styles.segmentOn]}>
+          <Text style={[styles.segmentText, view === 'results' && styles.segmentTextOn]}>
+            {t.schedule.pastResults}
+            {pastCount ? ` · ${pastCount}` : ''}
+          </Text>
+        </Pressable>
+      </View>
+
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
         <ErrorState onRetry={refetch} />
-      ) : upcoming.length === 0 && past.length === 0 ? (
-        <EmptyState subtitle={t.teams.noResults} />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}>
-          <Text style={styles.hint}>{t.predict.cta} · +3 / +1 {t.predict.pts}</Text>
-          {upcoming.map((group) => (
-            <View key={group.key} style={styles.daySection}>
-              <Text style={styles.dayHeader}>
-                {formatMatchDay(group.matches[0].kickoff_utc, language)}
-              </Text>
-              <View style={{ gap: 10 }}>
-                {group.matches.map((m) => (
-                  <MatchCard
-                    key={m.id}
-                    match={m}
-                    prediction={predictions?.[m.id] ?? null}
-                    onPress={openPrediction}
-                  />
-                ))}
-              </View>
-            </View>
-          ))}
-
-          {past.length ? (
-            <View style={styles.pastWrap}>
-              <Pressable
-                style={styles.pastHeader}
-                onPress={() => setShowPast((v) => !v)}>
-                <Text style={styles.pastTitle}>
-                  {t.schedule.pastResults} ({past.length})
+          {view === 'upcoming' ? (
+            <>
+              {liveNow.length ? (
+                <View style={styles.daySection}>
+                  <Text style={[styles.dayHeader, { color: palette.live }]}>
+                    ● {t.home.liveNow}
+                  </Text>
+                  <View style={{ gap: 10 }}>
+                    {liveNow.map((m) => (
+                      <MatchCard key={m.id} match={m} onPress={openPrediction} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {upcoming.length === 0 && liveNow.length === 0 ? (
+                <EmptyState subtitle={t.teams.noResults} />
+              ) : (
+                <Text style={styles.hint}>
+                  {t.predict.cta} · +3 / +1 {t.predict.pts}
                 </Text>
-                <Text style={styles.pastChevron}>{showPast ? '▲' : '▼'}</Text>
-              </Pressable>
-              {showPast ? (
-                <View style={{ gap: 10, marginTop: 10 }}>
-                  {past.map((m) => (
+              )}
+              {upcoming.map((group) => (
+                <View key={group.key} style={styles.daySection}>
+                  <Text style={styles.dayHeader}>
+                    {formatMatchDay(group.matches[0].kickoff_utc, language)}
+                  </Text>
+                  <View style={{ gap: 10 }}>
+                    {group.matches.map((m) => (
+                      <MatchCard
+                        key={m.id}
+                        match={m}
+                        prediction={predictions?.[m.id] ?? null}
+                        onPress={openPrediction}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : past.length === 0 ? (
+            <EmptyState subtitle={t.teams.noResults} />
+          ) : (
+            past.map((group) => (
+              <View key={group.key} style={styles.daySection}>
+                <Text style={styles.dayHeader}>
+                  {formatMatchDay(group.matches[0].kickoff_utc, language)}
+                </Text>
+                <View style={{ gap: 10 }}>
+                  {group.matches.map((m) => (
                     <MatchCard
                       key={m.id}
                       match={m}
@@ -172,9 +210,9 @@ export default function ScheduleScreen() {
                     />
                   ))}
                 </View>
-              ) : null}
-            </View>
-          ) : null}
+              </View>
+            ))
+          )}
         </ScrollView>
       )}
 
@@ -198,6 +236,16 @@ function groupByDay(matches: Match[]): DayGroup[] {
   );
   const map = new Map<string, Match[]>();
   for (const m of sorted) {
+    const k = dayKey(m.kickoff_utc);
+    (map.get(k) ?? map.set(k, []).get(k)!).push(m);
+  }
+  return Array.from(map.entries()).map(([key, ms]) => ({ key, matches: ms }));
+}
+
+/** Results view: most recent match day first. */
+function groupByDayDesc(matches: Match[]): DayGroup[] {
+  const map = new Map<string, Match[]>();
+  for (const m of matches) {
     const k = dayKey(m.kickoff_utc);
     (map.get(k) ?? map.set(k, []).get(k)!).push(m);
   }
@@ -259,18 +307,24 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 12,
   },
-  pastWrap: { marginTop: 8, marginBottom: 20 },
-  pastHeader: {
+  segmentRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: palette.surface,
-    borderRadius: radius.md,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: palette.card,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: palette.border,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    padding: 3,
+    gap: 3,
   },
-  pastTitle: { color: palette.text, fontSize: 14, fontWeight: '800' },
-  pastChevron: { color: palette.textSecondary, fontSize: 12 },
+  segment: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+  },
+  segmentOn: { backgroundColor: palette.goldDim, borderWidth: 1, borderColor: palette.gold },
+  segmentText: { color: palette.textSecondary, fontSize: 13, fontWeight: '800' },
+  segmentTextOn: { color: palette.gold },
 });

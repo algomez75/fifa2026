@@ -72,6 +72,8 @@ export const en = {
     noMatchesToday: 'No matches today',
     liveMatches: 'Live matches',
     tournamentStarts: 'Tournament starts in',
+    topScorers: 'Golden Boot',
+    goalsShort: 'G',
   },
   countdown: { days: 'D', hours: 'H', mins: 'M', secs: 'S' },
   schedule: {

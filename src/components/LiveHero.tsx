@@ -16,7 +16,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { type GoalEvent, useMatchGoals } from '@/hooks/useMatchEvents';
+import { type GoalEvent, useMatchCards, useMatchGoals } from '@/hooks/useMatchEvents';
 import type { Match } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
 import { teamsById, venuesById } from '@/lib/seed';
@@ -91,6 +91,7 @@ function LiveMatchBoard({
   const away = match.away_team_id ? teamsById[match.away_team_id] : undefined;
   const venue = match.venue_id ? venuesById[match.venue_id] : undefined;
   const goals = useMatchGoals(match.id, match.home_team_id);
+  const cards = useMatchCards(match.id, match.home_team_id);
 
   const stage = stageMeta[match.stage];
   const stageLabel =
@@ -136,6 +137,7 @@ function LiveMatchBoard({
               <TeamFlag team={home} size={44} showName={false} />
               <Text style={styles.teamName} numberOfLines={1}>
                 {teamName(home, language)}
+                {cards.homeReds.length ? ` ${'🟥'.repeat(cards.homeReds.length)}` : ''}
               </Text>
             </View>
 
@@ -149,6 +151,7 @@ function LiveMatchBoard({
               <TeamFlag team={away} size={44} showName={false} />
               <Text style={styles.teamName} numberOfLines={1}>
                 {teamName(away, language)}
+                {cards.awayReds.length ? ` ${'🟥'.repeat(cards.awayReds.length)}` : ''}
               </Text>
             </View>
           </View>

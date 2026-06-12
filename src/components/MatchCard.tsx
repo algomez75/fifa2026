@@ -8,7 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { Match, Prediction } from '@/lib/database.types';
-import { type GoalEvent, useMatchGoals } from '@/hooks/useMatchEvents';
+import { type GoalEvent, useMatchCards, useMatchGoals } from '@/hooks/useMatchEvents';
 import { formatKickoffTime, sideName } from '@/lib/format';
 import { scorePrediction } from '@/lib/scoring';
 import { palette, radius, stageMeta } from '@/lib/theme';
@@ -32,7 +32,8 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
   const goals = useMatchGoals(match.id, match.home_team_id);
-  const showGoals = !compact && (isLive || isFinished) && goals.all.length > 0;
+  const cards = useMatchCards(match.id, match.home_team_id);
+  const showGoals = !compact && (isLive || isFinished) && (goals.all.length > 0 || cards.any);
 
   const home = match.home_team_id ? teamsById[match.home_team_id] : undefined;
   const away = match.away_team_id ? teamsById[match.away_team_id] : undefined;
@@ -130,18 +131,30 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
           </View>
         ) : null}
 
-        {/* Goal scorers — minimalist avatar + name + minute, split by side */}
+        {/* Goal scorers + cards — minimalist avatars + minutes, split by side */}
         {showGoals ? (
           <View style={styles.goalsRow}>
             <View style={styles.goalsCol}>
               {goals.home.map((g) => (
                 <ScorerRow key={g.id} goal={g} />
               ))}
+              {cards.homeReds.map((c) => (
+                <RedCardRow key={c.id} card={c} />
+              ))}
+              {cards.homeYellows > 0 ? (
+                <Text style={styles.yellowCount}>🟨 ×{cards.homeYellows}</Text>
+              ) : null}
             </View>
             <View style={[styles.goalsCol, styles.goalsColRight]}>
               {goals.away.map((g) => (
                 <ScorerRow key={g.id} goal={g} right />
               ))}
+              {cards.awayReds.map((c) => (
+                <RedCardRow key={c.id} card={c} right />
+              ))}
+              {cards.awayYellows > 0 ? (
+                <Text style={styles.yellowCount}>🟨 ×{cards.awayYellows}</Text>
+              ) : null}
             </View>
           </View>
         ) : null}
@@ -173,6 +186,17 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
         ) : null}
       </Animated.View>
     </Pressable>
+  );
+}
+
+function RedCardRow({ card, right }: { card: GoalEvent; right?: boolean }) {
+  const minute = card.minute != null ? ` ${card.minute}′` : '';
+  return (
+    <View style={[styles.scorer, right && styles.scorerRight]}>
+      <Text style={styles.redCardText} numberOfLines={1}>
+        {right ? `${card.player_name ?? ''}${minute} 🟥` : `🟥 ${card.player_name ?? ''}${minute}`}
+      </Text>
+    </View>
   );
 }
 
@@ -261,6 +285,8 @@ const styles = StyleSheet.create({
   scorer: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' },
   scorerRight: { justifyContent: 'flex-end' },
   scorerText: { color: palette.textSecondary, fontSize: 12, flexShrink: 1 },
+  redCardText: { color: palette.live, fontSize: 11, fontWeight: '700', flexShrink: 1 },
+  yellowCount: { color: palette.textTertiary, fontSize: 11 },
   predRow: {
     flexDirection: 'row',
     alignItems: 'center',

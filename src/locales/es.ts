@@ -73,6 +73,8 @@ export const es: Translation = {
     noMatchesToday: 'No hay partidos hoy',
     liveMatches: 'Partidos en vivo',
     tournamentStarts: 'El torneo comienza en',
+    topScorers: 'Bota de Oro',
+    goalsShort: 'G',
   },
   countdown: { days: 'D', hours: 'H', mins: 'M', secs: 'S' },
   schedule: {

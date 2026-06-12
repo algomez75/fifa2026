@@ -64,8 +64,22 @@ export type Match = {
   updated_at: string;
 }
 
-/** A single goal within a match (scorer + minute), synced from football-data
- *  by the sync-scores edge function. Public-read; drives live celebrations. */
+/** Tournament golden-boot row, replaced wholesale by sync-scores. */
+export type TopScorerRow = {
+  rank: number;
+  fd_player_id: number | null;
+  player_id: number | null;
+  player_name: string;
+  team_id: string | null;
+  goals: number;
+  assists: number | null;
+  penalties: number | null;
+  played: number | null;
+  updated_at?: string;
+}
+
+/** A single match event (goal or card), synced from football-data by the
+ *  sync-scores edge function. Public-read; goals drive live celebrations. */
 export type MatchEventRow = {
   id: string;
   match_id: string;
@@ -236,6 +250,12 @@ export interface Database {
         Row: MatchEventRow;
         Insert: Partial<MatchEventRow> & { match_id: string; seq: number };
         Update: Partial<MatchEventRow>;
+        Relationships: [];
+      };
+      top_scorers: {
+        Row: TopScorerRow;
+        Insert: TopScorerRow;
+        Update: Partial<TopScorerRow>;
         Relationships: [];
       };
       players: {
