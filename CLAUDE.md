@@ -302,6 +302,32 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-12 — Stats: cards, golden boot, lineups, match detail screen (016–019)
+
+- **016 `players.photo_url`** + `scripts/import-player-photos.mjs` (API-Football
+  squads, free-plan paced, checkpointed, men's-team aware, token-set name
+  matching): 1130/1249 players with circular photo avatars; full squads
+  re-imported from football-data (1249 players, complete rosters + shirt nums).
+- **017 `match_events.player_id`** resolved by sync-scores per goal → scorer
+  photos everywhere. **PostgREST gotcha:** responses cap at 1000 rows — page
+  any full-players fetch (bit both the import script and sync-scores).
+- **018 `top_scorers`** (golden boot, refreshed from `/competitions/WC/scorers`)
+  and cards synced from `bookings[]` as match_events type `yellow`/`red` (seq
+  namespace 1000+). UI: red cards by name on match cards + LiveHero chips,
+  yellows as per-side counts, `TopScorersCard` widget on home.
+- **019 `match_details`** (formations, lineups+bench with player_id/photos,
+  substitutions, referee, attendance, stats jsonb) synced in a 90-min
+  pre-kickoff window. New **`match/[id]` detail screen**: stat bars
+  (possession/shots light up automatically if the football-data
+  **Stats-Package add-on** is purchased; goals+cards bars meanwhile) + a
+  formation pitch with photo avatars and goal/card badges. Live/finished
+  cards navigate to it; scheduled cards keep the prediction sheet.
+- Schedule: Upcoming/Results segmented control, live pinned on top, results
+  newest-first by day. Home: upcoming strip + golden boot.
+- **`eas update` rule:** `--environment` ignores local `.env` — env vars now
+  live in EAS environments (production+preview); ALWAYS verify the uploaded
+  bundle in `dist/` contains the real Supabase ref before announcing an OTA.
+
 ### 2026-06-11 — Live scores fixed + goal pushes with scorer names (migration 015)
 
 - **Root causes of "no live scores" on opening day:** (1) football-data.org's
