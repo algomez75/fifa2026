@@ -50,8 +50,10 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
   const qc = useQueryClient();
   const onGoalRef = useRef(onGoal);
   const onResultRef = useRef(onResult);
-  onGoalRef.current = onGoal;
-  onResultRef.current = onResult;
+  useEffect(() => {
+    onGoalRef.current = onGoal;
+    onResultRef.current = onResult;
+  });
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;

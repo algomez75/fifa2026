@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
 import { HeaderActions } from '@/components/HeaderActions';
-import { LiveBadge } from '@/components/LiveBadge';
+import { LiveHero } from '@/components/LiveHero';
 import { MatchCard } from '@/components/MatchCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
@@ -54,14 +54,14 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}>
-        {/* Hero countdown / live */}
+        {/* Hero: live scoreboard(s) while matches are on, else countdown */}
+        {hasLive ? (
+          <View style={styles.hero}>
+            <LiveHero matches={live} onPressMatch={openMatchTeam} />
+          </View>
+        ) : (
         <GlassCard style={styles.hero} accent={palette.gold}>
-          {hasLive ? (
-            <View style={styles.heroLive}>
-              <LiveBadge />
-              <Text style={styles.heroLiveText}>{t.home.liveNow}</Text>
-            </View>
-          ) : upNext ? (
+          {upNext ? (
             <View>
               <Text style={styles.heroLabel}>{t.home.nextMatch}</Text>
               <View style={styles.heroTeams}>
@@ -87,6 +87,7 @@ export default function HomeScreen() {
             <EmptyState emoji="🏆" title={t.common.emptyTitle} />
           )}
         </GlassCard>
+        )}
 
         {!isSupabaseConfigured ? (
           <Text style={styles.seedNote}>{t.common.seedNotice}</Text>
@@ -114,15 +115,6 @@ export default function HomeScreen() {
             </Pressable>
           )}
         </Section>
-
-        {/* Live matches */}
-        {hasLive ? (
-          <Section title={t.home.liveMatches}>
-            {live.map((m) => (
-              <MatchCard key={m.id} match={m} onPress={() => openMatchTeam(m)} />
-            ))}
-          </Section>
-        ) : null}
 
         {/* Today */}
         <Section title={t.home.todaysMatches}>
