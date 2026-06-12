@@ -14,6 +14,9 @@
   const I18N = {
     en: {
       nav_matches: 'Matches', nav_features: 'Features', nav_download: 'Download',
+      nav_results: 'Results', nav_videos: 'Videos',
+      res_title: 'Latest results', boot_title: '👟 Golden Boot', vid_title: 'Match highlights',
+      goalsAbbr: 'G', liveLabel: 'LIVE',
       hero_eyebrow: 'Football 2026 · USA · MEX · CAN',
       hero_title: 'The 2026 tournament,<br>in your pocket.',
       tagline: 'Predict · Compete · Win',
@@ -41,6 +44,9 @@
     },
     es: {
       nav_matches: 'Partidos', nav_features: 'Funciones', nav_download: 'Descargar',
+      nav_results: 'Resultados', nav_videos: 'Videos',
+      res_title: 'Últimos resultados', boot_title: '👟 Bota de Oro', vid_title: 'Highlights',
+      goalsAbbr: 'G', liveLabel: 'EN VIVO',
       hero_eyebrow: 'Fútbol 2026 · EE.UU. · MÉX · CAN',
       hero_title: 'El torneo 2026,<br>en tu bolsillo.',
       tagline: 'Predice · Compite · Gana',
@@ -82,6 +88,8 @@
     btn.querySelectorAll('span').forEach(function (s) { s.classList.remove('on'); });
     btn.querySelectorAll('span')[l === 'en' ? 0 : 1].classList.add('on');
     if (window.__matches) renderMatches(window.__matches); // re-render in new lang
+    loadResults();
+    loadScorers();
   }
   document.getElementById('lang').addEventListener('click', function () {
     apply(lang === 'en' ? 'es' : 'en');
@@ -131,24 +139,114 @@
       const day = d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
       const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
       const venue = m.venue ? (m.venue.name + ' · ' + m.venue.city) : '';
-      return '<div class="m-card" style="animation-delay:' + (i * 70) + 'ms">' +
-        '<div class="m-top"><span>' + esc(stageLabel(m)) + '</span><span class="tag">' + day + '</span></div>' +
+      const isLive = m.status === 'live';
+      const tag = isLive
+        ? '<span class="tag live-tag"><i></i>' + I18N[lang].liveLabel + (m.minute != null ? ' ' + m.minute + '′' : '') + '</span>'
+        : '<span class="tag">' + day + '</span>';
+      const mid = isLive
+        ? '<div class="m-vs m-live-score">' + (m.home_score != null ? m.home_score : 0) + ' : ' + (m.away_score != null ? m.away_score : 0) + '</div>'
+        : '<div class="m-vs">' + I18N[lang].vs + '</div>';
+      return '<div class="m-card' + (isLive ? ' m-card-live' : '') + '" style="animation-delay:' + (i * 70) + 'ms">' +
+        '<div class="m-top"><span>' + esc(stageLabel(m)) + '</span>' + tag + '</div>' +
         '<div class="m-team">' + flag(m.home) + esc(m.home && m.home.name || 'TBD') + '</div>' +
-        '<div class="m-vs">' + I18N[lang].vs + '</div>' +
+        mid +
         '<div class="m-team">' + flag(m.away) + esc(m.away && m.away.name || 'TBD') + '</div>' +
-        '<div class="m-foot">📍 ' + esc(venue) + '  ·  ' + time + '</div>' +
+        '<div class="m-foot">📍 ' + esc(venue) + (isLive ? '' : '  ·  ' + time) + '</div>' +
       '</div>';
     }).join('');
   }
 
   function loadMatches() {
-    const q = '/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,' +
+    // Live matches first (with score + minute), then the next kickoffs.
+    const q = '/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,status,minute,home_score,away_score,' +
       'home:teams!home_team_id(name,flag_emoji,iso2),away:teams!away_team_id(name,flag_emoji,iso2),' +
-      'venue:venues(name,city)&status=eq.scheduled&order=kickoff_utc.asc&limit=6';
+      'venue:venues(name,city)&status=in.(live,scheduled)&order=kickoff_utc.asc&limit=6';
     fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
       .then(function (r) { return r.ok ? r.json() : []; })
-      .then(function (data) { window.__matches = data; renderMatches(data); })
+      .then(function (data) {
+        data.sort(function (a, b) {
+          if (a.status === 'live' && b.status !== 'live') return -1;
+          if (b.status === 'live' && a.status !== 'live') return 1;
+          return new Date(a.kickoff_utc) - new Date(b.kickoff_utc);
+        });
+        window.__matches = data;
+        renderMatches(data);
+        // Refresh every 60s while something is live, so scores tick.
+        if (data.some(function (m) { return m.status === 'live'; })) {
+          setTimeout(function () { loadMatches(); loadResults(); }, 60000);
+        }
+      })
       .catch(function () { renderMatches([]); });
+  }
+
+  // ── latest results with real scorers ─────────────────────────────────────
+  function renderResults(list, eventsByMatch) {
+    const box = document.getElementById('resultList');
+    if (!list.length) { box.innerHTML = '<p class="muted" style="grid-column:1/-1">' + I18N[lang].noData + '</p>'; return; }
+    box.innerHTML = list.map(function (m, i) {
+      const d = new Date(m.kickoff_utc);
+      const day = d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+      const goals = (eventsByMatch[m.id] || []).filter(function (e) { return e.type === 'goal'; });
+      const reds = (eventsByMatch[m.id] || []).filter(function (e) { return e.type === 'red'; });
+      const scorers = goals.map(function (g) {
+        return '<span class="r-scorer">⚽ ' + esc(g.player_name || '') + (g.minute != null ? ' <i>' + g.minute + '′</i>' : '') + '</span>';
+      }).join('');
+      const redRow = reds.map(function (g) {
+        return '<span class="r-scorer red">🟥 ' + esc(g.player_name || '') + (g.minute != null ? ' <i>' + g.minute + '′</i>' : '') + '</span>';
+      }).join('');
+      return '<div class="m-card" style="animation-delay:' + (i * 70) + 'ms">' +
+        '<div class="m-top"><span>' + esc(stageLabel(m)) + '</span><span class="tag">' + day + '</span></div>' +
+        '<div class="m-team">' + flag(m.home) + esc(m.home && m.home.name || 'TBD') +
+          '<b class="m-score">' + (m.home_score != null ? m.home_score : '–') + '</b></div>' +
+        '<div class="m-team">' + flag(m.away) + esc(m.away && m.away.name || 'TBD') +
+          '<b class="m-score">' + (m.away_score != null ? m.away_score : '–') + '</b></div>' +
+        (scorers || redRow ? '<div class="r-scorers">' + scorers + redRow + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  function loadResults() {
+    const q = '/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,home_score,away_score,' +
+      'home:teams!home_team_id(name,flag_emoji,iso2),away:teams!away_team_id(name,flag_emoji,iso2)' +
+      '&status=eq.finished&order=kickoff_utc.desc&limit=6';
+    fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) {
+        if (!list.length) { renderResults([], {}); return; }
+        const ids = list.map(function (m) { return m.id; }).join(',');
+        fetch(SB_URL + '/rest/v1/match_events?select=match_id,type,minute,player_name&match_id=in.(' + ids + ')&order=seq', { headers: { apikey: SB_ANON } })
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (events) {
+            const byMatch = {};
+            events.forEach(function (e) { (byMatch[e.match_id] = byMatch[e.match_id] || []).push(e); });
+            renderResults(list, byMatch);
+          })
+          .catch(function () { renderResults(list, {}); });
+      })
+      .catch(function () { renderResults([], {}); });
+  }
+
+  // ── golden boot ──────────────────────────────────────────────────────────
+  function loadScorers() {
+    const q = '/rest/v1/top_scorers?select=rank,player_name,goals,team:teams(name,flag_emoji,iso2),player:players(photo_url)&order=rank.asc&limit=5';
+    fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) {
+        const box = document.getElementById('scorerList');
+        if (!list.length) { box.style.display = 'none'; return; }
+        box.innerHTML = list.map(function (s) {
+          const photo = s.player && s.player.photo_url
+            ? '<img class="boot-photo" loading="lazy" src="' + s.player.photo_url + '" alt="">'
+            : '<span class="boot-photo boot-initial">' + esc((s.player_name || '?')[0]) + '</span>';
+          return '<div class="boot-row' + (s.rank === 1 ? ' first' : '') + '">' +
+            '<b class="boot-rank">' + s.rank + '</b>' + photo +
+            '<span class="boot-name">' + esc(s.player_name) + '</span>' +
+            flag(s.team) +
+            '<b class="boot-goals">' + s.goals + '<i> ' + I18N[lang].goalsAbbr + '</i></b>' +
+          '</div>';
+        }).join('');
+      })
+      .catch(function () {});
   }
 
   // ── App Store links ──────────────────────────────────────────────────────
@@ -163,4 +261,6 @@
   apply(lang);
   tick(); setInterval(tick, 1000);
   loadMatches();
+  loadResults();
+  loadScorers();
 })();
