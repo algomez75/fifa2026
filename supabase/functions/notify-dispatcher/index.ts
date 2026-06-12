@@ -24,16 +24,30 @@ interface PushMessage {
   data: Record<string, unknown>;
 }
 
-async function sendExpoPush(messages: PushMessage[]) {
-  if (!messages.length) return;
-  // Expo accepts up to 100 messages per request.
+/** Sends in batches of 100 and returns tokens Expo reports as dead
+ *  (DeviceNotRegistered) so they can be pruned from user_settings. */
+async function sendExpoPush(messages: PushMessage[]): Promise<string[]> {
+  const dead: string[] = [];
   for (let i = 0; i < messages.length; i += 100) {
-    await fetch(EXPO_PUSH, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(messages.slice(i, i + 100)),
-    });
+    const batch = messages.slice(i, i + 100);
+    try {
+      const res = await fetch(EXPO_PUSH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(batch),
+      });
+      const json = await res.json();
+      const tickets = (json?.data ?? []) as { status: string; details?: { error?: string } }[];
+      tickets.forEach((t, idx) => {
+        if (t.status === 'error' && t.details?.error === 'DeviceNotRegistered') {
+          dead.push(batch[idx].to);
+        }
+      });
+    } catch (_e) {
+      // network hiccup — the cron retries naturally next minute
+    }
   }
+  return dead;
 }
 
 Deno.serve(async () => {
@@ -64,6 +78,21 @@ Deno.serve(async () => {
 
   const messages: PushMessage[] = [];
   const resultPushedIds: string[] = [];
+  const kickoffLog: { user_id: string; match_id: string; type: string }[] = [];
+
+  // Kickoff dedupe: which (user, match) pairs already got their alert?
+  const upcomingIds = (matches ?? [])
+    .filter((m: any) => m.status === 'scheduled')
+    .map((m: any) => m.id);
+  const kickoffSent = new Set<string>();
+  if (upcomingIds.length) {
+    const { data: logged } = await supabase
+      .from('push_log')
+      .select('user_id, match_id')
+      .eq('type', 'kickoff')
+      .in('match_id', upcomingIds);
+    for (const l of logged ?? []) kickoffSent.add(`${l.user_id}:${l.match_id}`);
+  }
 
   for (const m of matches ?? []) {
     const home = teamMap.get(m.home_team_id);
@@ -82,15 +111,19 @@ Deno.serve(async () => {
         m.status === 'scheduled' &&
         minsToKick > 0 &&
         minsToKick <= (u.notify_minutes_before ?? 15) &&
-        minsToKick > (u.notify_minutes_before ?? 15) - 1
+        !kickoffSent.has(`${u.user_id}:${m.id}`)
       ) {
         messages.push({
           to: u.expo_push_token!,
           title: '⚽ Kickoff soon',
-          body: `${label} kicks off in ${minsToKick} minutes 🔥`,
+          body:
+            minsToKick <= 1
+              ? `${label} is kicking off now! 🔥`
+              : `${label} kicks off in ${minsToKick} min 🔥`,
           sound: 'default',
           data: { matchId: m.id, type: 'kickoff' },
         });
+        kickoffLog.push({ user_id: u.user_id, match_id: m.id, type: 'kickoff' });
       } else if (
         m.status === 'finished' &&
         !m.result_pushed &&
@@ -215,7 +248,7 @@ Deno.serve(async () => {
     pushedIds.push(n.id);
   }
 
-  await sendExpoPush(messages);
+  const deadTokens = await sendExpoPush(messages);
 
   if (pushedIds.length) {
     await supabase.from('notifications').update({ pushed: true }).in('id', pushedIds);
@@ -226,10 +259,24 @@ Deno.serve(async () => {
   if (resultPushedIds.length) {
     await supabase.from('matches').update({ result_pushed: true }).in('id', resultPushedIds);
   }
+  if (kickoffLog.length) {
+    await supabase
+      .from('push_log')
+      .upsert(kickoffLog, { onConflict: 'user_id,match_id,type', ignoreDuplicates: true });
+  }
+  // Prune tokens Expo reports as dead so future batches stay lean.
+  if (deadTokens.length) {
+    await supabase
+      .from('user_settings')
+      .update({ expo_push_token: null })
+      .in('expo_push_token', deadTokens);
+  }
 
   return Response.json({
     sent: messages.length,
     goals: goalEventIds.length,
     results: resultPushedIds.length,
+    kickoffs: kickoffLog.length,
+    deadTokens: deadTokens.length,
   });
 });
