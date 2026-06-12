@@ -109,10 +109,17 @@ Deno.serve(async () => {
       .replace(/[^a-z\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  const { data: allPlayers } = await supabase
-    .from('players')
-    .select('id, team_id, name')
-    .limit(2000);
+  // PostgREST caps responses at 1000 rows — page through all ~1250 players.
+  const allPlayers: { id: number; team_id: string; name: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page } = await supabase
+      .from('players')
+      .select('id, team_id, name')
+      .order('id')
+      .range(from, from + 999);
+    allPlayers.push(...((page ?? []) as typeof allPlayers));
+    if (!page || page.length < 1000) break;
+  }
   const playersByTeam = new Map<string, { id: number; key: string }[]>();
   for (const p of allPlayers ?? []) {
     const list = playersByTeam.get(p.team_id) ?? [];

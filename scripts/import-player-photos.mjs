@@ -94,11 +94,24 @@ function matchPlayer(afName, candidates) {
   if (hits.length === 1) return hits[0];
   // 3. surname-only, if unambiguous
   hits = candidates.filter(tailMatch);
-  return hits.length === 1 ? hits[0] : null;
+  if (hits.length === 1) return hits[0];
+  // 4. token-set match (handles surname-first orders: "Son Heung-Min" vs
+  //    "Heung-min Son"), if unambiguous
+  const set = new Set(tokens.filter((t) => t.length > 1));
+  if (set.size >= 2) {
+    hits = candidates.filter((p) => {
+      const pt = norm(p.name).split(' ').filter((t) => t.length > 1);
+      return pt.length === set.size && pt.every((t) => set.has(t));
+    });
+    if (hits.length === 1) return hits[0];
+  }
+  return null;
 }
 
 // Our team names → API-Football search terms when they differ.
 const SEARCH_ALIASES = {
+  'bosnia and herzegovina': 'Bosnia',
+  'bosnia herzegovina': 'Bosnia',
   'korea republic': 'South Korea',
   'south korea': 'South Korea',
   "côte d'ivoire": 'Ivory Coast',
@@ -117,13 +130,21 @@ const SEARCH_ALIASES = {
 // ── checkpoint ───────────────────────────────────────────────────────────────
 const ckptPath = join(root, 'scripts', '.photo-import.json');
 const ckpt = existsSync(ckptPath)
-  ? JSON.parse(readFileSync(ckptPath, 'utf8'))
+  ? JSON.parse(readFileSync(ckptPath, 'utf8').replace(/^﻿/, ''))
   : { afIds: {}, doneTeams: [] };
 const save = () => writeFileSync(ckptPath, JSON.stringify(ckpt, null, 2));
 
 // ── main ─────────────────────────────────────────────────────────────────────
 const teams = await sbGet('teams?select=id,name,api_football_id&order=id');
-const players = await sbGet('players?select=id,team_id,name&limit=2000');
+// PostgREST caps responses at 1000 rows — page through all players.
+const players = [];
+for (let from = 0; ; from += 1000) {
+  const page = await sbGet(
+    `players?select=id,team_id,name&order=id&offset=${from}&limit=1000`,
+  );
+  players.push(...page);
+  if (page.length < 1000) break;
+}
 const byTeam = new Map();
 for (const p of players) {
   (byTeam.get(p.team_id) ?? byTeam.set(p.team_id, []).get(p.team_id)).push(p);
