@@ -17,11 +17,28 @@ async function fetchMatches(): Promise<Match[]> {
   return data && data.length ? (data as Match[]) : seedSchedule;
 }
 
+/** True when a match is live or kicks off within the next 15 minutes. */
+function anyMatchHot(matches: Match[] | undefined): boolean {
+  if (!matches) return false;
+  const now = Date.now();
+  return matches.some(
+    (m) =>
+      m.status === 'live' ||
+      (m.status === 'scheduled' &&
+        new Date(m.kickoff_utc).getTime() - now < 15 * 60_000 &&
+        new Date(m.kickoff_utc).getTime() - now > -3 * 60 * 60_000),
+  );
+}
+
 export function useMatches() {
   return useQuery({
     queryKey: matchesKey,
     queryFn: fetchMatches,
     initialData: seedSchedule,
+    // Belt-and-braces alongside the Realtime channel: while a match is hot,
+    // poll every 30s so scores/standings stay fresh even if the socket died.
+    refetchInterval: (query) =>
+      isSupabaseConfigured && anyMatchHot(query.state.data) ? 30_000 : false,
   });
 }
 

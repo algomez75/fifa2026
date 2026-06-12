@@ -8,11 +8,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { Match, Prediction } from '@/lib/database.types';
+import { type GoalEvent, useMatchGoals } from '@/hooks/useMatchEvents';
 import { formatKickoffTime, sideName } from '@/lib/format';
 import { scorePrediction } from '@/lib/scoring';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { teamsById, venuesById } from '@/lib/seed';
 import { useTranslation } from '@/store/useAppStore';
+import { Avatar } from './Avatar';
 import { LiveBadge } from './LiveBadge';
 import { TeamFlag } from './TeamFlag';
 
@@ -29,6 +31,8 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
   const predResult = prediction ? scorePrediction(prediction, match) : null;
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
+  const goals = useMatchGoals(match.id, match.home_team_id);
+  const showGoals = !compact && (isLive || isFinished) && goals.all.length > 0;
 
   const home = match.home_team_id ? teamsById[match.home_team_id] : undefined;
   const away = match.away_team_id ? teamsById[match.away_team_id] : undefined;
@@ -126,6 +130,22 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
           </View>
         ) : null}
 
+        {/* Goal scorers — minimalist avatar + name + minute, split by side */}
+        {showGoals ? (
+          <View style={styles.goalsRow}>
+            <View style={styles.goalsCol}>
+              {goals.home.map((g) => (
+                <ScorerRow key={g.id} goal={g} />
+              ))}
+            </View>
+            <View style={[styles.goalsCol, styles.goalsColRight]}>
+              {goals.away.map((g) => (
+                <ScorerRow key={g.id} goal={g} right />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {venue && !compact ? (
           <Text style={styles.venue} numberOfLines={1}>
             {venue.name} · {venue.city}
@@ -153,6 +173,20 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
         ) : null}
       </Animated.View>
     </Pressable>
+  );
+}
+
+function ScorerRow({ goal, right }: { goal: GoalEvent; right?: boolean }) {
+  const name = goal.player_name ?? '';
+  const minute = goal.minute != null ? ` ${goal.minute}′` : '';
+  return (
+    <View style={[styles.scorer, right && styles.scorerRight]}>
+      {!right ? <Avatar url={goal.player_photo} name={name} size={18} ring={false} /> : null}
+      <Text style={styles.scorerText} numberOfLines={1}>
+        {right ? `${name}${minute}` : `${name}${minute}`}
+      </Text>
+      {right ? <Avatar url={goal.player_photo} name={name} size={18} ring={false} /> : null}
+    </View>
   );
 }
 
@@ -213,6 +247,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 12,
   },
+  goalsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+  },
+  goalsCol: { flex: 1, gap: 5 },
+  goalsColRight: { alignItems: 'flex-end' },
+  scorer: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' },
+  scorerRight: { justifyContent: 'flex-end' },
+  scorerText: { color: palette.textSecondary, fontSize: 12, flexShrink: 1 },
   predRow: {
     flexDirection: 'row',
     alignItems: 'center',

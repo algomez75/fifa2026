@@ -99,6 +99,45 @@ Deno.serve(async () => {
     .not('fd_team_id', 'is', null);
   const teamByFdId = new Map((teams ?? []).map((t: any) => [t.fd_team_id, t.id]));
 
+  // Player lookup (normalized name within team) so events carry player_id and
+  // the app can show the scorer's photo avatar.
+  const normName = (s: string | null | undefined) =>
+    (s ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const { data: allPlayers } = await supabase
+    .from('players')
+    .select('id, team_id, name')
+    .limit(2000);
+  const playersByTeam = new Map<string, { id: number; key: string }[]>();
+  for (const p of allPlayers ?? []) {
+    const list = playersByTeam.get(p.team_id) ?? [];
+    list.push({ id: p.id, key: normName(p.name) });
+    playersByTeam.set(p.team_id, list);
+  }
+  const resolvePlayer = (teamId: string | null, name: string | null) => {
+    if (!teamId || !name) return null;
+    const key = normName(name);
+    const list = playersByTeam.get(teamId) ?? [];
+    const exact = list.filter((p) => p.key === key);
+    if (exact.length === 1) return exact[0].id;
+    // abbreviated / partial: surname tail (+ first initial when present)
+    const tokens = key.split(' ');
+    const initial = tokens[0]?.length === 1 ? tokens[0] : null;
+    const tail = (initial ? tokens.slice(1) : tokens).join(' ');
+    if (!tail) return null;
+    const hits = list.filter(
+      (p) =>
+        (p.key === tail || p.key.endsWith(` ${tail}`) || p.key.includes(` ${tail} `)) &&
+        (!initial || p.key.startsWith(initial)),
+    );
+    return hits.length === 1 ? hits[0].id : null;
+  };
+
   let events = 0;
   for (const row of active) {
     if (!row.api_football_fixture_id) continue;
@@ -109,16 +148,20 @@ Deno.serve(async () => {
     }
     const goals = (detail.goals ?? []) as any[];
     if (!goals.length) continue;
-    const rows = goals.map((g, i) => ({
-      match_id: row.id,
-      seq: i,
-      type: 'goal',
-      minute: typeof g.minute === 'number' ? g.minute : null,
-      team_id: teamByFdId.get(g.team?.id) ?? null,
-      player_name: g.scorer?.name ?? null,
-      score_home: g.score?.home ?? null,
-      score_away: g.score?.away ?? null,
-    }));
+    const rows = goals.map((g, i) => {
+      const teamId = teamByFdId.get(g.team?.id) ?? null;
+      return {
+        match_id: row.id,
+        seq: i,
+        type: 'goal',
+        minute: typeof g.minute === 'number' ? g.minute : null,
+        team_id: teamId,
+        player_id: resolvePlayer(teamId, g.scorer?.name ?? null),
+        player_name: g.scorer?.name ?? null,
+        score_home: g.score?.home ?? null,
+        score_away: g.score?.away ?? null,
+      };
+    });
     const { error } = await supabase
       .from('match_events')
       .upsert(rows, { onConflict: 'match_id,seq', ignoreDuplicates: true });

@@ -73,6 +73,8 @@ export type MatchEventRow = {
   type: string;
   minute: number | null;
   team_id: string | null;
+  /** Linked players.id when the scorer name resolved (drives the photo avatar). */
+  player_id: number | null;
   player_name: string | null;
   score_home: number | null;
   score_away: number | null;

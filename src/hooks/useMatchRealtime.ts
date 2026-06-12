@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 
 import type { Match, MatchEventRow } from '@/lib/database.types';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { type GoalEvent, matchEventsKey } from './useMatchEvents';
 import { matchesKey } from './useMatches';
 
 export interface MatchEvent {
@@ -31,8 +33,13 @@ const GOAL_EVENT_GRACE_MS = 3500;
 
 /**
  * Subscribes to `matches` UPDATEs and `match_events` INSERTs via Supabase
- * Realtime, patches the TanStack cache in place, and fires `onGoal` /
+ * Realtime, patches the TanStack caches in place, and fires `onGoal` /
  * `onResult` so the app can celebrate from anywhere.
+ *
+ * Resilient by design: iOS kills the socket when the app is backgrounded and
+ * a failed channel never recovers on its own — so the channel is re-created
+ * on error/close (with backoff) and whenever the app returns to the
+ * foreground, alongside a cache invalidation to pick up anything missed.
  *
  * Goals can arrive twice (a score bump on `matches` + a rich `match_events`
  * row with the scorer). The rich event wins: a score bump only schedules a
@@ -53,88 +60,140 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
     // pending score-diff fallbacks waiting out their grace period.
     const celebratedScores = new Set<string>();
     const pendingFallbacks = new Map<string, ReturnType<typeof setTimeout>>();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelay = 2000;
+    let disposed = false;
 
     const findMatch = (id: string) =>
       (qc.getQueryData<Match[]>(matchesKey) ?? []).find((m) => m.id === id);
 
-    const channel = supabase
-      .channel('live-matches')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'matches' },
-        (payload) => {
-          const next = payload.new as Match;
-          const prev = findMatch(next.id);
+    const onMatchUpdate = (payload: { new: unknown }) => {
+      const next = payload.new as Match;
+      const prev = findMatch(next.id);
 
-          qc.setQueryData<Match[]>(matchesKey, (old) =>
-            (old ?? []).map((m) => (m.id === next.id ? { ...m, ...next } : m)),
-          );
+      qc.setQueryData<Match[]>(matchesKey, (old) =>
+        (old ?? []).map((m) => (m.id === next.id ? { ...m, ...next } : m)),
+      );
 
-          if (next.status === 'live') {
-            const scoreUp =
-              prev &&
-              ((next.home_score ?? 0) > (prev.home_score ?? 0) ||
-                (next.away_score ?? 0) > (prev.away_score ?? 0));
-            if (!scoreUp) return;
-            const scoreKey = `${next.id}:${next.home_score ?? 0}-${next.away_score ?? 0}`;
-            if (celebratedScores.has(scoreKey) || pendingFallbacks.has(scoreKey)) return;
-            // Give the rich match_events row a moment to arrive with the
-            // scorer; fall back to a plain celebration if it doesn't.
-            pendingFallbacks.set(
-              scoreKey,
-              setTimeout(() => {
-                pendingFallbacks.delete(scoreKey);
-                if (celebratedScores.has(scoreKey)) return;
-                celebratedScores.add(scoreKey);
-                onGoalRef.current?.({ matchId: next.id, match: next });
-              }, GOAL_EVENT_GRACE_MS),
-            );
-          } else if (next.status === 'finished' && (!prev || prev.status !== 'finished')) {
-            // Late score backfills re-update finished rows — only celebrate
-            // the actual transition, and only with a real score.
-            if (next.home_score != null && next.away_score != null) {
-              onResultRef.current?.({ matchId: next.id, match: next });
-            }
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'match_events' },
-        (payload) => {
-          const ev = payload.new as MatchEventRow;
-          if (ev.type !== 'goal') return;
-          const match = findMatch(ev.match_id);
-          if (!match) return;
-          const scoreKey = `${ev.match_id}:${ev.score_home ?? 0}-${ev.score_away ?? 0}`;
-          const pending = pendingFallbacks.get(scoreKey);
-          if (pending) {
-            clearTimeout(pending);
+      if (next.status === 'live') {
+        const scoreUp =
+          prev &&
+          ((next.home_score ?? 0) > (prev.home_score ?? 0) ||
+            (next.away_score ?? 0) > (prev.away_score ?? 0));
+        if (!scoreUp) return;
+        const scoreKey = `${next.id}:${next.home_score ?? 0}-${next.away_score ?? 0}`;
+        if (celebratedScores.has(scoreKey) || pendingFallbacks.has(scoreKey)) return;
+        // Give the rich match_events row a moment to arrive with the scorer;
+        // fall back to a plain celebration if it doesn't.
+        pendingFallbacks.set(
+          scoreKey,
+          setTimeout(() => {
             pendingFallbacks.delete(scoreKey);
-          }
-          if (celebratedScores.has(scoreKey)) return;
-          // Old events arrive on (re)sync backfills too — only celebrate
-          // fresh ones (inserted within the last couple of minutes).
-          if (Date.now() - new Date(ev.created_at).getTime() > 2 * 60_000) return;
-          celebratedScores.add(scoreKey);
-          onGoalRef.current?.({
-            matchId: ev.match_id,
-            match,
-            goal: {
-              playerName: ev.player_name,
-              minute: ev.minute,
-              teamId: ev.team_id,
-              scoreHome: ev.score_home,
-              scoreAway: ev.score_away,
-            },
-          });
+            if (celebratedScores.has(scoreKey)) return;
+            celebratedScores.add(scoreKey);
+            onGoalRef.current?.({ matchId: next.id, match: next });
+          }, GOAL_EVENT_GRACE_MS),
+        );
+      } else if (next.status === 'finished' && (!prev || prev.status !== 'finished')) {
+        // Late score backfills re-update finished rows — only celebrate the
+        // actual transition, and only with a real score.
+        if (next.home_score != null && next.away_score != null) {
+          onResultRef.current?.({ matchId: next.id, match: next });
+        }
+      }
+    };
+
+    const onEventInsert = (payload: { new: unknown }) => {
+      const ev = payload.new as MatchEventRow;
+      if (ev.type !== 'goal') return;
+
+      // Keep the shared goal-events cache fresh for match cards (the photo
+      // joins in on the next refetch; until then the initials avatar shows).
+      qc.setQueryData<GoalEvent[]>(matchEventsKey, (old) =>
+        old && !old.some((e) => e.id === ev.id)
+          ? [...old, { ...ev, player_photo: null }]
+          : old,
+      );
+
+      const match = findMatch(ev.match_id);
+      if (!match) return;
+      const scoreKey = `${ev.match_id}:${ev.score_home ?? 0}-${ev.score_away ?? 0}`;
+      const pending = pendingFallbacks.get(scoreKey);
+      if (pending) {
+        clearTimeout(pending);
+        pendingFallbacks.delete(scoreKey);
+      }
+      if (celebratedScores.has(scoreKey)) return;
+      // Old events arrive on (re)sync backfills too — only celebrate fresh
+      // ones (inserted within the last couple of minutes).
+      if (Date.now() - new Date(ev.created_at).getTime() > 2 * 60_000) return;
+      celebratedScores.add(scoreKey);
+      onGoalRef.current?.({
+        matchId: ev.match_id,
+        match,
+        goal: {
+          playerName: ev.player_name,
+          minute: ev.minute,
+          teamId: ev.team_id,
+          scoreHome: ev.score_home,
+          scoreAway: ev.score_away,
         },
-      )
-      .subscribe();
+      });
+    };
+
+    const teardown = () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
+
+    const subscribe = () => {
+      if (disposed) return;
+      teardown();
+      channel = supabase
+        .channel('live-matches')
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'matches' },
+          onMatchUpdate,
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'match_events' },
+          onEventInsert,
+        )
+        .subscribe((status) => {
+          if (disposed) return;
+          if (status === 'SUBSCRIBED') {
+            retryDelay = 2000;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            // A dead channel never revives itself — rebuild it with backoff.
+            if (retryTimer) clearTimeout(retryTimer);
+            retryTimer = setTimeout(subscribe, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, 30_000);
+          }
+        });
+    };
+
+    subscribe();
+
+    // Foreground → resubscribe and refetch what the socket missed while iOS
+    // had the app suspended.
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || disposed) return;
+      subscribe();
+      qc.invalidateQueries({ queryKey: matchesKey });
+      qc.invalidateQueries({ queryKey: matchEventsKey });
+    });
 
     return () => {
+      disposed = true;
+      appState.remove();
+      if (retryTimer) clearTimeout(retryTimer);
       pendingFallbacks.forEach((t) => clearTimeout(t));
-      supabase.removeChannel(channel);
+      teardown();
     };
   }, [qc]);
 }
