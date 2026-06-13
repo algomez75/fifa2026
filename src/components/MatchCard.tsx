@@ -9,7 +9,7 @@ import Animated, {
 
 import type { Match, Prediction } from '@/lib/database.types';
 import { type GoalEvent, useMatchCards, useMatchGoals } from '@/hooks/useMatchEvents';
-import { formatKickoffTime, sideName } from '@/lib/format';
+import { formatKickoffTime, formatMatchDay, sideName } from '@/lib/format';
 import { scorePrediction } from '@/lib/scoring';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { teamsById, venuesById } from '@/lib/seed';
@@ -73,6 +73,71 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
         style={[styles.card, compact && styles.cardCompact, glowStyle]}>
         <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
+        {compact ? (
+          <>
+            <View style={styles.topRow}>
+              <Text style={styles.stage} numberOfLines={1}>
+                {groupLabel}
+              </Text>
+              {isLive ? (
+                <LiveBadge minute={match.minute} size="sm" />
+              ) : isFinished ? (
+                <Text style={styles.ft}>{t.common.ft}</Text>
+              ) : (
+                <Text style={styles.dayTime} numberOfLines={1}>
+                  <Text style={styles.dayInline}>
+                    {formatMatchDay(match.kickoff_utc, language)}
+                  </Text>
+                  {'   '}
+                  {formatKickoffTime(match.kickoff_utc, language)}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.stack}>
+              <View style={styles.stackRow}>
+                {home ? (
+                  <TeamFlag
+                    team={home}
+                    size={22}
+                    nameStyle={styles.stackName}
+                    style={styles.stackTeam}
+                  />
+                ) : (
+                  <Text style={styles.stackPlaceholder} numberOfLines={1}>
+                    {sideName(match.home_team_id, match.home_placeholder, language)}
+                  </Text>
+                )}
+                {isLive || isFinished ? (
+                  <Text style={[styles.stackScore, isLive && styles.scoreLive]}>
+                    {scoreText(match.home_score)}
+                  </Text>
+                ) : null}
+              </View>
+
+              <View style={styles.stackRow}>
+                {away ? (
+                  <TeamFlag
+                    team={away}
+                    size={22}
+                    nameStyle={styles.stackName}
+                    style={styles.stackTeam}
+                  />
+                ) : (
+                  <Text style={styles.stackPlaceholder} numberOfLines={1}>
+                    {sideName(match.away_team_id, match.away_placeholder, language)}
+                  </Text>
+                )}
+                {isLive || isFinished ? (
+                  <Text style={[styles.stackScore, isLive && styles.scoreLive]}>
+                    {scoreText(match.away_score)}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
         <View style={styles.topRow}>
           <Text style={styles.stage}>{groupLabel}</Text>
           {isLive ? (
@@ -184,6 +249,8 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
             ) : null}
           </View>
         ) : null}
+          </>
+        )}
       </Animated.View>
     </Pressable>
   );
@@ -244,6 +311,23 @@ const styles = StyleSheet.create({
   },
   time: { color: palette.gold, fontSize: 14, fontWeight: '800' },
   ft: { color: palette.textSecondary, fontSize: 12, fontWeight: '800' },
+  // Compact (home Today / Upcoming): Apple-Sports vertical stack — full names
+  // get the whole card width, date + time live in the header.
+  dayTime: { color: palette.gold, fontSize: 13, fontWeight: '800', flexShrink: 1, textAlign: 'right' },
+  dayInline: { color: palette.textSecondary, fontSize: 12, fontWeight: '700' },
+  stack: { gap: 12, marginTop: 2 },
+  stackRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stackTeam: { flex: 1 },
+  stackName: { fontSize: 15, fontWeight: '700' },
+  stackScore: {
+    color: palette.text,
+    fontSize: 20,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    minWidth: 22,
+    textAlign: 'right',
+  },
+  stackPlaceholder: { color: palette.textTertiary, fontSize: 13, flex: 1 },
   teamsRow: { flexDirection: 'row', alignItems: 'center' },
   side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   sideRight: { justifyContent: 'flex-end' },
