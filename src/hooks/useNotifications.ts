@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
@@ -51,7 +51,7 @@ async function registerForPush(): Promise<string | null> {
 }
 
 type NotifData = {
-  type?: 'kickoff' | 'result' | 'goal' | 'challenge';
+  type?: 'kickoff' | 'result' | 'goal' | 'lineup' | 'challenge';
   matchId?: string;
   eventId?: string;
   challengeId?: string;
@@ -118,7 +118,14 @@ export function useNotifications() {
     const response = Notifications.addNotificationResponseReceivedListener((r) => {
       const data = (r.notification.request.content.data ?? {}) as NotifData;
       queryClient.invalidateQueries({ queryKey: inboxKey });
-      if (data.type === 'challenge') router.push('/notifications');
+      // Tapping a challenge opens the inbox; any match alert (lineup / kickoff /
+      // goal / full time) opens that match's detail screen — so a "Lineups are
+      // out" tap lands right on the formation pitch.
+      if (data.type === 'challenge') {
+        router.push('/notifications');
+      } else if (data.matchId) {
+        router.push(`/match/${data.matchId}` as Href);
+      }
     });
 
     return () => {
