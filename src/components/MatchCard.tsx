@@ -9,7 +9,7 @@ import Animated, {
 
 import type { Match, Prediction } from '@/lib/database.types';
 import { type GoalEvent, useMatchCards, useMatchGoals } from '@/hooks/useMatchEvents';
-import { formatKickoffTime, formatMatchDay, sideName } from '@/lib/format';
+import { formatKickoffTime, matchDayLabel, sideName } from '@/lib/format';
 import { scorePrediction } from '@/lib/scoring';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { teamsById, venuesById } from '@/lib/seed';
@@ -86,7 +86,7 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
               ) : (
                 <Text style={styles.dayTime} numberOfLines={1}>
                   <Text style={styles.dayInline}>
-                    {formatMatchDay(match.kickoff_utc, language)}
+                    {matchDayLabel(match.kickoff_utc, language, t.common.today)}
                   </Text>
                   {'   '}
                   {formatKickoffTime(match.kickoff_utc, language)}

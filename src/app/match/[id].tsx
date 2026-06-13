@@ -11,7 +11,7 @@ import { TeamFlag } from '@/components/TeamFlag';
 import { useMatchDetail, type LineupPlayer, type MatchDetail } from '@/hooks/useMatchDetail';
 import { useMatchEvents } from '@/hooks/useMatchEvents';
 import { useMatches } from '@/hooks/useMatches';
-import { teamName } from '@/lib/format';
+import { formatKickoffTime, matchDayLabel, teamName } from '@/lib/format';
 import { teamsById, venuesById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { useTranslation } from '@/store/useAppStore';
@@ -81,8 +81,13 @@ export default function MatchDetailScreen() {
             </Pressable>
             {isLive ? (
               <LiveBadge minute={match.minute} />
+            ) : isFinished ? (
+              <Text style={styles.ft}>{t.common.ft}</Text>
             ) : (
-              <Text style={styles.ft}>{isFinished ? t.common.ft : ''}</Text>
+              <Text style={styles.kickoff}>
+                {matchDayLabel(match.kickoff_utc, language, t.common.today)} ·{' '}
+                {formatKickoffTime(match.kickoff_utc, language)}
+              </Text>
             )}
             <View style={{ width: 20 }} />
           </View>
@@ -357,6 +362,7 @@ const styles = StyleSheet.create({
   },
   back: { color: palette.text, fontSize: 30, fontWeight: '800', marginTop: -6 },
   ft: { color: palette.textSecondary, fontSize: 13, fontWeight: '800' },
+  kickoff: { color: palette.gold, fontSize: 13, fontWeight: '800' },
   scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   team: { flex: 1, alignItems: 'center', gap: 6 },
   teamName: { color: palette.text, fontSize: 13, fontWeight: '800', maxWidth: 110 },

@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
 import { TopScorersCard } from '@/components/TopScorersCard';
 import type { Match } from '@/lib/database.types';
-import { formatMatchDay, isMatchToday, nextMatch } from '@/lib/format';
+import { isMatchToday, matchDayLabel, nextMatch } from '@/lib/format';
 import { teamsById } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { palette } from '@/lib/theme';
@@ -72,8 +72,13 @@ export default function HomeScreen() {
         ) : (
         <GlassCard style={styles.hero} accent={palette.gold}>
           {upNext ? (
-            <View>
-              <Text style={styles.heroLabel}>{t.home.nextMatch}</Text>
+            <Pressable
+              onPress={() => router.push(`/match/${upNext.id}` as Href)}
+              style={({ pressed }) => pressed && { opacity: 0.9 }}>
+              <View style={styles.heroLabelRow}>
+                <Text style={styles.heroLabel}>{t.home.nextMatch}</Text>
+                <Text style={styles.heroChevron}>›</Text>
+              </View>
               <View style={styles.heroTeams}>
                 <TeamFlag
                   team={upNext.home_team_id ? teamsById[upNext.home_team_id] : undefined}
@@ -87,12 +92,12 @@ export default function HomeScreen() {
                 />
               </View>
               <Text style={styles.heroDay}>
-                {formatMatchDay(upNext.kickoff_utc, language)}
+                {matchDayLabel(upNext.kickoff_utc, language, t.common.today)}
               </Text>
               <View style={{ marginTop: 14 }}>
                 <Countdown target={upNext.kickoff_utc} onComplete={refetch} />
               </View>
-            </View>
+            </Pressable>
           ) : (
             <EmptyState emoji="🏆" title={t.common.emptyTitle} />
           )}
@@ -215,6 +220,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },
   scroll: { paddingHorizontal: 20, paddingBottom: 140, gap: 4 },
   hero: { marginBottom: 8 },
+  heroLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroLabel: {
     color: palette.textSecondary,
     fontSize: 12,
@@ -222,6 +228,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  heroChevron: { color: palette.gold, fontSize: 22, fontWeight: '300', marginTop: -4 },
   heroTeams: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 12 },
   heroVs: { color: palette.textTertiary, fontWeight: '800' },
   heroDay: { color: palette.gold, fontSize: 13, fontWeight: '700', marginTop: 8 },

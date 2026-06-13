@@ -17,6 +17,11 @@ export function formatMatchDay(iso: string, lang: Language): string {
   return format(d, 'EEE, MMM d', { locale: dateLocale(lang) });
 }
 
+/** Like `formatMatchDay`, but collapses to "Today"/"Hoy" when it's today. */
+export function matchDayLabel(iso: string, lang: Language, todayLabel: string): string {
+  return isToday(new Date(iso)) ? todayLabel : formatMatchDay(iso, lang);
+}
+
 /** "16:00" local kickoff time. */
 export function formatKickoffTime(iso: string, lang: Language): string {
   return format(new Date(iso), 'HH:mm', { locale: dateLocale(lang) });
