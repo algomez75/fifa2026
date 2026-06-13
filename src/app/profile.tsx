@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,10 +14,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  FadeInUp,
+  FadeOutUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
-import { ChevronLeftIcon } from '@/components/icons';
+import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/icons';
 import {
   deleteAccount,
   isAppleAuthAvailable,
@@ -32,6 +43,8 @@ import { selectIsAnonymous, useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useTranslation } from '@/store/useAppStore';
 
+type Flash = (type: 'error' | 'ok', text: string) => void;
+
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -40,8 +53,36 @@ export default function ProfileScreen() {
   const isAnon = useAuthStore(selectIsAnonymous);
 
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ type: 'error' | 'ok'; text: string } | null>(null);
-  const flash = (type: 'error' | 'ok', text: string) => setMsg({ type, text });
+  const [msg, setMsg] = useState<{ type: 'error' | 'ok'; text: string; id: number } | null>(null);
+  const flash: Flash = (type, text) => setMsg({ type, text, id: Date.now() });
+
+  // Auto-dismiss the toast after a few seconds (errors linger a touch longer).
+  useEffect(() => {
+    if (!msg) return;
+    const id = setTimeout(() => setMsg(null), msg.type === 'error' ? 4200 : 3000);
+    return () => clearTimeout(id);
+  }, [msg]);
+
+  // After a successful sign-in: go home if the profile is already set up,
+  // otherwise stay so the avatar nudge + name field can prompt the user.
+  const onAuthed = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('display_name, avatar_url')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      if (prof?.display_name && prof?.avatar_url) {
+        router.replace('/');
+      } else {
+        flash('ok', t.account.welcome);
+      }
+    } catch {
+      router.replace('/');
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -55,30 +96,58 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {msg ? (
-          <View style={[styles.alert, msg.type === 'error' ? styles.alertErr : styles.alertOk]}>
-            <Text style={styles.alertText}>{msg.text}</Text>
-          </View>
-        ) : null}
+      {/* Floating toast — absolute so it never shifts the form or hides under
+          the keyboard; auto-dismisses via the effect above. */}
+      {msg ? (
+        <Animated.View
+          key={msg.id}
+          entering={FadeInUp.springify().damping(18)}
+          exiting={FadeOutUp.duration(220)}
+          style={[
+            styles.toast,
+            { top: insets.top + 64 },
+            msg.type === 'error' ? styles.toastErr : styles.toastOk,
+          ]}>
+          <Text style={styles.toastText}>{msg.text}</Text>
+        </Animated.View>
+      ) : null}
 
-        <AvatarPicker busy={busy} setBusy={setBusy} flash={flash} />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}>
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}>
+          <AvatarPicker busy={busy} setBusy={setBusy} flash={flash} />
 
-        {isAnon ? (
-          <GuestView busy={busy} setBusy={setBusy} flash={flash} />
-        ) : (
-          <MemberView
-            email={user?.email ?? ''}
-            busy={busy}
-            setBusy={setBusy}
-            flash={flash}
-            onDone={() => router.back()}
-          />
-        )}
+          {isAnon ? (
+            <GuestView busy={busy} setBusy={setBusy} flash={flash} onAuthed={onAuthed} />
+          ) : (
+            <MemberView
+              email={user?.email ?? ''}
+              busy={busy}
+              setBusy={setBusy}
+              flash={flash}
+              onDone={() => router.back()}
+            />
+          )}
 
-        <AboutSection />
-      </ScrollView>
+          <AboutSection />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
+  );
+}
+
+function AboutItem({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.aboutItem} onPress={onPress}>
+      <Text style={styles.aboutLabel}>{label}</Text>
+      <Text style={styles.aboutChevron}>›</Text>
+    </Pressable>
   );
 }
 
@@ -87,22 +156,15 @@ function AboutSection() {
   const router = useRouter();
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
-  const Item = ({ label, onPress }: { label: string; onPress: () => void }) => (
-    <Pressable style={styles.aboutItem} onPress={onPress}>
-      <Text style={styles.aboutLabel}>{label}</Text>
-      <Text style={styles.aboutChevron}>›</Text>
-    </Pressable>
-  );
-
   return (
     <View style={styles.aboutWrap}>
       <Text style={styles.aboutTitle}>{t.account.about}</Text>
       <View style={styles.aboutCard}>
-        <Item label={t.account.privacyPolicy} onPress={() => router.push('/legal/privacy')} />
+        <AboutItem label={t.account.privacyPolicy} onPress={() => router.push('/legal/privacy')} />
         <View style={styles.aboutDivider} />
-        <Item label={t.account.termsOfService} onPress={() => router.push('/legal/terms')} />
+        <AboutItem label={t.account.termsOfService} onPress={() => router.push('/legal/terms')} />
         <View style={styles.aboutDivider} />
-        <Item
+        <AboutItem
           label={t.account.support}
           onPress={() => Linking.openURL('mailto:info@portela11.com')}
         />
@@ -122,12 +184,36 @@ function AvatarPicker({
 }: {
   busy: boolean;
   setBusy: (b: boolean) => void;
-  flash: (t: 'error' | 'ok', s: string) => void;
+  flash: Flash;
 }) {
   const { t } = useTranslation();
   const avatarUrl = useProfileStore((s) => s.avatarUrl);
   const displayName = useProfileStore((s) => s.displayName);
   const setProfile = useProfileStore((s) => s.setProfile);
+  const incomplete = !avatarUrl;
+
+  // Gently pulse the avatar + badge while no photo is set, hinting the user to
+  // add one. Stops as soon as a photo exists.
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (incomplete) {
+      pulse.value = withRepeat(
+        withSequence(withTiming(1, { duration: 900 }), withTiming(0, { duration: 900 })),
+        -1,
+        false,
+      );
+    } else {
+      pulse.value = withTiming(0, { duration: 200 });
+    }
+  }, [incomplete, pulse]);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: 0.55 * (1 - pulse.value),
+    transform: [{ scale: 1 + pulse.value * 0.18 }],
+  }));
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulse.value * 0.22 }],
+  }));
 
   const change = async () => {
     setBusy(true);
@@ -140,12 +226,56 @@ function AvatarPicker({
   return (
     <View style={styles.avatarWrap}>
       <Pressable onPress={change} disabled={busy} style={styles.avatarPress}>
+        {incomplete ? <Animated.View style={[styles.avatarRing, ringStyle]} /> : null}
         <Avatar url={avatarUrl} name={displayName} size={100} />
-        <View style={styles.avatarEdit}>
+        <Animated.View style={[styles.avatarEdit, badgeStyle]}>
           <Text style={styles.avatarEditText}>＋</Text>
-        </View>
+        </Animated.View>
       </Pressable>
-      <Text style={styles.avatarHint}>{t.account.changePhoto}</Text>
+      <Text style={[styles.avatarHint, incomplete && styles.avatarHintStrong]}>
+        {incomplete ? t.account.completeProfile : t.account.changePhoto}
+      </Text>
+    </View>
+  );
+}
+
+/** Password input with a minimalist show/hide eye toggle. */
+function PasswordField({
+  value,
+  onChangeText,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [show, setShow] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{t.account.passwordLabel}</Text>
+      <View style={styles.passwordWrap}>
+        <TextInput
+          style={[styles.input, styles.passwordInput]}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={!show}
+          autoCapitalize="none"
+          autoComplete="password"
+          placeholder="••••••••"
+          placeholderTextColor={palette.textTertiary}
+        />
+        <Pressable
+          style={styles.eyeBtn}
+          onPress={() => setShow((s) => !s)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={show ? t.account.hidePassword : t.account.showPassword}>
+          {show ? (
+            <EyeOffIcon color={palette.textSecondary} size={20} />
+          ) : (
+            <EyeIcon color={palette.textSecondary} size={20} />
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -154,10 +284,12 @@ function GuestView({
   busy,
   setBusy,
   flash,
+  onAuthed,
 }: {
   busy: boolean;
   setBusy: (b: boolean) => void;
-  flash: (t: 'error' | 'ok', s: string) => void;
+  flash: Flash;
+  onAuthed: () => void;
 }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<'create' | 'signin'>('create');
@@ -186,7 +318,11 @@ function GuestView({
         : await signInWithEmail(trimmedEmail, password);
     setBusy(false);
     if (!res.ok) return flash('error', res.error ?? 'Error');
-    if (res.needsConfirmation) flash('ok', t.account.checkEmail);
+    if (res.needsConfirmation) {
+      flash('ok', t.account.checkEmail); // create flow — must confirm by email
+    } else {
+      onAuthed(); // existing account signed in → home (or nudge profile)
+    }
   };
 
   return (
@@ -204,6 +340,7 @@ function GuestView({
             const res = await signInWithApple();
             setBusy(false);
             if (!res.ok && res.error) flash('error', res.error);
+            else if (res.ok) onAuthed();
           }}
         />
       ) : null}
@@ -215,22 +352,14 @@ function GuestView({
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          autoComplete="email"
           keyboardType="email-address"
           placeholder="you@email.com"
           placeholderTextColor={palette.textTertiary}
         />
       </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>{t.account.passwordLabel}</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="••••••••"
-          placeholderTextColor={palette.textTertiary}
-        />
-      </View>
+
+      <PasswordField value={password} onChangeText={setPassword} />
 
       <Pressable
         style={[styles.primary, busy && { opacity: 0.6 }]}
@@ -260,11 +389,13 @@ function MemberView({
   email: string;
   busy: boolean;
   setBusy: (b: boolean) => void;
-  flash: (t: 'error' | 'ok', s: string) => void;
+  flash: Flash;
   onDone: () => void;
 }) {
   const { t } = useTranslation();
   const [displayName, setDisplayName] = useState('');
+  const storeName = useProfileStore((s) => s.displayName);
+  const nameMissing = !storeName && !displayName.trim();
 
   useEffect(() => {
     (async () => {
@@ -314,9 +445,10 @@ function MemberView({
       <View style={styles.field}>
         <Text style={styles.label}>{t.account.displayNameLabel}</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, nameMissing && styles.inputHint]}
           value={displayName}
           onChangeText={setDisplayName}
+          autoFocus={nameMissing}
           placeholder={t.account.displayNamePlaceholder}
           placeholderTextColor={palette.textTertiary}
         />
@@ -338,6 +470,7 @@ function MemberView({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },
+  flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -361,9 +494,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: { color: palette.text, fontSize: 30, fontWeight: '900' },
-  body: { paddingHorizontal: 20, paddingBottom: 60, gap: 16 },
+  body: { paddingHorizontal: 20, paddingBottom: 80, paddingTop: 4, gap: 16 },
   avatarWrap: { alignItems: 'center', gap: 8, marginBottom: 4 },
-  avatarPress: { position: 'relative' },
+  avatarPress: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  avatarRing: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: palette.gold,
+  },
   avatarEdit: {
     position: 'absolute',
     right: -2,
@@ -378,7 +519,8 @@ const styles = StyleSheet.create({
     borderColor: palette.bg,
   },
   avatarEditText: { color: palette.bg, fontSize: 18, fontWeight: '900', lineHeight: 20 },
-  avatarHint: { color: palette.textSecondary, fontSize: 13, fontWeight: '600' },
+  avatarHint: { color: palette.textSecondary, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  avatarHintStrong: { color: palette.gold, paddingHorizontal: 24 },
   note: { color: palette.textSecondary, fontSize: 14, lineHeight: 20 },
   field: { gap: 6 },
   label: {
@@ -397,6 +539,17 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     color: palette.text,
     fontSize: 15,
+  },
+  inputHint: { borderColor: palette.gold },
+  passwordWrap: { position: 'relative', justifyContent: 'center' },
+  passwordInput: { paddingRight: 48 },
+  eyeBtn: {
+    position: 'absolute',
+    right: 6,
+    height: 40,
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   email: { color: palette.text, fontSize: 16, fontWeight: '600' },
   appleBtn: { height: 50, width: '100%' },
@@ -418,10 +571,23 @@ const styles = StyleSheet.create({
   ghostText: { color: palette.text, fontSize: 15, fontWeight: '700' },
   danger: { paddingVertical: 14, alignItems: 'center' },
   dangerText: { color: palette.live, fontSize: 14, fontWeight: '700' },
-  alert: { borderRadius: radius.md, padding: 12, borderWidth: 1 },
-  alertErr: { backgroundColor: palette.liveDim, borderColor: palette.live },
-  alertOk: { backgroundColor: palette.goldDim, borderColor: palette.gold },
-  alertText: { color: palette.text, fontSize: 13, fontWeight: '600' },
+  toast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 50,
+    borderRadius: radius.md,
+    padding: 13,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  toastErr: { backgroundColor: '#2A1518', borderColor: palette.live },
+  toastOk: { backgroundColor: '#1E2A1A', borderColor: palette.gold },
+  toastText: { color: palette.text, fontSize: 13.5, fontWeight: '700', textAlign: 'center' },
   aboutWrap: { marginTop: 24, gap: 8 },
   aboutTitle: {
     color: palette.textSecondary,
