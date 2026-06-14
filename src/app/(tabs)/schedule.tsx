@@ -1,23 +1,29 @@
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import CountryFlag from 'react-native-country-flag';
 
 import { MatchCard } from '@/components/MatchCard';
 import { PredictionModal } from '@/components/PredictionModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HeaderActions } from '@/components/HeaderActions';
+import { LocationPinIcon } from '@/components/icons';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
-import type { Match, Stage } from '@/lib/database.types';
+import type { Match } from '@/lib/database.types';
 import { dayKey, formatMatchDay } from '@/lib/format';
 import { venuesById } from '@/lib/seed';
-import { palette, radius, stageMeta } from '@/lib/theme';
+import { palette, radius } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { type HostFilter, useAppStore, useTranslation } from '@/store/useAppStore';
 
-const STAGE_FILTERS: (Stage | 'all')[] = ['all', 'group', 'r32', 'r16', 'qf', 'sf', 'final'];
 const HOST_FILTERS: HostFilter[] = ['all', 'USA', 'Mexico', 'Canada'];
+const HOST_ISO: Record<Exclude<HostFilter, 'all'>, string> = {
+  USA: 'US',
+  Mexico: 'MX',
+  Canada: 'CA',
+};
 
 export default function ScheduleScreen() {
   const { t, language } = useTranslation();
@@ -27,8 +33,6 @@ export default function ScheduleScreen() {
   const onlyMyTeams = useAppStore((s) => s.onlyMyTeams);
   const setOnlyMyTeams = useAppStore((s) => s.setOnlyMyTeams);
   const favorites = useAppStore((s) => s.favoriteTeamIds);
-  const filterStage = useAppStore((s) => s.filterStage);
-  const setFilterStage = useAppStore((s) => s.setFilterStage);
   const filterHost = useAppStore((s) => s.filterHost);
   const setFilterHost = useAppStore((s) => s.setFilterHost);
 
@@ -52,7 +56,6 @@ export default function ScheduleScreen() {
   const { liveNow, upcoming, past, pastCount } = useMemo(() => {
     const all = matches ?? [];
     const filtered = all.filter((m) => {
-      if (filterStage !== 'all' && m.stage !== filterStage) return false;
       if (filterHost !== 'all') {
         const v = m.venue_id ? venuesById[m.venue_id] : undefined;
         if (v?.country !== filterHost) return false;
@@ -80,7 +83,7 @@ export default function ScheduleScreen() {
       past: groupByDayDesc(pastM),
       pastCount: pastM.length,
     };
-  }, [matches, filterStage, filterHost, onlyMyTeams, favorites]);
+  }, [matches, filterHost, onlyMyTeams, favorites]);
 
   return (
     <View style={styles.screen}>
@@ -90,36 +93,18 @@ export default function ScheduleScreen() {
         right={<HeaderActions />}
       />
 
-      {/* Filters */}
+      {/* Host filters — minimalist flag chips */}
       <View style={styles.filters}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}>
+        <View style={styles.chipRow}>
           {HOST_FILTERS.map((h) => (
-            <Chip
+            <HostChip
               key={h}
-              label={h === 'all' ? t.schedule.filterAll : h}
+              host={h}
               active={filterHost === h}
               onPress={() => setFilterHost(h)}
             />
           ))}
-          <View style={styles.sep} />
-          {STAGE_FILTERS.map((s) => (
-            <Chip
-              key={s}
-              label={
-                s === 'all'
-                  ? t.schedule.filterStage
-                  : language === 'es'
-                    ? stageMeta[s].labelEs
-                    : stageMeta[s].short
-              }
-              active={filterStage === s}
-              onPress={() => setFilterStage(s)}
-            />
-          ))}
-        </ScrollView>
+        </View>
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>{t.schedule.onlyMyTeams}</Text>
           <Switch
@@ -257,22 +242,34 @@ function groupByDayDesc(matches: Match[]): DayGroup[] {
   return Array.from(map.entries()).map(([key, ms]) => ({ key, matches: ms }));
 }
 
-function Chip({
-  label,
+/** Minimalist host filter: a location pin for "all", flag swatch per country.
+ *  Inactive flags are dimmed; the selected one lights up with a gold ring. */
+function HostChip({
+  host,
   active,
   onPress,
 }: {
-  label: string;
+  host: HostFilter;
   active: boolean;
   onPress: () => void;
 }) {
+  if (host === 'all') {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={[styles.hostChip, active && styles.hostChipActive]}>
+        <LocationPinIcon
+          color={active ? palette.gold : palette.textSecondary}
+          size={18}
+        />
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-        {label}
-      </Text>
+      style={[styles.flagChip, active ? styles.flagChipActive : styles.flagChipOff]}>
+      <CountryFlag isoCode={HOST_ISO[host]} size={42} />
     </Pressable>
   );
 }
@@ -280,19 +277,29 @@ function Chip({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },
   filters: { paddingBottom: 8 },
-  chipRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
-  sep: { width: 1, height: 20, backgroundColor: palette.border2, marginHorizontal: 2 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
+  chipRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, alignItems: 'center' },
+  hostChip: {
+    width: 44,
+    height: 30,
+    borderRadius: radius.sm,
     backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipActive: { backgroundColor: palette.goldDim, borderColor: palette.gold },
-  chipText: { color: palette.textSecondary, fontSize: 13, fontWeight: '700' },
-  chipTextActive: { color: palette.gold },
+  hostChipActive: { backgroundColor: palette.goldDim, borderColor: palette.gold },
+  flagChip: {
+    width: 44,
+    height: 30,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  flagChipOff: { borderColor: palette.border, opacity: 0.4 },
+  flagChipActive: { borderColor: palette.gold, opacity: 1 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
