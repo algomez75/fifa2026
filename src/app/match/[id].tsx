@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
+import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
 import { LiveBadge } from '@/components/LiveBadge';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -67,6 +68,7 @@ export default function MatchDetailScreen() {
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
   const es = language === 'es';
+  const scheduled = !isLive && !isFinished;
 
   const statsAvailable = !!(detail?.home_stats && detail?.away_stats);
   const lineupAvailable = !!(detail?.home_lineup?.length || detail?.away_lineup?.length);
@@ -77,12 +79,6 @@ export default function MatchDetailScreen() {
   const refAssistants = refs.filter(
     (r) => r !== refMain && /ASSISTANT/.test(r.type ?? ''),
   );
-
-  // Fallback stat rows we can always compute (cards from events).
-  const yellow = (teamId: string | null | undefined) =>
-    matchEvents.filter((e) => e.type === 'yellow' && e.team_id === teamId).length;
-  const red = (teamId: string | null | undefined) =>
-    matchEvents.filter((e) => e.type === 'red' && e.team_id === teamId).length;
 
   return (
     <View style={styles.screen}>
@@ -113,17 +109,22 @@ export default function MatchDetailScreen() {
               </Text>
             </View>
             <View style={styles.scoreCol}>
-              <Text style={styles.score}>
-                {match.home_score ?? '–'}
-                <Text style={styles.scoreSep}> : </Text>
-                {match.away_score ?? '–'}
-              </Text>
-              {!isLive && !isFinished ? null : match.home_score_ht != null &&
-                match.away_score_ht != null ? (
-                <Text style={styles.htScore}>
-                  {t.common.halfTimeShort} {match.home_score_ht}–{match.away_score_ht}
-                </Text>
-              ) : null}
+              {scheduled ? (
+                <Text style={styles.vsBig}>{t.common.vs}</Text>
+              ) : (
+                <>
+                  <Text style={styles.score}>
+                    {match.home_score ?? '–'}
+                    <Text style={styles.scoreSep}> : </Text>
+                    {match.away_score ?? '–'}
+                  </Text>
+                  {match.home_score_ht != null && match.away_score_ht != null ? (
+                    <Text style={styles.htScore}>
+                      {t.common.halfTimeShort} {match.home_score_ht}–{match.away_score_ht}
+                    </Text>
+                  ) : null}
+                </>
+              )}
             </View>
             <View style={styles.team}>
               <TeamFlag team={away} size={42} showName={false} />
@@ -132,6 +133,14 @@ export default function MatchDetailScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Countdown to kickoff while the match hasn't started */}
+          {scheduled ? (
+            <View style={styles.countdownWrap}>
+              <Text style={styles.countdownLabel}>{t.home.kickoffIn}</Text>
+              <Countdown target={match.kickoff_utc} compact />
+            </View>
+          ) : null}
           {venue ? (
             <Text style={styles.venue} numberOfLines={1}>
               📍 {venue.name} · {venue.city}
@@ -159,50 +168,29 @@ export default function MatchDetailScreen() {
           ) : null}
         </GlassCard>
 
-        {/* Team stats with bars */}
-        <Text style={styles.sectionTitle}>{es ? 'Estadísticas' : 'Team stats'}</Text>
-        <GlassCard>
-          {statsAvailable ? (
-            <View style={{ gap: 14 }}>
-              {STAT_ROWS.map((row) => {
-                const h = Number(detail!.home_stats![row.key] ?? NaN);
-                const a = Number(detail!.away_stats![row.key] ?? NaN);
-                if (isNaN(h) && isNaN(a)) return null;
-                return (
-                  <StatBar
-                    key={row.key}
-                    label={es ? row.es : row.en}
-                    home={isNaN(h) ? 0 : h}
-                    away={isNaN(a) ? 0 : a}
-                  />
-                );
-              })}
-            </View>
-          ) : (
-            <View style={{ gap: 14 }}>
-              <StatBar
-                label={es ? 'Goles' : 'Goals'}
-                home={match.home_score ?? 0}
-                away={match.away_score ?? 0}
-              />
-              <StatBar
-                label={es ? 'Amarillas' : 'Yellow cards'}
-                home={yellow(match.home_team_id)}
-                away={yellow(match.away_team_id)}
-              />
-              <StatBar
-                label={es ? 'Rojas' : 'Red cards'}
-                home={red(match.home_team_id)}
-                away={red(match.away_team_id)}
-              />
-              <Text style={styles.statsNote}>
-                {es
-                  ? 'Posesión, tiros y más estadísticas — muy pronto.'
-                  : 'Possession, shots and more stats — coming soon.'}
-              </Text>
-            </View>
-          )}
-        </GlassCard>
+        {/* Team stats — only once real stats are in (hidden before kickoff) */}
+        {statsAvailable ? (
+          <>
+            <Text style={styles.sectionTitle}>{es ? 'Estadísticas' : 'Team stats'}</Text>
+            <GlassCard>
+              <View style={{ gap: 14 }}>
+                {STAT_ROWS.map((row) => {
+                  const h = Number(detail!.home_stats![row.key] ?? NaN);
+                  const a = Number(detail!.away_stats![row.key] ?? NaN);
+                  if (isNaN(h) && isNaN(a)) return null;
+                  return (
+                    <StatBar
+                      key={row.key}
+                      label={es ? row.es : row.en}
+                      home={isNaN(h) ? 0 : h}
+                      away={isNaN(a) ? 0 : a}
+                    />
+                  );
+                })}
+              </View>
+            </GlassCard>
+          </>
+        ) : null}
 
         {/* Lineups */}
         <Text style={styles.sectionTitle}>{es ? 'Alineaciones' : 'Starting lineup'}</Text>
@@ -324,22 +312,41 @@ function Pitch({
 
   return (
     <View style={styles.pitch}>
-      {rows.map((line, li) => (
-        <View key={li} style={styles.pitchRow}>
-          {line.map((p, pi) => (
-            <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
-              <View>
-                <Avatar url={p.photo} name={p.name} size={42} ring={false} />
-                {badge(p) ? <Text style={styles.pitchBadge}>{badge(p)}</Text> : null}
+      <PitchMarkings />
+      <View style={styles.pitchRows}>
+        {rows.map((line, li) => (
+          <View key={li} style={styles.pitchRow}>
+            {line.map((p, pi) => (
+              <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
+                <View>
+                  <Avatar url={p.photo} name={p.name} size={42} ring={false} />
+                  {badge(p) ? <Text style={styles.pitchBadge}>{badge(p)}</Text> : null}
+                </View>
+                <Text style={styles.pitchName} numberOfLines={1}>
+                  {shortName(p.name)}
+                </Text>
+                <Text style={styles.pitchNum}>{p.shirtNumber ?? ''}</Text>
               </View>
-              <Text style={styles.pitchName} numberOfLines={1}>
-                {shortName(p.name)}
-              </Text>
-              <Text style={styles.pitchNum}>{p.shirtNumber ?? ''}</Text>
-            </View>
-          ))}
-        </View>
-      ))}
+            ))}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** Minimalist painted field lines (Apple-Sports style): halfway line, center
+ *  circle + spot, and penalty + goal areas at both ends. Sits behind players. */
+function PitchMarkings() {
+  return (
+    <View style={styles.fieldMarks} pointerEvents="none">
+      <View style={styles.fieldHalfway} />
+      <View style={styles.fieldCircle} />
+      <View style={styles.fieldSpot} />
+      <View style={[styles.penaltyBox, styles.penaltyBoxTop]} />
+      <View style={[styles.goalArea, styles.goalAreaTop]} />
+      <View style={[styles.penaltyBox, styles.penaltyBoxBottom]} />
+      <View style={[styles.goalArea, styles.goalAreaBottom]} />
     </View>
   );
 }
@@ -412,12 +419,21 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   scoreSep: { color: palette.gold },
+  vsBig: { color: palette.gold, fontSize: 20, fontWeight: '800', letterSpacing: 1 },
   htScore: {
     color: palette.textTertiary,
     fontSize: 11,
     fontWeight: '700',
     marginTop: 2,
     fontVariant: ['tabular-nums'],
+  },
+  countdownWrap: { alignItems: 'center', marginTop: 16, gap: 8 },
+  countdownLabel: {
+    color: palette.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   venue: { color: palette.textTertiary, fontSize: 12, marginTop: 12, textAlign: 'center' },
   referee: { color: palette.textTertiary, fontSize: 11, marginTop: 4, textAlign: 'center' },
@@ -467,14 +483,68 @@ const styles = StyleSheet.create({
   formationText: { color: palette.textSecondary, fontSize: 13, fontWeight: '800' },
   formationTextOn: { color: palette.gold },
   pitch: {
+    position: 'relative',
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: 'rgba(99,153,34,0.35)',
-    backgroundColor: 'rgba(99,153,34,0.10)',
-    paddingVertical: 14,
-    gap: 16,
+    backgroundColor: 'rgba(99,153,34,0.12)',
+    overflow: 'hidden',
   },
+  pitchRows: { paddingVertical: 18, gap: 16 },
   pitchRow: { flexDirection: 'row', justifyContent: 'space-evenly' },
+  // Minimalist field markings (semi-transparent white lines).
+  fieldMarks: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  fieldHalfway: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  fieldCircle: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 88,
+    height: 88,
+    marginLeft: -44,
+    marginTop: -44,
+    borderRadius: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  fieldSpot: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 4,
+    height: 4,
+    marginLeft: -2,
+    marginTop: -2,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  penaltyBox: {
+    position: 'absolute',
+    left: '18%',
+    right: '18%',
+    height: 60,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  penaltyBoxTop: { top: 0, borderTopWidth: 0 },
+  penaltyBoxBottom: { bottom: 0, borderBottomWidth: 0 },
+  goalArea: {
+    position: 'absolute',
+    left: '34%',
+    right: '34%',
+    height: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  goalAreaTop: { top: 0, borderTopWidth: 0 },
+  goalAreaBottom: { bottom: 0, borderBottomWidth: 0 },
   pitchPlayer: { alignItems: 'center', width: 68 },
   pitchBadge: { position: 'absolute', right: -8, top: -4, fontSize: 12 },
   pitchName: { color: palette.text, fontSize: 10.5, fontWeight: '700', marginTop: 4 },
