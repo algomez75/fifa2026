@@ -77,6 +77,7 @@ export const es: Translation = {
     tournamentStarts: 'El torneo comienza en',
     topScorers: 'Bota de Oro',
     goalsShort: 'G',
+    assistsShort: 'A',
   },
   countdown: { days: 'D', hours: 'H', mins: 'M', secs: 'S' },
   schedule: {

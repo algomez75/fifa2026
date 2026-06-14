@@ -302,6 +302,28 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-13 — More coverage from the paid tier (023)
+
+All sourced from data football-data already returns (no new paid add-on):
+
+- **Extra match stats** in the detail screen: added `shots_off_goal`,
+  `free_kicks`, `goal_kicks`, `throw_ins` rows (already stored in
+  `match_details.{home,away}_stats`, just unrendered).
+- **Half-time score** — migration 023 adds `matches.home_score_ht`/
+  `away_score_ht`; `sync-scores` writes `score.halfTime` in the list loop (so it
+  self-backfills every finished match). Shown as "HT 1–0" under the scoreboard.
+- **Full referee crew** — `match_details.referees` jsonb (main + assistants +
+  nationality); detail header shows the referee + nationality and an assistants
+  line. Backfilled for past matches.
+- **Official standings** — new `standings` table (public-read) synced from
+  `/competitions/WC/standings` (correct FIFA tiebreaks + `form`). `useStandings`
+  hook; `GroupTable` uses it when present, else falls back to client-side
+  `computeStandings`.
+- **Assists** in the Golden Boot card (`top_scorers.assists` was already synced).
+- **Not done (needs another paid activation):** betting odds (Odds-Package
+  add-on) and xG (football-data has no xG — Sportmonks/API-Football territory).
+  Penalty-shootout sequence deferred until knockouts (array is empty in groups).
+
 ### 2026-06-13 — Stats-Package live: team stats on every match
 
 - **football-data Stats-Package add-on activated** → `detail.{home,away}Team.

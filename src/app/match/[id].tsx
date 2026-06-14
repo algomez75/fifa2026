@@ -21,10 +21,14 @@ const STAT_ROWS: { key: string; en: string; es: string; pct?: boolean }[] = [
   { key: 'ball_possession', en: 'Possession %', es: 'Posesión %', pct: true },
   { key: 'shots', en: 'Shots', es: 'Tiros' },
   { key: 'shots_on_goal', en: 'Shots on goal', es: 'Tiros al arco' },
+  { key: 'shots_off_goal', en: 'Shots off goal', es: 'Tiros desviados' },
   { key: 'corner_kicks', en: 'Corners', es: 'Córners' },
   { key: 'fouls', en: 'Fouls', es: 'Faltas' },
   { key: 'offsides', en: 'Offsides', es: 'Fueras de juego' },
   { key: 'saves', en: 'Saves', es: 'Atajadas' },
+  { key: 'free_kicks', en: 'Free kicks', es: 'Tiros libres' },
+  { key: 'goal_kicks', en: 'Goal kicks', es: 'Saques de meta' },
+  { key: 'throw_ins', en: 'Throw-ins', es: 'Saques de banda' },
   { key: 'yellow_cards', en: 'Yellow cards', es: 'Amarillas' },
   { key: 'red_cards', en: 'Red cards', es: 'Rojas' },
 ];
@@ -67,6 +71,13 @@ export default function MatchDetailScreen() {
   const statsAvailable = !!(detail?.home_stats && detail?.away_stats);
   const lineupAvailable = !!(detail?.home_lineup?.length || detail?.away_lineup?.length);
 
+  // Referee crew (main + assistants) — falls back to the single stored name.
+  const refs = detail?.referees ?? [];
+  const refMain = refs.find((r) => r.type === 'REFEREE') ?? refs[0] ?? null;
+  const refAssistants = refs.filter(
+    (r) => r !== refMain && /ASSISTANT/.test(r.type ?? ''),
+  );
+
   // Fallback stat rows we can always compute (cards from events).
   const yellow = (teamId: string | null | undefined) =>
     matchEvents.filter((e) => e.type === 'yellow' && e.team_id === teamId).length;
@@ -101,11 +112,19 @@ export default function MatchDetailScreen() {
                 {teamName(home, language)}
               </Text>
             </View>
-            <Text style={styles.score}>
-              {match.home_score ?? '–'}
-              <Text style={styles.scoreSep}> : </Text>
-              {match.away_score ?? '–'}
-            </Text>
+            <View style={styles.scoreCol}>
+              <Text style={styles.score}>
+                {match.home_score ?? '–'}
+                <Text style={styles.scoreSep}> : </Text>
+                {match.away_score ?? '–'}
+              </Text>
+              {!isLive && !isFinished ? null : match.home_score_ht != null &&
+                match.away_score_ht != null ? (
+                <Text style={styles.htScore}>
+                  {t.common.halfTimeShort} {match.home_score_ht}–{match.away_score_ht}
+                </Text>
+              ) : null}
+            </View>
             <View style={styles.team}>
               <TeamFlag team={away} size={42} showName={false} />
               <Text style={styles.teamName} numberOfLines={1}>
@@ -119,7 +138,23 @@ export default function MatchDetailScreen() {
               {detail?.attendance ? `  ·  👥 ${detail.attendance.toLocaleString()}` : ''}
             </Text>
           ) : null}
-          {detail?.referee ? (
+          {refMain ? (
+            <>
+              <Text style={styles.referee}>
+                🟡 {refMain.name}
+                {refMain.nationality ? ` · ${refMain.nationality}` : ''}
+              </Text>
+              {refAssistants.length ? (
+                <Text style={styles.refAssistants} numberOfLines={1}>
+                  {es ? 'Asistentes: ' : 'Assistants: '}
+                  {refAssistants
+                    .map((a) => a.name)
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              ) : null}
+            </>
+          ) : detail?.referee ? (
             <Text style={styles.referee}>🟡 {detail.referee}</Text>
           ) : null}
         </GlassCard>
@@ -369,16 +404,24 @@ const styles = StyleSheet.create({
   scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   team: { flex: 1, alignItems: 'center', gap: 6 },
   teamName: { color: palette.text, fontSize: 13, fontWeight: '800', maxWidth: 110 },
+  scoreCol: { alignItems: 'center', paddingHorizontal: 8 },
   score: {
     color: palette.text,
     fontSize: 38,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
-    paddingHorizontal: 8,
   },
   scoreSep: { color: palette.gold },
+  htScore: {
+    color: palette.textTertiary,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
   venue: { color: palette.textTertiary, fontSize: 12, marginTop: 12, textAlign: 'center' },
   referee: { color: palette.textTertiary, fontSize: 11, marginTop: 4, textAlign: 'center' },
+  refAssistants: { color: palette.textTertiary, fontSize: 10, marginTop: 2, textAlign: 'center' },
   sectionTitle: {
     color: palette.text,
     fontSize: 16,

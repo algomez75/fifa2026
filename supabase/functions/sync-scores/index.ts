@@ -96,6 +96,7 @@ Deno.serve(async () => {
     const status = mapStatus(m.status);
     if (!status) continue;
     const ft = m.score?.fullTime ?? {};
+    const ht = m.score?.halfTime ?? {};
     const pen = m.score?.penalties ?? {};
     const minute = typeof m.minute === 'number' ? m.minute : null;
     const { data: rows, error } = await supabase
@@ -103,6 +104,8 @@ Deno.serve(async () => {
       .update({
         home_score: ft.home ?? null,
         away_score: ft.away ?? null,
+        home_score_ht: ht.home ?? null,
+        away_score_ht: ht.away ?? null,
         home_score_penalties: pen.home ?? null,
         away_score_penalties: pen.away ?? null,
         minute,
@@ -211,6 +214,11 @@ Deno.serve(async () => {
             in_name: s.playerIn?.name ?? null,
           })),
           referee: detail.referees?.[0]?.name ?? null,
+          referees: (detail.referees ?? []).map((r: any) => ({
+            name: r.name ?? null,
+            type: r.type ?? null,
+            nationality: r.nationality ?? null,
+          })),
           attendance: detail.attendance ?? null,
           injury_time: detail.injuryTime ?? null,
           updated_at: new Date().toISOString(),
@@ -286,9 +294,50 @@ Deno.serve(async () => {
     }
   }
 
+  // 5. Official group standings (correct FIFA tiebreaks + recent form). Refresh
+  //    whenever scores moved; map football-data team ids → our team ids.
+  let standingsRows = 0;
+  if (updated > 0 || events > 0) {
+    const st = await fd('/competitions/WC/standings');
+    const groups = (st?.standings ?? []) as any[];
+    const rows: any[] = [];
+    for (const g of groups) {
+      if (g.type && g.type !== 'TOTAL') continue; // ignore HOME/AWAY splits
+      const letter = (g.group ?? '').replace(/^Group\s*/i, '').trim() || null;
+      if (!letter) continue;
+      for (const r of (g.table ?? []) as any[]) {
+        const teamId = teamByFdId.get(r.team?.id) ?? null;
+        if (!teamId) continue;
+        rows.push({
+          group_letter: letter,
+          team_id: teamId,
+          position: r.position ?? 0,
+          played: r.playedGames ?? 0,
+          won: r.won ?? 0,
+          draw: r.draw ?? 0,
+          lost: r.lost ?? 0,
+          goals_for: r.goalsFor ?? 0,
+          goals_against: r.goalsAgainst ?? 0,
+          goal_difference: r.goalDifference ?? 0,
+          points: r.points ?? 0,
+          form: r.form ?? null,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+    if (rows.length) {
+      const { error } = await supabase
+        .from('standings')
+        .upsert(rows, { onConflict: 'group_letter,team_id' });
+      if (error) errors.push(`standings: ${error.message}`);
+      else standingsRows = rows.length;
+    }
+  }
+
   return Response.json({
     updated,
     eventsSeen: events,
+    standingsRows,
     inWindow: active.length,
     scanned: matches.length,
     errors: errors.length ? errors : undefined,

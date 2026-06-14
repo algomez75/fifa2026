@@ -52,6 +52,9 @@ export type Match = {
   away_placeholder: string | null;
   home_score: number | null;
   away_score: number | null;
+  /** Half-time score (football-data score.halfTime; set by sync-scores). */
+  home_score_ht?: number | null;
+  away_score_ht?: number | null;
   home_score_penalties: number | null;
   away_score_penalties: number | null;
   status: MatchStatus;

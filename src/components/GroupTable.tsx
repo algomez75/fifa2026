@@ -2,7 +2,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { Match } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
-import { computeStandings } from '@/lib/standings';
+import { computeStandings, type StandingRow } from '@/lib/standings';
+import { useStandings } from '@/hooks/useStandings';
 import { palette, radius } from '@/lib/theme';
 import { teamsById } from '@/lib/seed';
 import { useTranslation } from '@/store/useAppStore';
@@ -14,11 +15,30 @@ interface Props {
   matches: Match[];
 }
 
-/** Standings table: P W D L GF GA GD Pts. Top 2 marked as qualifying. */
+/** Standings table: P W D L GF GA GD Pts. Top 2 marked as qualifying. Uses the
+ *  official football-data standings (correct FIFA tiebreaks) when available,
+ *  else falls back to the client-side computation. */
 export function GroupTable({ groupLetter, teamIds, matches }: Props) {
   const { t, language } = useTranslation();
-  const rows = computeStandings(teamIds, matches);
+  const { data: official } = useStandings();
   const c = t.groups.columns;
+
+  // Official rows for this group (already ordered by position), mapped to the
+  // shared shape; fall back to the client calc when none have synced yet.
+  const officialRows = (official ?? [])
+    .filter((s) => s.group_letter === groupLetter)
+    .map<StandingRow>((s) => ({
+      teamId: s.team_id,
+      played: s.played,
+      won: s.won,
+      drawn: s.draw,
+      lost: s.lost,
+      goalsFor: s.goals_for,
+      goalsAgainst: s.goals_against,
+      goalDiff: s.goal_difference,
+      points: s.points,
+    }));
+  const rows = officialRows.length ? officialRows : computeStandings(teamIds, matches);
 
   return (
     <View style={styles.wrap}>

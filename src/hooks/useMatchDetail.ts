@@ -26,6 +26,9 @@ export interface MatchDetail {
     | { minute: number | null; team_id: string | null; out_name: string | null; in_name: string | null }[]
     | null;
   referee: string | null;
+  referees:
+    | { name: string | null; type: string | null; nationality: string | null }[]
+    | null;
   attendance: number | null;
   injury_time: number | null;
 }

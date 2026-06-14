@@ -88,6 +88,11 @@ for (const m of matches) {
     home_stats: home,
     away_stats: away,
     referee: detail.referees?.[0]?.name ?? null,
+    referees: (detail.referees ?? []).map((r) => ({
+      name: r.name ?? null,
+      type: r.type ?? null,
+      nationality: r.nationality ?? null,
+    })),
     attendance: detail.attendance ?? null,
     injury_time: detail.injuryTime ?? null,
     updated_at: new Date().toISOString(),

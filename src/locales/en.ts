@@ -76,6 +76,7 @@ export const en = {
     tournamentStarts: 'Tournament starts in',
     topScorers: 'Golden Boot',
     goalsShort: 'G',
+    assistsShort: 'A',
   },
   countdown: { days: 'D', hours: 'H', mins: 'M', secs: 'S' },
   schedule: {

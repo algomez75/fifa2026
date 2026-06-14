@@ -28,6 +28,12 @@ export function TopScorersCard({ limit = 5 }: { limit?: number }) {
                 {s.player_name}
               </Text>
               <TeamFlag team={team} size={18} showName={false} />
+              {s.assists ? (
+                <Text style={styles.assists}>
+                  {s.assists}
+                  <Text style={styles.assistsLabel}> {t.home.assistsShort}</Text>
+                </Text>
+              ) : null}
               <Text style={styles.goals}>
                 {s.goals}
                 <Text style={styles.goalsLabel}> {t.home.goalsShort}</Text>
@@ -57,6 +63,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
+    minWidth: 34,
+    textAlign: 'right',
   },
   goalsLabel: { color: palette.textTertiary, fontSize: 11, fontWeight: '700' },
+  assists: {
+    color: palette.textSecondary,
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  assistsLabel: { color: palette.textTertiary, fontSize: 10, fontWeight: '700' },
 });
