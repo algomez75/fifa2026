@@ -34,11 +34,14 @@ export default function MatchDetailScreen() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const { data: matches } = useMatches();
-  const { data: detail } = useMatchDetail(id);
+  const match = (matches ?? []).find((m) => m.id === id);
+  const { data: detail } = useMatchDetail(id, {
+    live: match?.status === 'live',
+    finished: match?.status === 'finished',
+  });
   const { data: events } = useMatchEvents();
   const [side, setSide] = useState<'home' | 'away'>('home');
 
-  const match = (matches ?? []).find((m) => m.id === id);
   const home = match?.home_team_id ? teamsById[match.home_team_id] : undefined;
   const away = match?.away_team_id ? teamsById[match.away_team_id] : undefined;
   const venue = match?.venue_id ? venuesById[match.venue_id] : undefined;

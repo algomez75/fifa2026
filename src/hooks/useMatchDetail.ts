@@ -70,13 +70,18 @@ async function fetchDetail(matchId: string): Promise<MatchDetail | null> {
 }
 
 /** Rich match detail (lineups, formations, stats). Polls while fresh data may
- *  still be arriving (lineups ~1h before kickoff, stats during the match). */
-export function useMatchDetail(matchId: string | undefined) {
+ *  still be arriving: fast (~15s) during a live match so stats feel real-time,
+ *  slower (~60s) before kickoff (lineups land ~1h out), and not at all once the
+ *  match is finished (its stats are final — backfilled by sync-scores). */
+export function useMatchDetail(
+  matchId: string | undefined,
+  opts: { live?: boolean; finished?: boolean } = {},
+) {
   return useQuery({
     queryKey: ['match-detail', matchId],
     queryFn: () => fetchDetail(matchId!),
     enabled: !!matchId && isSupabaseConfigured,
-    staleTime: 45_000,
-    refetchInterval: 60_000,
+    staleTime: opts.live ? 8_000 : 45_000,
+    refetchInterval: opts.finished ? false : opts.live ? 15_000 : 60_000,
   });
 }

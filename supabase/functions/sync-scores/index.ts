@@ -63,6 +63,10 @@ Deno.serve(async () => {
   const now = Date.now();
   const windowStart = new Date(now - 4 * 60 * 60_000).toISOString();
   const backfillStart = new Date(now - 12 * 60 * 60_000).toISOString();
+  // Keep re-fetching a match for ~1.5h after full-time so the FINAL team stats
+  // (football-data finalizes possession/shots a few minutes after FINISHED)
+  // land in match_details.
+  const recentFinish = new Date(now - 3.5 * 60 * 60_000).toISOString();
   // 90 min ahead: football-data publishes starting lineups ~1h before kickoff.
   const soon = new Date(now + 90 * 60_000).toISOString();
   const { data: active, error: gErr } = await supabase
@@ -70,6 +74,7 @@ Deno.serve(async () => {
     .select('id, api_football_fixture_id, status, home_score')
     .or(
       `and(status.neq.finished,kickoff_utc.lte.${soon},kickoff_utc.gte.${windowStart}),` +
+        `and(status.eq.finished,kickoff_utc.gte.${recentFinish}),` +
         `and(status.eq.finished,home_score.is.null,kickoff_utc.gte.${backfillStart})`,
     );
   if (gErr) return Response.json({ error: gErr.message }, { status: 500 });
