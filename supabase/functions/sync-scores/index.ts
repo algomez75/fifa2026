@@ -32,6 +32,22 @@ function mapStatus(s: string): 'live' | 'finished' | null {
   return null; // SCHEDULED/TIMED/POSTPONED/CANCELLED → don't touch
 }
 
+/** Live period the client uses for the half-time label + the ticking clock.
+ *  Half-time is football-data status PAUSED; otherwise derive 1H/2H/ET/PEN. */
+function mapPeriod(
+  fdStatus: string,
+  minute: number | null,
+  duration: string | null,
+): string | null {
+  if (fdStatus === 'PAUSED') return 'HT';
+  if (fdStatus === 'IN_PLAY') {
+    if (duration === 'PENALTY_SHOOTOUT') return 'PEN';
+    if (duration === 'EXTRA_TIME') return 'ET';
+    return typeof minute === 'number' && minute > 45 ? '2H' : '1H';
+  }
+  return null; // scheduled / finished
+}
+
 async function fd(path: string): Promise<any | null> {
   const res = await fetch(`${FD_BASE}${path}`, { headers: { 'X-Auth-Token': TOKEN } });
   if (!res.ok) return null;
@@ -76,6 +92,7 @@ Deno.serve(async () => {
     if (!status) continue;
     const ft = m.score?.fullTime ?? {};
     const pen = m.score?.penalties ?? {};
+    const minute = typeof m.minute === 'number' ? m.minute : null;
     const { data: rows, error } = await supabase
       .from('matches')
       .update({
@@ -83,7 +100,8 @@ Deno.serve(async () => {
         away_score: ft.away ?? null,
         home_score_penalties: pen.home ?? null,
         away_score_penalties: pen.away ?? null,
-        minute: typeof m.minute === 'number' ? m.minute : null,
+        minute,
+        period: mapPeriod(m.status, minute, m.score?.duration ?? null),
         status,
       })
       .eq('api_football_fixture_id', m.id)

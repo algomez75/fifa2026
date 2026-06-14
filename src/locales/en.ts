@@ -12,6 +12,8 @@ export const en = {
     confirm: 'Confirm',
     today: 'Today',
     live: 'LIVE',
+    halfTime: 'Half Time',
+    halfTimeShort: 'HT',
     vs: 'vs',
     ft: 'FT',
     search: 'Search',

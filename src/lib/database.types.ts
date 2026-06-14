@@ -59,6 +59,9 @@ export type Match = {
   venue_id: string | null;
   api_football_fixture_id: number | null;
   minute: number | null;
+  /** Live period for the half-time label + ticking clock: '1H'|'2H'|'HT'|'ET'|'PEN'|null
+   *  (set by sync-scores; 'HT' = football-data PAUSED). See migration 022. */
+  period?: string | null;
   /** Full-time push already sent (server-side dedupe; app never writes it). */
   result_pushed?: boolean;
   updated_at: string;

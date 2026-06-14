@@ -13,6 +13,8 @@ export const es: Translation = {
     confirm: 'Confirmar',
     today: 'Hoy',
     live: 'EN VIVO',
+    halfTime: 'Medio Tiempo',
+    halfTimeShort: 'MT',
     vs: 'vs',
     ft: 'FIN',
     search: 'Buscar',

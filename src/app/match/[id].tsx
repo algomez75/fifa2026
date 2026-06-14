@@ -80,7 +80,7 @@ export default function MatchDetailScreen() {
               <Text style={styles.back}>‹</Text>
             </Pressable>
             {isLive ? (
-              <LiveBadge minute={match.minute} />
+              <LiveBadge match={match} />
             ) : isFinished ? (
               <Text style={styles.ft}>{t.common.ft}</Text>
             ) : (

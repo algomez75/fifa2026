@@ -13,7 +13,7 @@ import { TeamFlag } from '@/components/TeamFlag';
 import { TopScorersCard } from '@/components/TopScorersCard';
 import type { Match } from '@/lib/database.types';
 import { isMatchToday, matchDayLabel, nextMatch } from '@/lib/format';
-import { teamsById } from '@/lib/seed';
+import { teamsById, venuesById } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { palette } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
@@ -94,6 +94,11 @@ export default function HomeScreen() {
               <Text style={styles.heroDay}>
                 {matchDayLabel(upNext.kickoff_utc, language, t.common.today)}
               </Text>
+              {upNext.venue_id && venuesById[upNext.venue_id] ? (
+                <Text style={styles.heroVenue} numberOfLines={1}>
+                  📍 {venuesById[upNext.venue_id].name} · {venuesById[upNext.venue_id].city}
+                </Text>
+              ) : null}
               <View style={{ marginTop: 14 }}>
                 <Countdown target={upNext.kickoff_utc} onComplete={refetch} />
               </View>
@@ -232,6 +237,7 @@ const styles = StyleSheet.create({
   heroTeams: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 12 },
   heroVs: { color: palette.textTertiary, fontWeight: '800' },
   heroDay: { color: palette.gold, fontSize: 13, fontWeight: '700', marginTop: 8 },
+  heroVenue: { color: palette.textTertiary, fontSize: 12, marginTop: 6 },
   heroLive: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   heroLiveText: { color: palette.text, fontSize: 22, fontWeight: '900', letterSpacing: 0.5 },
   seedNote: {

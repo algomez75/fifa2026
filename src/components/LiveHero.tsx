@@ -129,7 +129,7 @@ function LiveMatchBoard({
         <GlassCard intensity={30} style={styles.glass}>
           <View style={styles.topRow}>
             <Text style={styles.stage}>{stageLabel}</Text>
-            <LiveBadge minute={match.minute} />
+            <LiveBadge match={match} />
           </View>
 
           <View style={styles.scoreRow}>

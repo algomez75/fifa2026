@@ -80,7 +80,7 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
                 {groupLabel}
               </Text>
               {isLive ? (
-                <LiveBadge minute={match.minute} size="sm" />
+                <LiveBadge match={match} size="sm" />
               ) : isFinished ? (
                 <Text style={styles.ft}>{t.common.ft}</Text>
               ) : (
@@ -141,7 +141,7 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
         <View style={styles.topRow}>
           <Text style={styles.stage}>{groupLabel}</Text>
           {isLive ? (
-            <LiveBadge minute={match.minute} size="sm" />
+            <LiveBadge match={match} size="sm" />
           ) : isFinished ? (
             <Text style={styles.ft}>{t.common.ft}</Text>
           ) : (
