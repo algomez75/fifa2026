@@ -1,6 +1,14 @@
 import { BlurView } from 'expo-blur';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { type TopScorer, useTopScorers } from '@/hooks/useTopScorers';
 import { teamsById } from '@/lib/seed';
@@ -10,9 +18,11 @@ import { Avatar } from './Avatar';
 import { GlassCard } from './GlassCard';
 import { TeamFlag } from './TeamFlag';
 
+type T = ReturnType<typeof useTranslation>['t'];
+
 /** Golden-boot leaderboard: rank · player avatar · name · flag · assists · goals.
  *  Columns are fixed-width so flags/assists/goals line up across every row.
- *  Tapping the card opens the full table in a modal. */
+ *  Tapping the card opens the full table in a draggable, scrollable sheet. */
 export function TopScorersCard({ limit = 5 }: { limit?: number }) {
   const { t } = useTranslation();
   const { data } = useTopScorers();
@@ -34,27 +44,79 @@ export function TopScorersCard({ limit = 5 }: { limit?: number }) {
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handle} />
-            <Text style={styles.title}>👟 {t.home.topScorers}</Text>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-              {all.map((s) => (
-                <ScorerRow key={s.rank} s={s} t={t} />
-              ))}
-            </ScrollView>
-            <Pressable style={styles.cancel} onPress={() => setOpen(false)}>
-              <Text style={styles.cancelText}>{t.common.cancel}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
+        {open ? <ScorersSheet scorers={all} t={t} onClose={() => setOpen(false)} /> : null}
       </Modal>
     </>
   );
 }
 
-function ScorerRow({ s, t }: { s: TopScorer; t: ReturnType<typeof useTranslation>['t'] }) {
+/** Bottom sheet: drag the header down (or fling sideways) to dismiss; the list
+ *  itself scrolls independently. */
+function ScorersSheet({
+  scorers,
+  t,
+  onClose,
+}: {
+  scorers: TopScorer[];
+  t: T;
+  onClose: () => void;
+}) {
+  const { height, width } = Dimensions.get('window');
+  const translateY = useSharedValue(0);
+  const translateX = useSharedValue(0);
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      translateY.value = Math.max(0, e.translationY);
+      translateX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      const dismissDown = e.translationY > 120 || e.velocityY > 900;
+      const dismissSide = Math.abs(e.translationX) > 120 || Math.abs(e.velocityX) > 900;
+      if (dismissDown) {
+        translateY.value = withTiming(height, { duration: 220 }, () => runOnJS(onClose)());
+      } else if (dismissSide) {
+        const dir = e.translationX >= 0 ? 1 : -1;
+        translateX.value = withTiming(dir * width, { duration: 220 }, () => runOnJS(onClose)());
+      } else {
+        translateY.value = withSpring(0, { damping: 18 });
+        translateX.value = withSpring(0, { damping: 18 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }, { translateX: translateX.value }],
+  }));
+
+  return (
+    <GestureHandlerRootView style={styles.overlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+      </Pressable>
+      <Animated.View style={[styles.sheet, sheetStyle]}>
+        <GestureDetector gesture={pan}>
+          <View style={styles.dragZone}>
+            <View style={styles.handle} />
+            <Text style={styles.title}>👟 {t.home.topScorers}</Text>
+          </View>
+        </GestureDetector>
+        <ScrollView
+          style={styles.list}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}>
+          {scorers.map((s) => (
+            <ScorerRow key={s.rank} s={s} t={t} />
+          ))}
+        </ScrollView>
+        <Pressable style={styles.cancel} onPress={onClose}>
+          <Text style={styles.cancelText}>{t.common.cancel}</Text>
+        </Pressable>
+      </Animated.View>
+    </GestureHandlerRootView>
+  );
+}
+
+function ScorerRow({ s, t }: { s: TopScorer; t: T }) {
   const team = s.team_id ? teamsById[s.team_id] : undefined;
   return (
     <View style={styles.row}>
@@ -109,7 +171,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   goalsLabel: { color: palette.textTertiary, fontSize: 11, fontWeight: '700' },
-  // Modal
+  // Modal sheet
   overlay: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: palette.surface,
@@ -117,20 +179,20 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     borderWidth: 1,
     borderColor: palette.border2,
-    padding: 24,
+    paddingHorizontal: 24,
     paddingBottom: 40,
-    gap: 14,
-    maxHeight: '75%',
+    maxHeight: '80%',
   },
+  dragZone: { paddingTop: 12, paddingBottom: 14, alignItems: 'center', gap: 12 },
   handle: {
-    alignSelf: 'center',
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: palette.border2,
-    marginBottom: 2,
   },
   title: { color: palette.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  cancel: { alignItems: 'center', paddingVertical: 4 },
+  list: { flexShrink: 1 },
+  listContent: { gap: 12, paddingBottom: 4 },
+  cancel: { alignItems: 'center', paddingTop: 16 },
   cancelText: { color: palette.textSecondary, fontSize: 14, fontWeight: '700' },
 });
