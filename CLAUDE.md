@@ -302,6 +302,24 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-13 — UI polish: live clock, half-time, home cards (022, OTA-only)
+
+- **Live clock that ticks on-device.** New `useLiveClock(match)` anchors on the
+  server `minute` (re-anchored every Realtime patch) and adds the minutes
+  elapsed locally since `updated_at`, so `LiveBadge` counts up every second
+  instead of freezing between ~60s syncs; stoppage shows "45+2" / "90+3".
+  `LiveBadge` now takes the whole `match` (was `minute`).
+- **Half-time.** Migration **022** adds `matches.period` (`1H`/`2H`/`HT`/`ET`/
+  `PEN`/null); `sync-scores` derives it from football-data status (PAUSED → HT)
+  plus `score.duration`. `status` stays `live`, so every live filter is unchanged —
+  the badge just flips to an amber **"Half Time" / "Medio Tiempo"** (HT/MT
+  compact) with a steady dot.
+- **Home cards (Apple-Sports).** Compact Today/Upcoming cards rebuilt as a
+  vertical stack (full team names + exact day·time, "Today/Hoy" when today).
+  Next-match hero now shows the **stadium** (`📍 venue · city`) and is tappable →
+  `/match/[id]` (the same lineups/detail screen the lineup push opens). Match
+  detail header shows the kickoff "Today · 16:00" for scheduled matches.
+
 ### 2026-06-12 — Stats: cards, golden boot, lineups, match detail screen (016–019)
 
 - **016 `players.photo_url`** + `scripts/import-player-photos.mjs` (API-Football
