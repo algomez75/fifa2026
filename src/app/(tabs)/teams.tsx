@@ -17,6 +17,7 @@ import { HeartIcon, SearchIcon } from '@/components/icons';
 import type { Team } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
 import { seedTeams, teamsById } from '@/lib/seed';
+import { teamMatchesQuery } from '@/lib/teamSearch';
 import { palette, radius } from '@/lib/theme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useTranslation } from '@/store/useAppStore';
@@ -28,14 +29,9 @@ export default function TeamsScreen() {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return seedTeams;
-    return seedTeams.filter(
-      (team) =>
-        team.name.toLowerCase().includes(q) ||
-        (team.name_es ?? '').toLowerCase().includes(q) ||
-        (team.group_letter ?? '').toLowerCase() === q,
-    );
+    return seedTeams.filter((team) => teamMatchesQuery(team, q));
   }, [query]);
 
   const favTeams = favorites
