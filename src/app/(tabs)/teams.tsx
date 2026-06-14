@@ -92,29 +92,27 @@ export default function TeamsScreen() {
         {filtered.length === 0 ? (
           <EmptyState emoji="🔎" title={t.teams.noResults} />
         ) : (
-          <View style={styles.grid}>
+          <View style={styles.list}>
             {filtered.map((team) => {
               const isFav = favorites.includes(team.id);
               return (
                 <Pressable
                   key={team.id}
-                  style={styles.card}
+                  style={styles.row}
                   onPress={() => router.push(`/team/${team.id}`)}>
-                  <View style={styles.cardFlag}>
+                  <View style={styles.rowFlag}>
                     {team.iso2 ? (
-                      <CountryFlag isoCode={team.iso2} size={30} />
+                      <CountryFlag isoCode={team.iso2} size={28} />
                     ) : (
-                      <Text style={{ fontSize: 26 }}>{team.flag_emoji}</Text>
+                      <Text style={{ fontSize: 24 }}>{team.flag_emoji}</Text>
                     )}
                   </View>
-                  <Text style={styles.cardName} numberOfLines={1}>
+                  <Text style={styles.rowName} numberOfLines={1}>
                     {teamName(team, language)}
                   </Text>
-                  <View style={styles.cardMeta}>
-                    <Text style={styles.cardGroup}>
-                      {t.groups.group} {team.group_letter}
-                    </Text>
-                    {isFav ? <HeartIcon color={palette.gold} size={13} filled /> : null}
+                  {isFav ? <HeartIcon color={palette.gold} size={15} filled /> : null}
+                  <View style={styles.groupBadge}>
+                    <Text style={styles.groupBadgeText}>{team.group_letter}</Text>
                   </View>
                 </Pressable>
               );
@@ -162,24 +160,31 @@ const styles = StyleSheet.create({
     width: 96,
   },
   favName: { color: palette.text, fontSize: 12, fontWeight: '700', maxWidth: 80 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: {
-    width: '48%',
+  // Full-width rows: flag · full name (never truncates) · favorite · group badge.
+  list: { gap: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: palette.card,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: palette.border,
-    padding: 14,
-    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  cardFlag: { borderRadius: 4, overflow: 'hidden', alignSelf: 'flex-start' },
-  cardName: { color: palette.text, fontSize: 15, fontWeight: '700' },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardGroup: {
-    color: palette.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  rowFlag: { borderRadius: 4, overflow: 'hidden' },
+  rowName: { flex: 1, color: palette.text, fontSize: 15, fontWeight: '700' },
+  groupBadge: {
+    minWidth: 26,
+    height: 26,
+    paddingHorizontal: 7,
+    borderRadius: radius.sm,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  groupBadgeText: { color: palette.gold, fontSize: 12, fontWeight: '800' },
 });
