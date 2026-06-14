@@ -175,6 +175,7 @@ export const en = {
     haveAccount: 'Already have an account? Sign in',
     noAccount: 'Need an account? Create one',
     or: 'or',
+    language: 'Language',
     about: 'About',
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',

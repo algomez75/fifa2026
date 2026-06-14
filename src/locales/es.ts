@@ -176,6 +176,7 @@ export const es: Translation = {
     haveAccount: '¿Ya tienes cuenta? Inicia sesión',
     noAccount: '¿Necesitas una cuenta? Créala',
     or: 'o',
+    language: 'Idioma',
     about: 'Acerca de',
     privacyPolicy: 'Política de Privacidad',
     termsOfService: 'Términos de Servicio',

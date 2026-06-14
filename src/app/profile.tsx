@@ -1,5 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -41,7 +42,7 @@ import { supabase } from '@/lib/supabase';
 import { palette, radius } from '@/lib/theme';
 import { selectIsAnonymous, useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
-import { useTranslation } from '@/store/useAppStore';
+import { useAppStore, useTranslation } from '@/store/useAppStore';
 
 type Flash = (type: 'error' | 'ok', text: string) => void;
 
@@ -135,9 +136,43 @@ export default function ProfileScreen() {
             />
           )}
 
+          <LanguageSection />
           <AboutSection />
         </ScrollView>
       </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+/** Minimalist EN / ES picker — the only place the app language is chosen. */
+function LanguageSection() {
+  const { t } = useTranslation();
+  const language = useAppStore((s) => s.language);
+  const setLanguage = useAppStore((s) => s.setLanguage);
+  const options = [
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+  ] as const;
+
+  return (
+    <View style={styles.langWrap}>
+      <Text style={styles.aboutTitle}>{t.account.language}</Text>
+      <View style={styles.langSegment}>
+        {options.map((o) => {
+          const on = language === o.code;
+          return (
+            <Pressable
+              key={o.code}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setLanguage(o.code);
+              }}
+              style={[styles.langOption, on && styles.langOptionOn]}>
+              <Text style={[styles.langText, on && styles.langTextOn]}>{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -596,6 +631,25 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
+  langWrap: { marginTop: 24, gap: 8 },
+  langSegment: {
+    flexDirection: 'row',
+    backgroundColor: palette.surface,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 4,
+    gap: 4,
+  },
+  langOption: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: radius.pill,
+  },
+  langOptionOn: { backgroundColor: palette.goldDim },
+  langText: { color: palette.textSecondary, fontSize: 14, fontWeight: '700' },
+  langTextOn: { color: palette.gold },
   aboutCard: {
     backgroundColor: palette.surface,
     borderRadius: radius.md,

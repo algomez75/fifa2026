@@ -16,6 +16,7 @@ import { teamsById, venuesById } from '@/lib/seed';
 import { useTranslation } from '@/store/useAppStore';
 import { Avatar } from './Avatar';
 import { LiveBadge } from './LiveBadge';
+import { LocationPinIcon } from './icons';
 import { TeamFlag } from './TeamFlag';
 
 interface Props {
@@ -145,7 +146,11 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
           ) : isFinished ? (
             <Text style={styles.ft}>{t.common.ft}</Text>
           ) : (
-            <Text style={styles.time}>
+            <Text style={styles.time} numberOfLines={1}>
+              <Text style={styles.dayInline}>
+                {matchDayLabel(match.kickoff_utc, language, t.common.today)}
+              </Text>
+              {'  '}
               {formatKickoffTime(match.kickoff_utc, language)}
             </Text>
           )}
@@ -214,9 +219,16 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
         ) : null}
 
         {venue && !compact ? (
-          <Text style={styles.venue} numberOfLines={1}>
-            {venue.name} · {venue.city}
-          </Text>
+          <View style={styles.venueRow}>
+            <LocationPinIcon
+              color={palette.textTertiary}
+              dotColor={palette.textTertiary}
+              size={13}
+            />
+            <Text style={styles.venue} numberOfLines={1}>
+              {venue.name} · {venue.city}
+            </Text>
+          </View>
         ) : null}
 
         {prediction ? (
@@ -338,10 +350,11 @@ const styles = StyleSheet.create({
   scoreSep: { color: palette.textTertiary },
   vs: { color: palette.textTertiary, fontSize: 13, fontWeight: '700' },
   pens: { color: palette.textSecondary, fontSize: 10, marginTop: 2 },
+  venueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
   venue: {
     color: palette.textTertiary,
     fontSize: 12,
-    marginTop: 12,
+    flexShrink: 1,
   },
   goalsRow: {
     flexDirection: 'row',
