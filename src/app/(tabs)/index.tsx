@@ -32,15 +32,6 @@ export default function HomeScreen() {
       (m) => isMatchToday(m.kickoff_utc) && m.status !== 'finished',
     );
     const upNext = nextMatch(all);
-    // Scheduled matches beyond today are inherently in the future (past
-    // matches are live/finished), so no clock check is needed here.
-    const upcomingNext = all
-      .filter((m) => m.status === 'scheduled' && !isMatchToday(m.kickoff_utc))
-      .sort(
-        (a, b) =>
-          new Date(a.kickoff_utc).getTime() - new Date(b.kickoff_utc).getTime(),
-      )
-      .slice(0, 6);
     const favMatches = favorites
       .map((teamId) =>
         all.find(
@@ -50,13 +41,13 @@ export default function HomeScreen() {
         ),
       )
       .filter(Boolean) as Match[];
-    return { live, today, upNext, upcomingNext, favMatches };
+    return { live, today, upNext, favMatches };
   }, [matches, favorites]);
 
   if (isLoading) return <ScreenFrame><LoadingState /></ScreenFrame>;
   if (isError) return <ScreenFrame><ErrorState onRetry={refetch} /></ScreenFrame>;
 
-  const { live, today, upNext, upcomingNext, favMatches } = derived;
+  const { live, today, upNext, favMatches } = derived;
   const hasLive = live.length > 0;
 
   return (
@@ -136,47 +127,18 @@ export default function HomeScreen() {
           )}
         </Section>
 
-        {/* Today */}
+        {/* Today — full-width cards, same as Your teams */}
         <Section title={t.home.todaysMatches}>
           {today.length ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hScroll}>
-              {today.map((m) => (
-                <MatchCard
-                  key={m.id}
-                  match={m}
-                  compact
-                  onPress={() => openMatchTeam(m)}
-                />
-              ))}
-            </ScrollView>
+            today.map((m) => (
+              <MatchCard key={m.id} match={m} onPress={() => openMatchTeam(m)} />
+            ))
           ) : (
             <GlassCard>
               <Text style={styles.emptyInline}>{t.home.noMatchesToday}</Text>
             </GlassCard>
           )}
         </Section>
-
-        {/* Coming up (beyond today) */}
-        {upcomingNext.length ? (
-          <Section title={t.schedule.upcoming}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hScroll}>
-              {upcomingNext.map((m) => (
-                <MatchCard
-                  key={m.id}
-                  match={m}
-                  compact
-                  onPress={() => openMatchTeam(m)}
-                />
-              ))}
-            </ScrollView>
-          </Section>
-        ) : null}
 
         {/* Golden boot */}
         <Section title={`👟 ${t.home.topScorers}`}>
@@ -254,7 +216,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     letterSpacing: 0.3,
   },
-  hScroll: { gap: 12, paddingRight: 8 },
   emptyInline: { color: palette.textSecondary, fontSize: 14, textAlign: 'center', paddingVertical: 8 },
   ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   ctaTitle: { color: palette.text, fontSize: 15, fontWeight: '700' },

@@ -153,7 +153,10 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
 
         <View style={styles.teamsRow}>
           <View style={styles.side}>
-            <TeamFlag team={home} size={26} nameStyle={styles.teamName} />
+            <TeamFlag team={home} size={32} showName={false} />
+            <Text style={styles.teamName} numberOfLines={2}>
+              {sideName(match.home_team_id, match.home_placeholder, language)}
+            </Text>
           </View>
 
           <View style={styles.scoreBox}>
@@ -174,27 +177,13 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
             ) : null}
           </View>
 
-          <View style={[styles.side, styles.sideRight]}>
-            <TeamFlag
-              team={away}
-              size={26}
-              reverse
-              nameStyle={[styles.teamName, styles.teamNameRight]}
-            />
-          </View>
-        </View>
-
-        {/* Placeholder names for undecided knockout matches */}
-        {!home || !away ? (
-          <View style={styles.placeholderRow}>
-            <Text style={styles.placeholder} numberOfLines={1}>
-              {sideName(match.home_team_id, match.home_placeholder, language)}
-            </Text>
-            <Text style={styles.placeholder} numberOfLines={1}>
+          <View style={styles.side}>
+            <TeamFlag team={away} size={32} showName={false} />
+            <Text style={styles.teamName} numberOfLines={2}>
               {sideName(match.away_team_id, match.away_placeholder, language)}
             </Text>
           </View>
-        ) : null}
+        </View>
 
         {/* Goal scorers + cards — minimalist avatars + minutes, split by side */}
         {showGoals ? (
@@ -329,10 +318,15 @@ const styles = StyleSheet.create({
   },
   stackPlaceholder: { color: palette.textTertiary, fontSize: 13, flex: 1 },
   teamsRow: { flexDirection: 'row', alignItems: 'center' },
-  side: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  sideRight: { justifyContent: 'flex-end' },
-  teamName: { fontSize: 15, fontWeight: '700' },
-  teamNameRight: { textAlign: 'right' },
+  // Flag stacked over the full team name (no truncation / "…").
+  side: { flex: 1, alignItems: 'center', gap: 8 },
+  teamName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: palette.text,
+    textAlign: 'center',
+    lineHeight: 17,
+  },
   scoreBox: { alignItems: 'center', minWidth: 74, paddingHorizontal: 6 },
   score: {
     color: palette.text,
@@ -344,12 +338,6 @@ const styles = StyleSheet.create({
   scoreSep: { color: palette.textTertiary },
   vs: { color: palette.textTertiary, fontSize: 13, fontWeight: '700' },
   pens: { color: palette.textSecondary, fontSize: 10, marginTop: 2 },
-  placeholderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  placeholder: { color: palette.textTertiary, fontSize: 11, flex: 1 },
   venue: {
     color: palette.textTertiary,
     fontSize: 12,
