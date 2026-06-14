@@ -302,6 +302,25 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-13 — Stats-Package live: team stats on every match
+
+- **football-data Stats-Package add-on activated** → `detail.{home,away}Team.
+  statistics` now returns real `ball_possession`/`shots`/`shots_on_goal`/
+  `corner_kicks`/`fouls`/`offsides`/`saves`/cards (was a `{msg:"Subscribe…"}`
+  placeholder). `sync-scores` already stored it in `match_details.home_stats`/
+  `away_stats`, so the match-detail StatBars now light up with the real bars.
+  (Evaluated API-Football & Sportmonks free tiers first — **both exclude the
+  2026 World Cup season**, so staying on football-data was the zero-code path.)
+- **Backfill** `scripts/backfill-stats.mjs`: finished matches synced before the
+  add-on had null stats (sync-scores never re-fetches a finished+scored match).
+  One-time re-fetch merges stats into `match_details` (lineups preserved via
+  on-conflict). Ran for all 6 finished matches.
+- **sync-scores guard** now also re-fetches a match for ~1.5h after full-time so
+  the FINAL stats (finalized a few min after FINISHED) land automatically — no
+  future manual backfill needed.
+- **`useMatchDetail` adaptive polling:** ~15s while live (stats feel real-time),
+  60s pre-kickoff, off once finished.
+
 ### 2026-06-13 — UI polish: live clock, half-time, home cards (022, OTA-only)
 
 - **Live clock that ticks on-device.** New `useLiveClock(match)` anchors on the
