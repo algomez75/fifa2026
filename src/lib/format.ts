@@ -87,6 +87,12 @@ export function teamName(team: Team | undefined, lang: Language): string {
   return (lang === 'es' && team.name_es) || team.name;
 }
 
+/** FIFA-style 3-letter uppercase code (e.g. "USA", "BIH", "KOR"). Used as the
+ *  no-ellipsis fallback for long names — see the <TeamName/> component. */
+export function teamAbbr(team: Team | undefined): string {
+  return (team?.id ?? 'TBD').toUpperCase();
+}
+
 /** Next upcoming (scheduled) match by kickoff, or the first live one. */
 export function nextMatch(matches: Match[]): Match | undefined {
   const live = matches.find((m) => m.status === 'live');

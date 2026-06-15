@@ -9,14 +9,17 @@ import {
   View,
 } from 'react-native';
 import CountryFlag from 'react-native-country-flag';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HeaderActions } from '@/components/HeaderActions';
 import { EmptyState } from '@/components/States';
+import { TeamName } from '@/components/TeamName';
 import { HeartIcon, SearchIcon } from '@/components/icons';
 import type { Team } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
 import { seedTeams, teamsById } from '@/lib/seed';
+import { teamColor } from '@/lib/teamColors';
 import { teamMatchesQuery } from '@/lib/teamSearch';
 import { palette, radius } from '@/lib/theme';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -100,16 +103,21 @@ export default function TeamsScreen() {
                   key={team.id}
                   style={styles.row}
                   onPress={() => router.push(`/team/${team.id}`)}>
+                  <CardGradient team={team} />
                   <View style={styles.rowFlag}>
                     {team.iso2 ? (
-                      <CountryFlag isoCode={team.iso2} size={28} />
+                      <CountryFlag isoCode={team.iso2} size={30} />
                     ) : (
-                      <Text style={{ fontSize: 24 }}>{team.flag_emoji}</Text>
+                      <Text style={{ fontSize: 26 }}>{team.flag_emoji}</Text>
                     )}
                   </View>
-                  <Text style={styles.rowName} numberOfLines={1}>
-                    {teamName(team, language)}
-                  </Text>
+                  <View style={styles.rowMid}>
+                    <TeamName team={team} language={language} style={styles.rowName} />
+                    <Text style={styles.rowSub} numberOfLines={1}>
+                      {team.confederation}
+                      {team.host_country ? ` · ${t.schedule.filterCountry}` : ''}
+                    </Text>
+                  </View>
                   {isFav ? <HeartIcon color={palette.gold} size={15} filled /> : null}
                   <View style={styles.groupBadge}>
                     <Text style={styles.groupBadgeText}>{team.group_letter}</Text>
@@ -121,6 +129,25 @@ export default function TeamsScreen() {
         )}
       </ScrollView>
     </View>
+  );
+}
+
+/** Subtle left→right flag-colour gradient tint behind a team row. Uses SVG (no
+ *  extra native module) with a per-team gradient id. */
+function CardGradient({ team }: { team: Team }) {
+  const color = teamColor(team);
+  const id = `tg-${team.id}`;
+  return (
+    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={color} stopOpacity={0.24} />
+          <Stop offset="0.55" stopColor={color} stopOpacity={0.07} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
   );
 }
 
@@ -160,7 +187,8 @@ const styles = StyleSheet.create({
     width: 96,
   },
   favName: { color: palette.text, fontSize: 12, fontWeight: '700', maxWidth: 80 },
-  // Full-width rows: flag · full name (never truncates) · favorite · group badge.
+  // Full-width rows: flag-colour gradient · flag · name + confederation ·
+  // favorite · group badge. Names never truncate (3-letter code fallback).
   list: { gap: 8 },
   row: {
     flexDirection: 'row',
@@ -170,11 +198,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: palette.border,
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 14,
+    overflow: 'hidden',
   },
   rowFlag: { borderRadius: 4, overflow: 'hidden' },
-  rowName: { flex: 1, color: palette.text, fontSize: 15, fontWeight: '700' },
+  rowMid: { flex: 1, gap: 2 },
+  rowName: { color: palette.text, fontSize: 15, fontWeight: '700' },
+  rowSub: {
+    color: palette.textTertiary,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
   groupBadge: {
     minWidth: 26,
     height: 26,
