@@ -19,6 +19,8 @@
       goalsAbbr: 'G', liveLabel: 'LIVE',
       hero_eyebrow: 'Football 2026 · USA · MEX · CAN',
       hero_title: 'The 2026 tournament,<br>in your pocket.',
+      hero_title_1: 'The 2026 tournament,', hero_title_2: 'in your pocket.',
+      hero_badge: 'Free · No ads · Bilingual',
       tagline: 'Predict · Compete · Win',
       hero_lead: 'Schedule, live scores, squads, and a prediction game with friends. Free, dark, and bilingual.',
       store_apple_small: 'Download on the', store_google_small: 'Get it on',
@@ -49,6 +51,8 @@
       goalsAbbr: 'G', liveLabel: 'EN VIVO',
       hero_eyebrow: 'Fútbol 2026 · EE.UU. · MÉX · CAN',
       hero_title: 'El torneo 2026,<br>en tu bolsillo.',
+      hero_title_1: 'El torneo 2026,', hero_title_2: 'en tu bolsillo.',
+      hero_badge: 'Gratis · Sin anuncios · Bilingüe',
       tagline: 'Predice · Compite · Gana',
       hero_lead: 'Calendario, marcadores en vivo, plantillas y un juego de predicciones con amigos. Gratis, oscuro y bilingüe.',
       store_apple_small: 'Descarga en el', store_google_small: 'Disponible en',
@@ -263,4 +267,85 @@
   loadMatches();
   loadResults();
   loadScorers();
+
+  // ── motion engine (no deps; respects reduced-motion) ─────────────────────
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // scroll progress bar + sticky-nav state (rAF-throttled)
+  const bar = document.getElementById('progress');
+  const nav = document.getElementById('nav');
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(function () {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      if (bar) bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+      if (nav) nav.classList.toggle('scrolled', h.scrollTop > 12);
+      ticking = false;
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // stagger reveals that share a parent (cards, features, steps, stats)
+  document.querySelectorAll('.hero-copy,.grid,.steps,.stats').forEach(function (group) {
+    group.querySelectorAll('.reveal').forEach(function (el, i) {
+      el.style.setProperty('--rd', (i * 80) + 'ms');
+    });
+  });
+
+  // count-up numbers when the stat scrolls into view
+  function animateCount(el) {
+    const to = parseInt(el.getAttribute('data-to'), 10) || 0;
+    if (reduce) { el.textContent = to; return; }
+    const dur = 1100, t0 = performance.now();
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(to * eased);
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  const countIO = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { animateCount(e.target); countIO.unobserve(e.target); }
+    });
+  }, { threshold: 0.6 });
+  document.querySelectorAll('.count').forEach(function (el) { countIO.observe(el); });
+
+  if (!reduce) {
+    // magnetic buttons — pull toward the cursor, spring back on leave
+    document.querySelectorAll('.magnetic').forEach(function (el) {
+      el.addEventListener('pointermove', function (ev) {
+        const r = el.getBoundingClientRect();
+        const x = ev.clientX - r.left - r.width / 2;
+        const y = ev.clientY - r.top - r.height / 2;
+        el.style.transform = 'translate(' + x * 0.3 + 'px,' + y * 0.4 + 'px)';
+      });
+      el.addEventListener('pointerleave', function () { el.style.transform = ''; });
+    });
+
+    // 3D tilt + parallax chips, driven by cursor over the hero
+    const phone = document.getElementById('phone');
+    const stage = phone && phone.closest('.phone-stage');
+    const chips = document.querySelectorAll('.parallax');
+    if (stage) {
+      const hero = stage.closest('.hero');
+      hero.addEventListener('pointermove', function (ev) {
+        const r = hero.getBoundingClientRect();
+        const nx = (ev.clientX - r.left) / r.width - 0.5;
+        const ny = (ev.clientY - r.top) / r.height - 0.5;
+        phone.style.setProperty('--tilt', 'rotateY(' + nx * 14 + 'deg) rotateX(' + (-ny * 12) + 'deg)');
+        chips.forEach(function (c) {
+          const s = parseFloat(c.getAttribute('data-speed')) || 1;
+          c.style.setProperty('--px', 'translate(' + nx * 18 * s + 'px,' + ny * 18 * s + 'px)');
+        });
+      });
+      hero.addEventListener('pointerleave', function () {
+        phone.style.removeProperty('--tilt');
+        chips.forEach(function (c) { c.style.removeProperty('--px'); });
+      });
+    }
+  }
 })();

@@ -10,11 +10,26 @@
   <meta property="og:description" content="Schedule, live scores, squads, predictions and 1v1 challenges. Free, dark, bilingual." />
   <meta property="og:type" content="website" />
   <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- scroll progress -->
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
+  <!-- animated atmosphere -->
+  <div class="atmos" aria-hidden="true">
+    <div class="aurora a1"></div>
+    <div class="aurora a2"></div>
+    <div class="aurora a3"></div>
+    <div class="grid-lines"></div>
+    <div class="noise"></div>
+  </div>
+
   <!-- NAV -->
-  <header class="nav">
+  <header class="nav" id="nav">
     <a class="brand" href="#top" aria-label="11 Gol home">
       <span class="ball" aria-hidden="true"></span>
       <span>11&nbsp;Gol</span>
@@ -23,7 +38,7 @@
       <a href="#matches" data-i18n="nav_matches">Matches</a>
       <a href="#results" data-i18n="nav_results">Results</a>
       <a href="#videos" data-i18n="nav_videos">Videos</a>
-      <a href="#" data-store-link data-i18n="nav_download">Download</a>
+      <a class="nav-cta magnetic" href="#" data-store-link data-i18n="nav_download">Download</a>
       <button id="lang" class="lang" type="button" aria-label="Toggle language">
         <span class="on">EN</span> · <span>ES</span>
       </button>
@@ -33,23 +48,27 @@
   <main id="top">
     <!-- HERO -->
     <section class="hero">
-      <div class="hero-copy reveal">
-        <p class="eyebrow" data-i18n="hero_eyebrow">Football 2026 · USA · MEX · CAN</p>
-        <h1 data-i18n="hero_title">The 2026 tournament,<br />in your pocket.</h1>
-        <p class="tagline" data-i18n="tagline">Predict · Compete · Win</p>
-        <p class="lead" data-i18n="hero_lead">
+      <div class="hero-copy">
+        <p class="eyebrow reveal" data-i18n="hero_eyebrow">Football 2026 · USA · MEX · CAN</p>
+        <h1 class="hero-title">
+          <span class="reveal" data-i18n="hero_title_1">The 2026 tournament,</span>
+          <span class="reveal grad" data-i18n="hero_title_2">in your pocket.</span>
+        </h1>
+        <p class="tagline reveal" data-i18n="tagline">Predict · Compete · Win</p>
+        <p class="lead reveal" data-i18n="hero_lead">
           Schedule, live scores, squads, and a prediction game with friends.
           Free, dark, and bilingual.
         </p>
 
-        <div class="cta" id="download">
-          <a class="store" href="#" data-store-link aria-label="Download on the App Store">
+        <div class="cta reveal" id="download">
+          <a class="store magnetic" href="#" data-store-link aria-label="Download on the App Store">
             <span class="store-ic apple" aria-hidden="true"></span>
             <span class="store-txt"><small data-i18n="store_apple_small">Download on the</small><b>App Store</b></span>
           </a>
+          <span class="free-chip" data-i18n="hero_badge">Free · No ads · Bilingual</span>
         </div>
 
-        <div class="countdown" aria-live="polite">
+        <div class="countdown reveal" aria-live="polite">
           <p class="cd-label" data-i18n="cd_label">Kickoff in</p>
           <div class="cd-grid" id="cd">
             <div><b data-cd="d">00</b><span data-i18n="cd_d">Days</span></div>
@@ -61,33 +80,50 @@
       </div>
 
       <!-- PHONE MOCKUP -->
-      <div class="phone reveal" aria-hidden="true">
-        <div class="phone-screen">
-          <div class="p-eyebrow">11 GOL · 2026</div>
-          <div class="p-title">11&nbsp;Gol</div>
-          <div class="p-card glow">
-            <div class="p-row"><span><img class="fl-img sm" src="https://flagcdn.com/w20/mx.png" alt="">Mexico</span><b class="live"><i></i>LIVE 67'</b></div>
-            <div class="p-score">1 : 1</div>
-            <div class="p-row right"><span>South Africa<img class="fl-img sm" src="https://flagcdn.com/w20/za.png" alt=""></span></div>
+      <div class="phone-stage reveal" aria-hidden="true">
+        <div class="phone tilt" id="phone">
+          <div class="phone-glow"></div>
+          <div class="phone-screen">
+            <div class="p-eyebrow">11 GOL · 2026</div>
+            <div class="p-title">11&nbsp;Gol</div>
+            <div class="p-card glow">
+              <div class="p-row"><span><img class="fl-img sm" src="https://flagcdn.com/w20/mx.png" alt="">Mexico</span><b class="live"><i></i>LIVE 67'</b></div>
+              <div class="p-score">1 : 1</div>
+              <div class="p-row right"><span>South Africa<img class="fl-img sm" src="https://flagcdn.com/w20/za.png" alt=""></span></div>
+            </div>
+            <div class="p-card">
+              <div class="p-row"><span><img class="fl-img sm" src="https://flagcdn.com/w20/br.png" alt="">Brazil</span><span class="muted">19:00</span></div>
+              <div class="p-row right"><span>Morocco<img class="fl-img sm" src="https://flagcdn.com/w20/ma.png" alt=""></span></div>
+              <div class="p-pred">Your pick · 2–1 <b>+3</b></div>
+            </div>
+            <div class="p-tabbar">
+              <span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
           </div>
-          <div class="p-card">
-            <div class="p-row"><span><img class="fl-img sm" src="https://flagcdn.com/w20/br.png" alt="">Brazil</span><span class="muted">19:00</span></div>
-            <div class="p-row right"><span>Morocco<img class="fl-img sm" src="https://flagcdn.com/w20/ma.png" alt=""></span></div>
-            <div class="p-pred">Your pick · 2–1 <b>+3</b></div>
-          </div>
-          <div class="p-tabbar">
-            <span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-          </div>
+        </div>
+        <!-- floating parallax chips -->
+        <div class="chip-float c-pts parallax" data-speed="2.2">+3 <small>pts</small></div>
+        <div class="chip-float c-goal parallax" data-speed="-1.8">⚽ GOAL</div>
+        <div class="chip-float c-rank parallax" data-speed="1.4">#1 <small>rank</small></div>
+      </div>
+    </section>
+
+    <!-- MARQUEE -->
+    <section class="marquee-wrap reveal" aria-hidden="true">
+      <div class="marquee">
+        <div class="marquee-track">
+          <span>June 11 2026</span><i>✦</i><span>USA</span><i>✦</i><span>Mexico</span><i>✦</i><span>Canada</span><i>✦</i><span>48 Teams</span><i>✦</i><span>104 Matches</span><i>✦</i><span>16 Venues</span><i>✦</i>
+          <span>June 11 2026</span><i>✦</i><span>USA</span><i>✦</i><span>Mexico</span><i>✦</i><span>Canada</span><i>✦</i><span>48 Teams</span><i>✦</i><span>104 Matches</span><i>✦</i><span>16 Venues</span><i>✦</i>
         </div>
       </div>
     </section>
 
     <!-- STATS STRIP -->
-    <section class="stats reveal">
-      <div><b>48</b><span data-i18n="st_teams">Teams</span></div>
-      <div><b>104</b><span data-i18n="st_matches">Matches</span></div>
-      <div><b>16</b><span data-i18n="st_venues">Venues</span></div>
-      <div><b>3</b><span data-i18n="st_hosts">Host nations</span></div>
+    <section class="stats">
+      <div class="reveal"><b class="count" data-to="48">0</b><span data-i18n="st_teams">Teams</span></div>
+      <div class="reveal"><b class="count" data-to="104">0</b><span data-i18n="st_matches">Matches</span></div>
+      <div class="reveal"><b class="count" data-to="16">0</b><span data-i18n="st_venues">Venues</span></div>
+      <div class="reveal"><b class="count" data-to="3">0</b><span data-i18n="st_hosts">Host nations</span></div>
     </section>
 
     <!-- LIVE + UPCOMING MATCHES (live from API) -->
@@ -161,10 +197,12 @@
 
     <!-- CTA BANNER -->
     <section class="banner reveal">
-      <h2 data-i18n="banner_title">Ready for June 11?</h2>
-      <p data-i18n="banner_sub">Download 11 Gol and don't miss a single match.</p>
-      <div class="cta center">
-        <a class="store" href="#" data-store-link><span class="store-ic apple"></span><span class="store-txt"><small data-i18n="store_apple_small">Download on the</small><b>App Store</b></span></a>
+      <div class="banner-inner">
+        <h2 data-i18n="banner_title">Ready for June 11?</h2>
+        <p data-i18n="banner_sub">Download 11 Gol and don't miss a single match.</p>
+        <div class="cta center">
+          <a class="store magnetic" href="#" data-store-link><span class="store-ic apple"></span><span class="store-txt"><small data-i18n="store_apple_small">Download on the</small><b>App Store</b></span></a>
+        </div>
       </div>
     </section>
   </main>
