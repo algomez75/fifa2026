@@ -93,6 +93,14 @@ export function teamAbbr(team: Team | undefined): string {
   return (team?.id ?? 'TBD').toUpperCase();
 }
 
+/** Compact a player's name for tight UI: "Julián Quiñones" → "J. Quiñones". */
+export function shortName(name: string | null | undefined): string {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name;
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+}
+
 /** Next upcoming (scheduled) match by kickoff, or the first live one. */
 export function nextMatch(matches: Match[]): Match | undefined {
   const live = matches.find((m) => m.status === 'live');

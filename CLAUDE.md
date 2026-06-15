@@ -302,6 +302,34 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-15 — Self-hosted player photos + modular lineup pitch (024)
+
+- **Every player photo is now self-hosted** (migration **024**: public
+  `player-photos` Storage bucket). Photos used to be hotlinked to
+  `media.api-sports.io` (1130/1249) with 119 missing. `scripts/host-player-photos.mjs`
+  downloads every photo into `player-photos/<id>.jpg` and repoints
+  `players.photo_url` at our own CDN — permanent, no third-party dependency, and
+  it survives squad re-imports (`import-squads.mjs`/`sync-scores` never touch
+  `photo_url`). Result: **1240/1249 self-hosted, 0 still on api-sports**, only 9
+  fringe players left (clean gold-initial avatar fallback).
+- **Multi-source gap fill** (119 → 9 missing). Per player, the script resolves an
+  image in priority order: (1) existing api-sports URL → re-host; (2) **match by
+  shirt number** within the team against the API-Football squad (unique key —
+  recovered **89** gap players where name-matching had failed); (3) **Wikidata /
+  Wikimedia Commons** for the rest (all of DR Congo — API-Football returns 0
+  squads for them — plus single-name players), gated on occupation = association
+  football player (Q937857) so a namesake/team photo is never attached, with an
+  English-Wikipedia full-text fallback for mononyms ("Martinelli" → Gabriel
+  Martinelli). 21 filled via Wikidata. Resumable checkpoint
+  (`scripts/.host-photos.json`), idempotent (`--refresh` to re-pull).
+- **Modular `LineupPitch` component** (`src/components/LineupPitch.tsx`). The
+  formation pitch was inline in `match/[id].tsx`; extracted into one reusable
+  component so every lineup surface (live, finished/past results, future) renders
+  **identically**. Made **taller + real-pitch-shaped** (`aspectRatio 0.64`, rows
+  distributed evenly down the field via `flex` + `space-between`) — bigger and
+  more elongated than the old content-hugging layout. `shortName` moved to
+  `lib/format.ts` (shared by the pitch + bench/subs). JS-only → OTA.
+
 ### 2026-06-13 — More coverage from the paid tier (023)
 
 All sourced from data football-data already returns (no new paid add-on):

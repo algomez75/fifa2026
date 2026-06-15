@@ -2,18 +2,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Avatar } from '@/components/Avatar';
 import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
-import { GloveIcon } from '@/components/icons';
+import { LineupPitch } from '@/components/LineupPitch';
 import { LiveBadge } from '@/components/LiveBadge';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
-import { useMatchDetail, type LineupPlayer, type MatchDetail } from '@/hooks/useMatchDetail';
+import { useMatchDetail, type MatchDetail } from '@/hooks/useMatchDetail';
 import { useMatchEvents } from '@/hooks/useMatchEvents';
 import { useMatches } from '@/hooks/useMatches';
-import { formatKickoffTime, matchDayLabel, teamName } from '@/lib/format';
+import { formatKickoffTime, matchDayLabel, shortName, teamName } from '@/lib/format';
 import { teamsById, venuesById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { useTranslation } from '@/store/useAppStore';
@@ -219,7 +218,7 @@ export default function MatchDetailScreen() {
               </Pressable>
             </View>
 
-            <Pitch
+            <LineupPitch
               lineup={(side === 'home' ? detail.home_lineup : detail.away_lineup) ?? []}
               formation={side === 'home' ? detail.home_formation : detail.away_formation}
               events={matchEvents}
@@ -271,110 +270,6 @@ function StatBar({ label, home, away }: { label: string; home: number; away: num
   );
 }
 
-/** Vertical pitch: GK at the bottom, attackers on top, rows from the formation. */
-function Pitch({
-  lineup,
-  formation,
-  events,
-}: {
-  lineup: LineupPlayer[];
-  formation: string | null;
-  events: { type: string; player_id: number | null; player_name: string | null }[];
-}) {
-  const rows = useMemo(() => {
-    if (!lineup.length) return [] as LineupPlayer[][];
-    const [gk, ...rest] = lineup;
-    const counts = (formation ?? '4-4-2')
-      .split('-')
-      .map((n) => parseInt(n, 10))
-      .filter((n) => !isNaN(n) && n > 0);
-    const lines: LineupPlayer[][] = [[gk]];
-    let i = 0;
-    for (const c of counts) {
-      lines.push(rest.slice(i, i + c));
-      i += c;
-    }
-    if (i < rest.length) lines.push(rest.slice(i)); // leftovers safety
-    return lines.reverse(); // attack on top, GK at the bottom
-  }, [lineup, formation]);
-
-  const gk = lineup[0];
-
-  const badge = (p: LineupPlayer) => {
-    const mine = events.filter(
-      (e) =>
-        (p.player_id != null && e.player_id === p.player_id) ||
-        (e.player_name != null && p.name != null && e.player_name === p.name),
-    );
-    let out = '';
-    if (mine.some((e) => e.type === 'goal')) out += '⚽';
-    if (mine.some((e) => e.type === 'yellow')) out += '🟨';
-    if (mine.some((e) => e.type === 'red')) out += '🟥';
-    return out;
-  };
-
-  return (
-    <View style={styles.pitch}>
-      <PitchMarkings />
-      <View style={styles.pitchRows}>
-        {rows.map((line, li) => (
-          <View key={li} style={styles.pitchRow}>
-            {line.map((p, pi) => {
-              const isGK = p === gk || /goal|portero|keeper/i.test(p.position ?? '');
-              return (
-                <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
-                  <View style={styles.avatarWrap}>
-                    <Avatar url={p.photo} name={p.name} size={44} ring={false} />
-                    {/* shirt number */}
-                    {p.shirtNumber != null ? (
-                      <View style={styles.numBadge}>
-                        <Text style={styles.numText}>{p.shirtNumber}</Text>
-                      </View>
-                    ) : null}
-                    {/* goalkeeper hint */}
-                    {isGK ? (
-                      <View style={styles.gkBadge}>
-                        <GloveIcon color={palette.gold} size={12} strokeWidth={2.2} />
-                      </View>
-                    ) : null}
-                    {/* captain */}
-                    {p.captain ? (
-                      <View style={styles.capBadge}>
-                        <Text style={styles.capText}>C</Text>
-                      </View>
-                    ) : null}
-                    {/* goals / cards */}
-                    {badge(p) ? <Text style={styles.pitchBadge}>{badge(p)}</Text> : null}
-                  </View>
-                  <Text style={styles.pitchName} numberOfLines={1}>
-                    {shortName(p.name)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-/** Minimalist painted field lines (Apple-Sports style): halfway line, center
- *  circle + spot, and penalty + goal areas at both ends. Sits behind players. */
-function PitchMarkings() {
-  return (
-    <View style={styles.fieldMarks} pointerEvents="none">
-      <View style={styles.fieldHalfway} />
-      <View style={styles.fieldCircle} />
-      <View style={styles.fieldSpot} />
-      <View style={[styles.penaltyBox, styles.penaltyBoxTop]} />
-      <View style={[styles.goalArea, styles.goalAreaTop]} />
-      <View style={[styles.penaltyBox, styles.penaltyBoxBottom]} />
-      <View style={[styles.goalArea, styles.goalAreaBottom]} />
-    </View>
-  );
-}
-
 function BenchAndSubs({
   detail,
   side,
@@ -410,14 +305,6 @@ function BenchAndSubs({
       ) : null}
     </View>
   );
-}
-
-/** "Julián Quiñones" → "J. Quiñones" */
-function shortName(name: string | null): string {
-  if (!name) return '';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length < 2) return name;
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
 }
 
 const styles = StyleSheet.create({
@@ -506,118 +393,6 @@ const styles = StyleSheet.create({
   formationChipOn: { backgroundColor: palette.goldDim, borderColor: palette.gold },
   formationText: { color: palette.textSecondary, fontSize: 13, fontWeight: '800' },
   formationTextOn: { color: palette.gold },
-  pitch: {
-    position: 'relative',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(99,153,34,0.35)',
-    backgroundColor: 'rgba(99,153,34,0.12)',
-    overflow: 'hidden',
-  },
-  pitchRows: { paddingVertical: 26, gap: 30 },
-  pitchRow: { flexDirection: 'row', justifyContent: 'space-evenly' },
-  // Minimalist field markings (semi-transparent white lines).
-  fieldMarks: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  fieldHalfway: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  fieldCircle: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 88,
-    height: 88,
-    marginLeft: -44,
-    marginTop: -44,
-    borderRadius: 44,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  fieldSpot: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 4,
-    height: 4,
-    marginLeft: -2,
-    marginTop: -2,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  penaltyBox: {
-    position: 'absolute',
-    left: '18%',
-    right: '18%',
-    height: 60,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  penaltyBoxTop: { top: 0, borderTopWidth: 0 },
-  penaltyBoxBottom: { bottom: 0, borderBottomWidth: 0 },
-  goalArea: {
-    position: 'absolute',
-    left: '34%',
-    right: '34%',
-    height: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  goalAreaTop: { top: 0, borderTopWidth: 0 },
-  goalAreaBottom: { bottom: 0, borderBottomWidth: 0 },
-  pitchPlayer: { alignItems: 'center', width: 64 },
-  avatarWrap: { position: 'relative' },
-  pitchBadge: { position: 'absolute', right: -8, top: -4, fontSize: 12 },
-  numBadge: {
-    position: 'absolute',
-    right: -5,
-    bottom: -4,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 3,
-    borderRadius: 9,
-    backgroundColor: palette.card,
-    borderWidth: 1,
-    borderColor: palette.border2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numText: {
-    color: palette.text,
-    fontSize: 10,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-  },
-  gkBadge: {
-    position: 'absolute',
-    left: -5,
-    top: -4,
-    width: 19,
-    height: 19,
-    borderRadius: 10,
-    backgroundColor: palette.card,
-    borderWidth: 1,
-    borderColor: palette.goldDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  capBadge: {
-    position: 'absolute',
-    left: -5,
-    bottom: -4,
-    width: 17,
-    height: 17,
-    borderRadius: 9,
-    backgroundColor: palette.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  capText: { color: palette.bg, fontSize: 10, fontWeight: '900' },
-  pitchName: { color: palette.text, fontSize: 10.5, fontWeight: '700', marginTop: 6 },
   benchWrap: { marginTop: 14, gap: 4 },
   benchTitle: {
     color: palette.gold,
