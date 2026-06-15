@@ -188,6 +188,7 @@ Deno.serve(async () => {
         shirtNumber: p.shirtNumber ?? null,
         fd_id: p.id ?? null,
         player_id: resolvePlayer(teamId, p.name ?? null),
+        captain: p.captain ?? null,
       }));
     const homeTeamId = teamByFdId.get(detail.homeTeam?.id) ?? null;
     const awayTeamId = teamByFdId.get(detail.awayTeam?.id) ?? null;

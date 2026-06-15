@@ -8,6 +8,8 @@ export interface LineupPlayer {
   shirtNumber: number | null;
   fd_id: number | null;
   player_id: number | null;
+  /** Team captain, when the feed flags it. */
+  captain?: boolean | null;
   /** Joined client-side from the players cache when available. */
   photo?: string | null;
 }

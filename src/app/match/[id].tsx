@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '@/components/Avatar';
 import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
+import { GloveIcon } from '@/components/icons';
 import { LiveBadge } from '@/components/LiveBadge';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/States';
@@ -297,6 +298,8 @@ function Pitch({
     return lines.reverse(); // attack on top, GK at the bottom
   }, [lineup, formation]);
 
+  const gk = lineup[0];
+
   const badge = (p: LineupPlayer) => {
     const mine = events.filter(
       (e) =>
@@ -316,18 +319,39 @@ function Pitch({
       <View style={styles.pitchRows}>
         {rows.map((line, li) => (
           <View key={li} style={styles.pitchRow}>
-            {line.map((p, pi) => (
-              <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
-                <View>
-                  <Avatar url={p.photo} name={p.name} size={42} ring={false} />
-                  {badge(p) ? <Text style={styles.pitchBadge}>{badge(p)}</Text> : null}
+            {line.map((p, pi) => {
+              const isGK = p === gk || /goal|portero|keeper/i.test(p.position ?? '');
+              return (
+                <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
+                  <View style={styles.avatarWrap}>
+                    <Avatar url={p.photo} name={p.name} size={44} ring={false} />
+                    {/* shirt number */}
+                    {p.shirtNumber != null ? (
+                      <View style={styles.numBadge}>
+                        <Text style={styles.numText}>{p.shirtNumber}</Text>
+                      </View>
+                    ) : null}
+                    {/* goalkeeper hint */}
+                    {isGK ? (
+                      <View style={styles.gkBadge}>
+                        <GloveIcon color={palette.gold} size={12} strokeWidth={2.2} />
+                      </View>
+                    ) : null}
+                    {/* captain */}
+                    {p.captain ? (
+                      <View style={styles.capBadge}>
+                        <Text style={styles.capText}>C</Text>
+                      </View>
+                    ) : null}
+                    {/* goals / cards */}
+                    {badge(p) ? <Text style={styles.pitchBadge}>{badge(p)}</Text> : null}
+                  </View>
+                  <Text style={styles.pitchName} numberOfLines={1}>
+                    {shortName(p.name)}
+                  </Text>
                 </View>
-                <Text style={styles.pitchName} numberOfLines={1}>
-                  {shortName(p.name)}
-                </Text>
-                <Text style={styles.pitchNum}>{p.shirtNumber ?? ''}</Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ))}
       </View>
@@ -490,7 +514,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(99,153,34,0.12)',
     overflow: 'hidden',
   },
-  pitchRows: { paddingVertical: 18, gap: 16 },
+  pitchRows: { paddingVertical: 26, gap: 30 },
   pitchRow: { flexDirection: 'row', justifyContent: 'space-evenly' },
   // Minimalist field markings (semi-transparent white lines).
   fieldMarks: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -545,10 +569,55 @@ const styles = StyleSheet.create({
   },
   goalAreaTop: { top: 0, borderTopWidth: 0 },
   goalAreaBottom: { bottom: 0, borderBottomWidth: 0 },
-  pitchPlayer: { alignItems: 'center', width: 68 },
+  pitchPlayer: { alignItems: 'center', width: 64 },
+  avatarWrap: { position: 'relative' },
   pitchBadge: { position: 'absolute', right: -8, top: -4, fontSize: 12 },
-  pitchName: { color: palette.text, fontSize: 10.5, fontWeight: '700', marginTop: 4 },
-  pitchNum: { color: palette.textTertiary, fontSize: 10 },
+  numBadge: {
+    position: 'absolute',
+    right: -5,
+    bottom: -4,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 3,
+    borderRadius: 9,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  numText: {
+    color: palette.text,
+    fontSize: 10,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
+  gkBadge: {
+    position: 'absolute',
+    left: -5,
+    top: -4,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.goldDim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  capBadge: {
+    position: 'absolute',
+    left: -5,
+    bottom: -4,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: palette.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  capText: { color: palette.bg, fontSize: 10, fontWeight: '900' },
+  pitchName: { color: palette.text, fontSize: 10.5, fontWeight: '700', marginTop: 6 },
   benchWrap: { marginTop: 14, gap: 4 },
   benchTitle: {
     color: palette.gold,

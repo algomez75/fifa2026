@@ -163,6 +163,20 @@ export function LocationPinIcon({
   );
 }
 
+export function GloveIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path
+        d="M8 12V6.2a1.4 1.4 0 0 1 2.8 0V11m0-.6V4.8a1.4 1.4 0 0 1 2.8 0V11m0-.4V6a1.4 1.4 0 0 1 2.8 0v6.8c0 3.4-2.3 6.2-6 6.2-2.4 0-4-1.1-5-2.8l-2-3.4a1.5 1.5 0 0 1 2.5-1.7L8 12.2"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function SearchIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">
