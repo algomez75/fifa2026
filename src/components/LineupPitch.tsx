@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { GloveIcon } from '@/components/icons';
@@ -29,6 +29,11 @@ interface Props {
  * finished/past results, and any future surface) so they all look identical.
  */
 export function LineupPitch({ lineup, formation, events = [] }: Props) {
+  // Sized as a fraction of the screen so the field is large and identical on
+  // every surface (live, past results, …) — ~72% of the iPhone's height.
+  const { height } = useWindowDimensions();
+  const pitchHeight = Math.max(540, Math.round(height * 0.72));
+
   const rows = useMemo(() => {
     if (!lineup.length) return [] as LineupPlayer[][];
     const [gk, ...rest] = lineup;
@@ -62,7 +67,7 @@ export function LineupPitch({ lineup, formation, events = [] }: Props) {
   };
 
   return (
-    <View style={styles.pitch}>
+    <View style={[styles.pitch, { height: pitchHeight }]}>
       <PitchMarkings />
       <View style={styles.pitchRows}>
         {rows.map((line, li) => (
@@ -72,7 +77,7 @@ export function LineupPitch({ lineup, formation, events = [] }: Props) {
               return (
                 <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
                   <View style={styles.avatarWrap}>
-                    <Avatar url={p.photo} name={p.name} size={46} ring={false} />
+                    <Avatar url={p.photo} name={p.name} size={52} ring={false} />
                     {p.shirtNumber != null ? (
                       <View style={styles.numBadge}>
                         <Text style={styles.numText}>{p.shirtNumber}</Text>
@@ -122,17 +127,17 @@ function PitchMarkings() {
 const LINE = 'rgba(255,255,255,0.14)';
 
 const styles = StyleSheet.create({
-  // Tall, real-pitch proportions; rows are distributed evenly down the field.
+  // Tall field (height is set dynamically to ~72% of the screen); rows are
+  // distributed evenly down the pitch.
   pitch: {
     position: 'relative',
-    aspectRatio: 0.64,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: 'rgba(99,153,34,0.35)',
     backgroundColor: 'rgba(99,153,34,0.12)',
     overflow: 'hidden',
   },
-  pitchRows: { flex: 1, paddingVertical: 22, justifyContent: 'space-between' },
+  pitchRows: { flex: 1, paddingVertical: 28, justifyContent: 'space-between' },
   pitchRow: { flexDirection: 'row', justifyContent: 'space-evenly' },
   fieldMarks: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   fieldHalfway: {
@@ -147,11 +152,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 104,
-    height: 104,
-    marginLeft: -52,
-    marginTop: -52,
-    borderRadius: 52,
+    width: 128,
+    height: 128,
+    marginLeft: -64,
+    marginTop: -64,
+    borderRadius: 64,
     borderWidth: 1,
     borderColor: LINE,
   },
@@ -168,9 +173,9 @@ const styles = StyleSheet.create({
   },
   penaltyBox: {
     position: 'absolute',
-    left: '18%',
-    right: '18%',
-    height: 66,
+    left: '17%',
+    right: '17%',
+    height: 88,
     borderWidth: 1,
     borderColor: LINE,
   },
@@ -178,15 +183,15 @@ const styles = StyleSheet.create({
   penaltyBoxBottom: { bottom: 0, borderBottomWidth: 0 },
   goalArea: {
     position: 'absolute',
-    left: '34%',
-    right: '34%',
-    height: 28,
+    left: '33%',
+    right: '33%',
+    height: 38,
     borderWidth: 1,
     borderColor: LINE,
   },
   goalAreaTop: { top: 0, borderTopWidth: 0 },
   goalAreaBottom: { bottom: 0, borderBottomWidth: 0 },
-  pitchPlayer: { alignItems: 'center', width: 66 },
+  pitchPlayer: { alignItems: 'center', width: 62 },
   avatarWrap: { position: 'relative' },
   pitchBadge: { position: 'absolute', right: -8, top: -4, fontSize: 12 },
   numBadge: {
