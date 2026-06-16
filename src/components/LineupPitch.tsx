@@ -30,9 +30,9 @@ interface Props {
  */
 export function LineupPitch({ lineup, formation, events = [] }: Props) {
   // Sized as a fraction of the screen so the field is large and identical on
-  // every surface (live, past results, …) — ~72% of the iPhone's height.
+  // every surface (live, past results, …) — ~78% of the iPhone's height.
   const { height } = useWindowDimensions();
-  const pitchHeight = Math.max(540, Math.round(height * 0.72));
+  const pitchHeight = Math.max(580, Math.round(height * 0.78));
 
   const rows = useMemo(() => {
     if (!lineup.length) return [] as LineupPlayer[][];
@@ -77,7 +77,7 @@ export function LineupPitch({ lineup, formation, events = [] }: Props) {
               return (
                 <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
                   <View style={styles.avatarWrap}>
-                    <Avatar url={p.photo} name={p.name} size={52} ring={false} />
+                    <Avatar url={p.photo} name={p.name} size={56} ring={false} />
                     {p.shirtNumber != null ? (
                       <View style={styles.numBadge}>
                         <Text style={styles.numText}>{p.shirtNumber}</Text>
@@ -152,11 +152,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 128,
-    height: 128,
-    marginLeft: -64,
-    marginTop: -64,
-    borderRadius: 64,
+    width: 140,
+    height: 140,
+    marginLeft: -70,
+    marginTop: -70,
+    borderRadius: 70,
     borderWidth: 1,
     borderColor: LINE,
   },
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   goalAreaTop: { top: 0, borderTopWidth: 0 },
   goalAreaBottom: { bottom: 0, borderBottomWidth: 0 },
-  pitchPlayer: { alignItems: 'center', width: 62 },
+  pitchPlayer: { alignItems: 'center', width: 64 },
   avatarWrap: { position: 'relative' },
   pitchBadge: { position: 'absolute', right: -8, top: -4, fontSize: 12 },
   numBadge: {
@@ -239,5 +239,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   capText: { color: palette.bg, fontSize: 10, fontWeight: '900' },
-  pitchName: { color: palette.text, fontSize: 10.5, fontWeight: '700', marginTop: 6 },
+  pitchName: { color: palette.text, fontSize: 11, fontWeight: '700', marginTop: 7 },
 });
