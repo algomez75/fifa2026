@@ -43,6 +43,8 @@ example
 /ios
 /android
 
-# photo-import runtime artifacts (checkpoint + log)
+# script runtime artifacts (checkpoints + logs)
 scripts/.host-photos.json
 scripts/.host-photos.log
+scripts/.ios-build.log
+scripts/.ios-submit.log
