@@ -66,6 +66,7 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let retryDelay = 2000;
     let disposed = false;
+    let hasConnected = false; // becomes true after the first SUBSCRIBED
 
     const findMatch = (id: string) =>
       (qc.getQueryData<Match[]>(matchesKey) ?? []).find((m) => m.id === id);
@@ -144,6 +145,24 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
       });
     };
 
+    // sync-scores reconciles match_events against the live feed: a VAR-annulled
+    // goal is DELETEd and a corrected one UPDATEd. Reflect both so the scorer
+    // disappears / updates in place instead of lingering until a refetch.
+    const onEventUpdate = (payload: { new: unknown }) => {
+      const ev = payload.new as MatchEventRow;
+      qc.setQueryData<GoalEvent[]>(matchEventsKey, (old) =>
+        (old ?? []).map((e) => (e.id === ev.id ? { ...e, ...ev } : e)),
+      );
+    };
+
+    const onEventDelete = (payload: { old: unknown }) => {
+      const oldId = (payload.old as { id?: string })?.id;
+      if (!oldId) return;
+      qc.setQueryData<GoalEvent[]>(matchEventsKey, (old) =>
+        (old ?? []).filter((e) => e.id !== oldId),
+      );
+    };
+
     const teardown = () => {
       if (channel) {
         supabase.removeChannel(channel);
@@ -166,10 +185,28 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
           { event: 'INSERT', schema: 'public', table: 'match_events' },
           onEventInsert,
         )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'match_events' },
+          onEventUpdate,
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'match_events' },
+          onEventDelete,
+        )
         .subscribe((status) => {
           if (disposed) return;
           if (status === 'SUBSCRIBED') {
             retryDelay = 2000;
+            // On a *re*-connect (after a drop), refetch what the socket missed
+            // while it was down. Skip the very first connect (initial fetch
+            // already runs).
+            if (hasConnected) {
+              qc.invalidateQueries({ queryKey: matchesKey });
+              qc.invalidateQueries({ queryKey: matchEventsKey });
+            }
+            hasConnected = true;
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             // A dead channel never revives itself — rebuild it with backoff.
             if (retryTimer) clearTimeout(retryTimer);

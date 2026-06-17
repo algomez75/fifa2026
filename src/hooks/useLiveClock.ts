@@ -7,6 +7,9 @@ export interface LiveClock {
   isHalfTime: boolean;
   /** Ready-to-render minute, e.g. "67", "45+2", "90+3" — null when unknown. */
   text: string | null;
+  /** Progressive match clock with seconds, e.g. "67:23", "45+2:13" — null when
+   *  unknown. Ticks every second so the live time feels real (Apple-Sports). */
+  clock: string | null;
 }
 
 /** Add the in-half stoppage "+n" when the running minute overruns its half. */
@@ -15,6 +18,8 @@ function formatMinute(minute: number, period: string | null | undefined): string
   if ((period === '2H' || period == null) && minute > 90) return `90+${minute - 90}`;
   return String(minute);
 }
+
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
 /**
  * A live match clock that **ticks on the device** instead of waiting for the
@@ -39,18 +44,27 @@ export function useLiveClock(match: Match): LiveClock {
   }, [isLive]);
 
   const isHalfTime = match.period === 'HT' || match.period === 'BT';
-  if (!isLive || isHalfTime) return { isHalfTime, text: null };
+  if (!isLive || isHalfTime) return { isHalfTime, text: null, clock: null };
 
+  // Derive minute AND seconds from the drift since the server anchor, so the
+  // clock counts up smoothly between ~20s syncs and re-anchors on each patch.
   let minute: number | null = null;
+  let seconds = 0;
   if (typeof match.minute === 'number') {
     const anchorAt = match.updated_at ? new Date(match.updated_at).getTime() : now;
-    const drift = Math.max(0, Math.floor((now - anchorAt) / 60_000));
-    minute = match.minute + drift;
+    const driftSec = Math.max(0, Math.floor((now - anchorAt) / 1000));
+    minute = match.minute + Math.floor(driftSec / 60);
+    seconds = driftSec % 60;
   } else {
     const kickoff = new Date(match.kickoff_utc).getTime();
-    if (now > kickoff) minute = Math.floor((now - kickoff) / 60_000) + 1;
+    if (now > kickoff) {
+      const elapsedSec = Math.floor((now - kickoff) / 1000);
+      minute = Math.floor(elapsedSec / 60) + 1;
+      seconds = elapsedSec % 60;
+    }
   }
 
-  if (minute == null) return { isHalfTime: false, text: null };
-  return { isHalfTime: false, text: formatMinute(Math.max(1, minute), match.period) };
+  if (minute == null) return { isHalfTime: false, text: null, clock: null };
+  const label = formatMinute(Math.max(1, minute), match.period);
+  return { isHalfTime: false, text: label, clock: `${label}:${pad2(seconds)}` };
 }

@@ -18,7 +18,7 @@ async function fetchMatches(): Promise<Match[]> {
 }
 
 /** True when a match is live or kicks off within the next 15 minutes. */
-function anyMatchHot(matches: Match[] | undefined): boolean {
+export function anyMatchHot(matches: Match[] | undefined): boolean {
   if (!matches) return false;
   const now = Date.now();
   return matches.some(
@@ -36,9 +36,9 @@ export function useMatches() {
     queryFn: fetchMatches,
     initialData: seedSchedule,
     // Belt-and-braces alongside the Realtime channel: while a match is hot,
-    // poll every 30s so scores/standings stay fresh even if the socket died.
+    // poll every 20s so scores/standings stay fresh even if the socket died.
     refetchInterval: (query) =>
-      isSupabaseConfigured && anyMatchHot(query.state.data) ? 30_000 : false,
+      isSupabaseConfigured && anyMatchHot(query.state.data) ? 20_000 : false,
   });
 }
 

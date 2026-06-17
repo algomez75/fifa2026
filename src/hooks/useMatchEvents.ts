@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { MatchEventRow } from '@/lib/database.types';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { anyMatchHot, useMatches } from './useMatches';
 
 export const matchEventsKey = ['match-events'] as const;
 
@@ -29,10 +30,16 @@ async function fetchMatchEvents(): Promise<GoalEvent[]> {
  * slice via `useMatchGoals` / `useMatchCards`.
  */
 export function useMatchEvents() {
+  // While a match is hot, poll as a fallback to the Realtime channel so goals
+  // that the socket missed appear — and, crucially, so VAR-annulled goals that
+  // sync-scores DELETEs disappear from the UI even if the DELETE event is lost.
+  const { data: matches } = useMatches();
+  const hot = anyMatchHot(matches);
   return useQuery({
     queryKey: matchEventsKey,
     queryFn: fetchMatchEvents,
-    staleTime: 30_000,
+    staleTime: hot ? 8_000 : 30_000,
+    refetchInterval: hot ? 15_000 : false,
     enabled: isSupabaseConfigured,
   });
 }

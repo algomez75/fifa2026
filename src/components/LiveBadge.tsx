@@ -20,7 +20,7 @@ import { useTranslation } from '@/store/useAppStore';
  */
 export function LiveBadge({ match, size = 'md' }: { match: Match; size?: 'sm' | 'md' }) {
   const { t } = useTranslation();
-  const { isHalfTime, text } = useLiveClock(match);
+  const { isHalfTime, clock } = useLiveClock(match);
   const pulse = useSharedValue(1);
   const small = size === 'sm';
 
@@ -45,7 +45,7 @@ export function LiveBadge({ match, size = 'md' }: { match: Match; size?: 'sm' | 
     ? small
       ? t.common.halfTimeShort
       : t.common.halfTime
-    : `${t.common.live}${text ? ` ${text}'` : ''}`;
+    : `${t.common.live}${clock ? ` ${clock}` : ''}`;
 
   return (
     <Animated.View style={[styles.pill, small && styles.pillSm, isHalfTime && styles.pillHt]}>

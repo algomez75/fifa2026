@@ -302,6 +302,38 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-16 — Faster, self-correcting live pushes + MM:SS clock (025)
+
+Reworked the live/notification pipeline after late + sometimes-wrong pushes
+(a VAR-annulled goal kept showing the scorer).
+
+- **VAR-annulled goals fixed (server).** `sync-scores` wrote `match_events` with
+  `ignoreDuplicates:true` on `(match_id, seq)` → insert-only, so an annulled goal
+  lingered forever. Now it **reconciles** goal events to mirror the upstream
+  `goals[]`: diff by a stable natural key (`minute|team|scorer`), preserve
+  `id`/`pushed`/`created_at` for goals that persist (no re-push, no re-celebrate),
+  delete the ones VAR removed, and **write nothing when the set is unchanged** (no
+  realtime churn). Cards stay insert-only.
+- **Near-instant goal pushes (server).** `sync-scores` now sends the "⚽ GOAL"
+  Expo push **inline** the moment it detects a new goal — no waiting for the
+  separate `notify-dispatcher` cron — and the cron cadence dropped from 60s to
+  **20s** (migration 025, `cron.alter_job` → `'20 seconds'`; the function
+  self-guards so off-window cost is one cheap query). Latency ~2 min → ~10-20s.
+  `notify-dispatcher` keeps kickoff/lineup/full-time/challenges + is the goal
+  backstop; `match_events.pushed` dedupes across both. Shared push logic extracted
+  to `supabase/functions/_shared/push.ts` (`sendExpoPush`/`loadDevices`/`wants`/
+  `dedupe`).
+- **App reflects corrections + self-heals (OTA).** `useMatchRealtime` now handles
+  `match_events` **UPDATE & DELETE** (annulled scorer disappears in place) and
+  **refetches on socket reconnect** (not just on foreground). `useMatchEvents`
+  gained a **~15s live poll** fallback (matches poll tightened 30s→20s) so a missed
+  realtime event still self-corrects — "repeat the search" without a manual reload.
+- **Progressive MM:SS live clock (OTA).** `useLiveClock` now interpolates seconds
+  from the server anchor + drift and exposes `clock` ("67:23", "45+2:13");
+  `LiveBadge` shows the ticking seconds everywhere (cards, hero, detail). Re-anchors
+  on every realtime patch; half-time still shows "Half Time".
+- Ships as an **OTA** at version 1.0.1 (runtime `2c3aa583`, matches the live build).
+
 ### 2026-06-16 — Lineup polish: shorter pitch + Apple-Sports avatars (OTA)
 
 - **`LineupPitch` refined** toward the Apple-Sports reference: field height

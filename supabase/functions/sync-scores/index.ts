@@ -21,6 +21,8 @@
 // Secret:  supabase secrets set FOOTBALLDATA_TOKEN=xxxx
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+import { dedupe, loadDevices, sendExpoPush, wants, type PushMessage } from '../_shared/push.ts';
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const TOKEN = Deno.env.get('FOOTBALLDATA_TOKEN') ?? '';
@@ -122,9 +124,12 @@ Deno.serve(async () => {
   //    (goals[].team.id maps to teams.fd_team_id; seq = index in goals[].)
   const { data: teams } = await supabase
     .from('teams')
-    .select('id, fd_team_id')
+    .select('id, fd_team_id, name, flag_emoji')
     .not('fd_team_id', 'is', null);
   const teamByFdId = new Map((teams ?? []).map((t: any) => [t.fd_team_id, t.id]));
+  const teamById = new Map((teams ?? []).map((t: any) => [t.id, t]));
+  const teamName = (id: string | null) => (id ? teamById.get(id)?.name ?? 'TBD' : 'TBD');
+  const teamFlag = (id: string | null) => (id ? teamById.get(id)?.flag_emoji ?? '' : '');
 
   // Player lookup (normalized name within team) so events carry player_id and
   // the app can show the scorer's photo avatar.
@@ -171,6 +176,20 @@ Deno.serve(async () => {
     );
     return hits.length === 1 ? hits[0].id : null;
   };
+
+  // Goals detected as genuinely new this run → pushed inline at the end so the
+  // alert lands in seconds instead of waiting for the notify-dispatcher cron.
+  interface NewGoal {
+    matchId: string;
+    homeTeamId: string | null;
+    awayTeamId: string | null;
+    teamId: string | null;
+    playerName: string | null;
+    minute: number | null;
+    scoreHome: number | null;
+    scoreAway: number | null;
+  }
+  const newGoals: NewGoal[] = [];
 
   let events = 0;
   for (const row of active) {
@@ -231,8 +250,16 @@ Deno.serve(async () => {
 
     const goals = (detail.goals ?? []) as any[];
     const bookings = (detail.bookings ?? []) as any[];
-    if (!goals.length && !bookings.length) continue;
-    const rows = goals.map((g, i) => {
+
+    // ── Goals: reconcile match_events to MIRROR the upstream goals[] ──────────
+    // Insert-only (the old behaviour) left VAR-annulled goals behind forever.
+    // Now we diff by a stable natural key (minute|team|scorer): added goals are
+    // inserted (+queued for an inline push), annulled goals are deleted, and the
+    // common "nothing changed" case writes nothing (no realtime churn).
+    const natKey = (e: { minute: number | null; team_id: string | null; player_name: string | null }) =>
+      `${e.minute ?? ''}|${e.team_id ?? ''}|${normName(e.player_name)}`;
+
+    const desired = goals.map((g, i) => {
       const teamId = teamByFdId.get(g.team?.id) ?? null;
       return {
         match_id: row.id,
@@ -246,26 +273,119 @@ Deno.serve(async () => {
         score_away: g.score?.away ?? null,
       };
     });
-    // Cards: seq namespace 1000+ so they never collide with goal seqs.
-    for (const [i, b] of bookings.entries()) {
-      const teamId = teamByFdId.get(b.team?.id) ?? null;
-      rows.push({
-        match_id: row.id,
-        seq: 1000 + i,
-        type: b.card === 'RED' || b.card === 'YELLOW_RED' ? 'red' : 'yellow',
-        minute: typeof b.minute === 'number' ? b.minute : null,
-        team_id: teamId,
-        player_id: resolvePlayer(teamId, b.player?.name ?? null),
-        player_name: b.player?.name ?? null,
-        score_home: null,
-        score_away: null,
-      });
-    }
-    const { error } = await supabase
+
+    const { data: existing } = await supabase
       .from('match_events')
-      .upsert(rows, { onConflict: 'match_id,seq', ignoreDuplicates: true });
-    if (error) errors.push(`events ${row.id}: ${error.message}`);
-    else events += rows.length;
+      .select('id, minute, team_id, player_name, pushed, created_at')
+      .eq('match_id', row.id)
+      .eq('type', 'goal');
+    const existingByKey = new Map((existing ?? []).map((e: any) => [natKey(e), e]));
+    const desiredKeys = new Set(desired.map(natKey));
+
+    // Only touch the table when the set of goals actually changed (rare).
+    const setChanged =
+      desired.length !== (existing ?? []).length ||
+      desired.some((d) => !existingByKey.has(natKey(d)));
+    if (setChanged) {
+      // Full replace, preserving id / pushed / created_at for goals that
+      // persist (so they neither re-push nor re-celebrate, and re-indexing
+      // after an annulment can't violate the (match_id,seq) unique key).
+      await supabase.from('match_events').delete().eq('match_id', row.id).eq('type', 'goal');
+      const insertRows = desired.map((d) => {
+        const prior = existingByKey.get(natKey(d));
+        return {
+          ...d,
+          ...(prior ? { id: prior.id, created_at: prior.created_at } : {}),
+          pushed: prior?.pushed ?? false,
+        };
+      });
+      if (insertRows.length) {
+        const { error } = await supabase.from('match_events').insert(insertRows);
+        if (error) errors.push(`goals ${row.id}: ${error.message}`);
+        else events += insertRows.length;
+      }
+      // Brand-new goals (no prior row) → queue an inline push.
+      for (const d of desired) {
+        if (!existingByKey.has(natKey(d))) {
+          newGoals.push({
+            matchId: row.id,
+            homeTeamId,
+            awayTeamId,
+            teamId: d.team_id,
+            playerName: d.player_name,
+            minute: d.minute,
+            scoreHome: d.score_home,
+            scoreAway: d.score_away,
+          });
+        }
+      }
+    }
+    // Annulled goals no longer in `desired` are removed by the full replace
+    // above; nothing extra to push (per product decision — silent correction).
+
+    // ── Cards: insert-only (seq 1000+; rescinded cards are vanishingly rare) ──
+    if (bookings.length) {
+      const cardRows = bookings.map((b, i) => {
+        const teamId = teamByFdId.get(b.team?.id) ?? null;
+        return {
+          match_id: row.id,
+          seq: 1000 + i,
+          type: b.card === 'RED' || b.card === 'YELLOW_RED' ? 'red' : 'yellow',
+          minute: typeof b.minute === 'number' ? b.minute : null,
+          team_id: teamId,
+          player_id: resolvePlayer(teamId, b.player?.name ?? null),
+          player_name: b.player?.name ?? null,
+          score_home: null,
+          score_away: null,
+        };
+      });
+      const { error } = await supabase
+        .from('match_events')
+        .upsert(cardRows, { onConflict: 'match_id,seq', ignoreDuplicates: true });
+      if (error) errors.push(`cards ${row.id}: ${error.message}`);
+    }
+  }
+
+  // ── Inline goal pushes: send the instant a goal is detected (no cron hop) ───
+  // Deduped globally via match_events.pushed, shared with notify-dispatcher's
+  // backstop, so a goal is never pushed twice.
+  if (newGoals.length) {
+    const { devices } = await loadDevices(supabase);
+    if (devices.length) {
+      const messages: PushMessage[] = [];
+      for (const g of newGoals) {
+        if (!g.homeTeamId || !g.awayTeamId) continue;
+        const who = g.playerName ?? teamName(g.teamId) ?? 'Goal';
+        const min = g.minute != null ? ` ${g.minute}'` : '';
+        const flag = teamFlag(g.teamId);
+        const score =
+          g.scoreHome != null && g.scoreAway != null
+            ? ` — ${teamName(g.homeTeamId)} ${g.scoreHome}–${g.scoreAway} ${teamName(g.awayTeamId)}`
+            : ` — ${teamName(g.homeTeamId)} vs ${teamName(g.awayTeamId)}`;
+        for (const d of devices) {
+          if (!wants(d, g.homeTeamId, g.awayTeamId)) continue;
+          messages.push({
+            to: d.token,
+            title: `${d.lang === 'es' ? '⚽ ¡GOL!' : '⚽ GOAL!'}${flag ? ' ' + flag : ''}`,
+            body: `${who}${min}${score}`,
+            sound: 'default',
+            data: { matchId: g.matchId, type: 'goal' },
+          });
+        }
+      }
+      if (messages.length) {
+        await sendExpoPush(dedupe(messages));
+        // Mark every still-unpushed goal of these matches as pushed so the
+        // dispatcher backstop doesn't re-send the same alerts.
+        const matchIds = [...new Set(newGoals.map((g) => g.matchId))];
+        await supabase
+          .from('match_events')
+          .update({ pushed: true })
+          .in('match_id', matchIds)
+          .eq('type', 'goal')
+          .eq('pushed', false);
+      }
+    }
   }
 
   // 4. Golden boot — refresh the tournament top scorers when anything changed.

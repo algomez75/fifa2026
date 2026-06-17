@@ -19,95 +19,19 @@
 // Deploy:  supabase functions deploy notify-dispatcher
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+import { dedupe, loadDevices, sendExpoPush, wants, type PushMessage } from '../_shared/push.ts';
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
-
-interface PushMessage {
-  to: string;
-  title: string;
-  body: string;
-  sound: 'default';
-  data: Record<string, unknown>;
-}
-
-/** One physical device: a unique Expo token with the merged preferences of
- *  every user_settings row that shares it. */
-interface Device {
-  token: string;
-  user_id: string; // a representative row (for challenge mapping)
-  notifyAll: boolean;
-  notifyFavorites: boolean;
-  favs: Set<string>;
-  minsBefore: number;
-  lang: 'en' | 'es';
-}
-
-/** Sends in batches of 100 and returns tokens Expo reports as dead
- *  (DeviceNotRegistered) so they can be pruned from user_settings. */
-async function sendExpoPush(messages: PushMessage[]): Promise<string[]> {
-  const dead: string[] = [];
-  for (let i = 0; i < messages.length; i += 100) {
-    const batch = messages.slice(i, i + 100);
-    try {
-      const res = await fetch(EXPO_PUSH, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(batch),
-      });
-      const json = await res.json();
-      const tickets = (json?.data ?? []) as { status: string; details?: { error?: string } }[];
-      tickets.forEach((t, idx) => {
-        if (t.status === 'error' && t.details?.error === 'DeviceNotRegistered') {
-          dead.push(batch[idx].to);
-        }
-      });
-    } catch (_e) {
-      // network hiccup — the cron retries naturally next minute
-    }
-  }
-  return dead;
-}
 
 Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   // ── 1. Collapse user_settings rows into unique devices (by token) ──────────
-  const { data: users } = await supabase
-    .from('user_settings')
-    .select('user_id, favorite_team_ids, notify_favorites, notify_all, notify_minutes_before, language, expo_push_token')
-    .not('expo_push_token', 'is', null);
-
-  if (!users || users.length === 0) {
+  const { devices, users } = await loadDevices(supabase);
+  if (!users.length) {
     return Response.json({ sent: 0, reason: 'no subscribers' });
   }
-
-  const deviceByToken = new Map<string, Device>();
-  for (const u of users) {
-    const token = u.expo_push_token as string;
-    let d = deviceByToken.get(token);
-    if (!d) {
-      d = {
-        token,
-        user_id: u.user_id,
-        notifyAll: false,
-        notifyFavorites: false,
-        favs: new Set<string>(),
-        minsBefore: 0,
-        lang: u.language === 'es' ? 'es' : 'en',
-      };
-      deviceByToken.set(token, d);
-    }
-    if (u.notify_all) d.notifyAll = true;
-    if (u.notify_favorites) d.notifyFavorites = true;
-    for (const f of u.favorite_team_ids ?? []) d.favs.add(f);
-    // earliest preferred window across the device's sessions
-    d.minsBefore = Math.max(d.minsBefore, u.notify_minutes_before ?? 15);
-    if (u.language === 'es') d.lang = 'es';
-  }
-  const devices = [...deviceByToken.values()];
-  const wants = (d: Device, homeId: string, awayId: string) =>
-    d.notifyAll || (d.notifyFavorites && (d.favs.has(homeId) || d.favs.has(awayId)));
 
   const now = Date.now();
   // 90 min ahead so lineups (which land ~1h before) are in range.
@@ -313,14 +237,7 @@ Deno.serve(async () => {
   }
 
   // ── 4. Final dedupe net: never send identical (token,title,body) twice ─────
-  const seen = new Set<string>();
-  const unique = messages.filter((msg) => {
-    const k = `${msg.to}|${msg.title}|${msg.body}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-
+  const unique = dedupe(messages);
   const deadTokens = await sendExpoPush(unique);
 
   if (pushedIds.length) {
