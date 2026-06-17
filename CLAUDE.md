@@ -302,7 +302,7 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
-### 2026-06-16 — Lineup polish: shorter pitch + Apple-Sports avatars (v1.0.2)
+### 2026-06-16 — Lineup polish: shorter pitch + Apple-Sports avatars (OTA)
 
 - **`LineupPitch` refined** toward the Apple-Sports reference: field height
   `~78% → ~70%` of the screen (a touch shorter, still large; positions unchanged
@@ -313,9 +313,13 @@ development-simulator / preview / production profiles).
   background; applied only to the `<Image>`, so the ~9 photoless players keep the
   gold-initial-on-dark fallback) and `ringColor` (default gold). Header/leaderboard
   avatars are unchanged by the defaults.
-- **Release:** JS-only, but a new build is required (OTAs don't match the live
-  build's fingerprint runtime). `expo.version 1.0.1 → 1.0.2`; iOS build 11 →
-  TestFlight → App Store review. See `project_ota_runtime_fingerprint` memory.
+- **Shipped via OTA** — JS-only, so it reaches the live build directly. The
+  current store build is **1.0.1 / build 10 (runtime `2c3aa583`)**; keeping
+  `expo.version` at **1.0.1** makes the update fingerprint match, so the OTA lands
+  on every 1.0.1 device (no new build/review needed). This is the first OTA that
+  actually reaches users since the runtime finally matches the installed build —
+  see `project_ota_runtime_fingerprint` memory. (A version bump would re-break the
+  match, so it was reverted.)
 
 ### 2026-06-15 — Self-hosted player photos + modular lineup pitch (024)
 
