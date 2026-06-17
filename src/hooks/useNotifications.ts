@@ -51,7 +51,7 @@ async function registerForPush(): Promise<string | null> {
 }
 
 type NotifData = {
-  type?: 'kickoff' | 'result' | 'goal' | 'lineup' | 'challenge';
+  type?: 'kickoff' | 'result' | 'goal' | 'lineup' | 'challenge' | 'predict' | 'leaderboard';
   matchId?: string;
   eventId?: string;
   challengeId?: string;
@@ -118,11 +118,14 @@ export function useNotifications() {
     const response = Notifications.addNotificationResponseReceivedListener((r) => {
       const data = (r.notification.request.content.data ?? {}) as NotifData;
       queryClient.invalidateQueries({ queryKey: inboxKey });
-      // Tapping a challenge opens the inbox; any match alert (lineup / kickoff /
-      // goal / full time) opens that match's detail screen — so a "Lineups are
-      // out" tap lands right on the formation pitch.
+      // Tapping a challenge opens the inbox; a leaderboard nudge opens the
+      // ranking; any match alert (lineup / kickoff / goal / full time / predict
+      // reminder) opens that match's detail screen — so a "predict" tap lands on
+      // the match with its Make-a-prediction CTA.
       if (data.type === 'challenge') {
         router.push('/notifications');
+      } else if (data.type === 'leaderboard') {
+        router.push('/leaderboard' as Href);
       } else if (data.matchId) {
         router.push(`/match/${data.matchId}` as Href);
       }

@@ -34,8 +34,9 @@ Deno.serve(async () => {
   }
 
   const now = Date.now();
-  // 90 min ahead so lineups (which land ~1h before) are in range.
-  const horizon = new Date(now + 90 * 60_000).toISOString();
+  // 180 min ahead: lineups land ~1h before, and prediction reminders fire
+  // ~30-180 min before kickoff.
+  const horizon = new Date(now + 180 * 60_000).toISOString();
 
   const { data: matches } = await supabase
     .from('matches')
@@ -62,7 +63,7 @@ Deno.serve(async () => {
     }
   }
 
-  // Already-sent lineup/kickoff alerts, keyed by `${token}:${match}:${type}`.
+  // Already-sent lineup/kickoff/predict alerts, keyed by `${token}:${match}:${type}`.
   const alreadySent = new Set<string>();
   if (scheduledIds.length) {
     const { data: sent } = await supabase
@@ -70,6 +71,21 @@ Deno.serve(async () => {
       .select('token, match_id, type')
       .in('match_id', scheduledIds);
     for (const s of sent ?? []) alreadySent.add(`${s.token}:${s.match_id}:${s.type}`);
+  }
+
+  // Display names (for personalized nudges) + which users already predicted the
+  // upcoming matches, so prediction reminders only target those who haven't.
+  const { data: profs } = await supabase.from('profiles').select('user_id, display_name');
+  const nameByUser = new Map<string, string | null>(
+    (profs ?? []).map((p: any) => [p.user_id, p.display_name]),
+  );
+  const predicted = new Set<string>();
+  if (scheduledIds.length) {
+    const { data: preds } = await supabase
+      .from('predictions')
+      .select('user_id, match_id')
+      .in('match_id', scheduledIds);
+    for (const p of preds ?? []) predicted.add(`${p.user_id}:${p.match_id}`);
   }
 
   const messages: PushMessage[] = [];
@@ -118,6 +134,32 @@ Deno.serve(async () => {
           });
           alreadySent.add(kickoffKey);
           sentLog.push({ token: d.token, match_id: m.id, type: 'kickoff' });
+        }
+
+        // 🔮 Prediction reminder — once, ~30-180 min before kickoff, only to a
+        // user who hasn't predicted this match. Personalized by display name.
+        const predictKey = `${d.token}:${m.id}:predict`;
+        if (
+          minsToKick > 30 &&
+          minsToKick <= 180 &&
+          !alreadySent.has(predictKey) &&
+          !predicted.has(`${d.user_id}:${m.id}`)
+        ) {
+          const nm = nameByUser.get(d.user_id);
+          const hi = nm ? `${nm}, ` : '';
+          const h = teamName(m.home_team_id);
+          const a = teamName(m.away_team_id);
+          messages.push({
+            to: d.token,
+            title: es ? '🔮 ¿Tu predicción?' : '🔮 Your prediction?',
+            body: es
+              ? `${hi}aún no predices ${h} vs ${a} — ¡hazlo antes del pitazo! 🎯`
+              : `${hi}you haven't predicted ${h} vs ${a} — do it before kickoff! 🎯`,
+            sound: 'default',
+            data: { matchId: m.id, type: 'predict' },
+          });
+          alreadySent.add(predictKey);
+          sentLog.push({ token: d.token, match_id: m.id, type: 'predict' });
         }
       } else if (
         m.status === 'finished' &&
@@ -236,6 +278,68 @@ Deno.serve(async () => {
     }
   }
 
+  // ── 3.5 Leaderboard nudge → fired when a match finished recently, capped at
+  //        ~twice a day per device (AM/PM bucket). Personalized: the user's rank
+  //        + the current leader, to lure them back to play. Deep-links to the
+  //        leaderboard tab.
+  const since2h = new Date(now - 2 * 60 * 60_000).toISOString();
+  const { data: recentFin } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('status', 'finished')
+    .gte('updated_at', since2h)
+    .limit(1);
+  let leaderboardNudges = 0;
+  if ((recentFin?.length ?? 0) > 0) {
+    const d0 = new Date(now);
+    const bucket = `lb-${d0.toISOString().slice(0, 10)}-${d0.getUTCHours() < 12 ? 'AM' : 'PM'}`;
+    const { data: lbSent } = await supabase
+      .from('push_sent')
+      .select('token')
+      .eq('match_id', bucket)
+      .eq('type', 'leaderboard');
+    const lbSentTokens = new Set((lbSent ?? []).map((s: any) => s.token));
+    const { data: lb } = await supabase.rpc('get_leaderboard');
+    const rows = (lb ?? []) as { user_id: string; display_name: string; points: number }[];
+    if (rows.length) {
+      const leader = rows[0];
+      const rankByUser = new Map(rows.map((r, i) => [r.user_id, i + 1]));
+      const sentThisRun = new Set<string>();
+      for (const d of devices) {
+        if (!(d.notifyAll || d.notifyFavorites)) continue; // respect opt-out
+        if (lbSentTokens.has(d.token) || sentThisRun.has(d.token)) continue;
+        const es = d.lang === 'es';
+        const rank = rankByUser.get(d.user_id);
+        const nm = nameByUser.get(d.user_id);
+        const hi = nm ? `${nm}, ` : '';
+        let body: string;
+        if (rank === 1) {
+          body = es
+            ? `${hi}¡vas #1 con ${leader.points} pts! 👑 Defiende tu corona`
+            : `${hi}you're #1 with ${leader.points} pts! 👑 Defend your crown`;
+        } else if (rank) {
+          body = es
+            ? `${hi}vas #${rank}. ${leader.display_name} lidera con ${leader.points} pts — ¡remonta! 🚀`
+            : `${hi}you're #${rank}. ${leader.display_name} leads with ${leader.points} pts — catch up! 🚀`;
+        } else {
+          body = es
+            ? `${leader.display_name} lidera con ${leader.points} pts. ¡Haz tus predicciones y entra al ranking! 🔮`
+            : `${leader.display_name} leads with ${leader.points} pts. Predict and join the ranking! 🔮`;
+        }
+        messages.push({
+          to: d.token,
+          title: es ? '🏆 Tabla de posiciones' : '🏆 Leaderboard',
+          body,
+          sound: 'default',
+          data: { type: 'leaderboard' },
+        });
+        sentLog.push({ token: d.token, match_id: bucket, type: 'leaderboard' });
+        sentThisRun.add(d.token);
+        leaderboardNudges++;
+      }
+    }
+  }
+
   // ── 4. Final dedupe net: never send identical (token,title,body) twice ─────
   const unique = dedupe(messages);
   const deadTokens = await sendExpoPush(unique);
@@ -265,6 +369,8 @@ Deno.serve(async () => {
     results: resultPushedIds.length,
     lineupAlerts: sentLog.filter((s) => s.type === 'lineup').length,
     kickoffs: sentLog.filter((s) => s.type === 'kickoff').length,
+    predictReminders: sentLog.filter((s) => s.type === 'predict').length,
+    leaderboardNudges,
     deadTokens: deadTokens.length,
   });
 });

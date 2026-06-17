@@ -302,6 +302,29 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-16 — Personalized engagement pushes (predict reminders + leaderboard)
+
+Two new `notify-dispatcher` notification types to pull users back in, both
+**personalized by display name** (`profiles.display_name`):
+
+- **🔮 Prediction reminder.** ~30-180 min before kickoff, each user who **hasn't
+  predicted** that match (checked against `predictions`) gets one personalized
+  nudge ("{name}, you haven't predicted X vs Y — do it before kickoff!").
+  Gated by the existing `wants()` notify prefs, deduped once per
+  `(token, match, 'predict')` in `push_sent`. The dispatcher horizon widened
+  90→180 min to cover the window. Tapping opens `/match/[id]`, which now has a
+  **"Make / Edit my prediction" CTA** on the scheduled scoreboard (opens
+  `PredictionModal`).
+- **🏆 Leaderboard nudge.** When a match finished in the last ~2h, each opted-in
+  device gets a nudge built from `get_leaderboard()` — personalized with the
+  user's **rank + the current leader** ("you're #4, {leader} leads with N pts —
+  catch up!", or a "join the ranking" line for the unranked, or "defend your
+  crown" for #1). Throttled to ~twice a day via a synthetic `push_sent` key
+  (`lb-<date>-AM|PM`). Tapping deep-links to the leaderboard tab.
+- App (OTA): `useNotifications` routes `type:'leaderboard'` → `/leaderboard` and
+  `type:'predict'` → the match; new `NotifData` types. Server-only otherwise
+  (no schema change — reuses `push_sent` with non-FK text keys).
+
 ### 2026-06-16 — Faster, self-correcting live pushes + MM:SS clock (025)
 
 Reworked the live/notification pipeline after late + sometimes-wrong pushes

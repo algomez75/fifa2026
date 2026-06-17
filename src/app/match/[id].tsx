@@ -6,12 +6,14 @@ import { Countdown } from '@/components/Countdown';
 import { GlassCard } from '@/components/GlassCard';
 import { LineupPitch } from '@/components/LineupPitch';
 import { LiveBadge } from '@/components/LiveBadge';
+import { PredictionModal } from '@/components/PredictionModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
 import { useMatchDetail, type MatchDetail } from '@/hooks/useMatchDetail';
 import { useMatchEvents } from '@/hooks/useMatchEvents';
 import { useMatches } from '@/hooks/useMatches';
+import { usePredictions } from '@/hooks/usePredictions';
 import { formatKickoffTime, matchDayLabel, shortName, teamName } from '@/lib/format';
 import { teamsById, venuesById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
@@ -45,7 +47,9 @@ export default function MatchDetailScreen() {
     finished: match?.status === 'finished',
   });
   const { data: events } = useMatchEvents();
+  const { data: predictions } = usePredictions();
   const [side, setSide] = useState<'home' | 'away'>('home');
+  const [predicting, setPredicting] = useState(false);
 
   const home = match?.home_team_id ? teamsById[match.home_team_id] : undefined;
   const away = match?.away_team_id ? teamsById[match.away_team_id] : undefined;
@@ -139,6 +143,17 @@ export default function MatchDetailScreen() {
             <View style={styles.countdownWrap}>
               <Text style={styles.countdownLabel}>{t.home.kickoffIn}</Text>
               <Countdown target={match.kickoff_utc} compact />
+              <Pressable style={styles.predictBtn} onPress={() => setPredicting(true)}>
+                <Text style={styles.predictBtnText}>
+                  {predictions?.[id ?? '']
+                    ? es
+                      ? '🔮 Editar mi predicción'
+                      : '🔮 Edit my prediction'
+                    : es
+                      ? '🔮 Hacer mi predicción'
+                      : '🔮 Make my prediction'}
+                </Text>
+              </Pressable>
             </View>
           ) : null}
           {venue ? (
@@ -237,6 +252,11 @@ export default function MatchDetailScreen() {
           </GlassCard>
         )}
       </ScrollView>
+      <PredictionModal
+        match={predicting ? match : null}
+        prediction={predicting ? (predictions?.[id ?? ''] ?? null) : null}
+        onClose={() => setPredicting(false)}
+      />
     </View>
   );
 }
@@ -346,6 +366,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  predictBtn: {
+    marginTop: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: palette.goldDim,
+    borderWidth: 1,
+    borderColor: palette.gold,
+  },
+  predictBtnText: { color: palette.gold, fontSize: 14, fontWeight: '800' },
   venue: { color: palette.textTertiary, fontSize: 12, marginTop: 12, textAlign: 'center' },
   referee: { color: palette.textTertiary, fontSize: 11, marginTop: 4, textAlign: 'center' },
   refAssistants: { color: palette.textTertiary, fontSize: 10, marginTop: 2, textAlign: 'center' },
