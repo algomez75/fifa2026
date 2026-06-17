@@ -302,6 +302,21 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-16 — Lineup polish: shorter pitch + Apple-Sports avatars (v1.0.2)
+
+- **`LineupPitch` refined** toward the Apple-Sports reference: field height
+  `~78% → ~70%` of the screen (a touch shorter, still large; positions unchanged
+  via the existing `flex` + `space-between`), and player avatars `56 → 54` on a
+  **white circle + subtle ring** so the cut-out api-sports headshots pop instead
+  of blending into the green (they were rendering on the dark `palette.surface`).
+- **`Avatar` gained two optional, backward-compatible props** — `bg` (photo
+  background; applied only to the `<Image>`, so the ~9 photoless players keep the
+  gold-initial-on-dark fallback) and `ringColor` (default gold). Header/leaderboard
+  avatars are unchanged by the defaults.
+- **Release:** JS-only, but a new build is required (OTAs don't match the live
+  build's fingerprint runtime). `expo.version 1.0.1 → 1.0.2`; iOS build 11 →
+  TestFlight → App Store review. See `project_ota_runtime_fingerprint` memory.
+
 ### 2026-06-15 — Self-hosted player photos + modular lineup pitch (024)
 
 - **Every player photo is now self-hosted** (migration **024**: public

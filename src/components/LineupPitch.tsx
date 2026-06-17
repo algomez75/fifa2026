@@ -30,9 +30,9 @@ interface Props {
  */
 export function LineupPitch({ lineup, formation, events = [] }: Props) {
   // Sized as a fraction of the screen so the field is large and identical on
-  // every surface (live, past results, …) — ~78% of the iPhone's height.
+  // every surface (live, past results, …) — ~70% of the iPhone's height.
   const { height } = useWindowDimensions();
-  const pitchHeight = Math.max(580, Math.round(height * 0.78));
+  const pitchHeight = Math.max(540, Math.round(height * 0.7));
 
   const rows = useMemo(() => {
     if (!lineup.length) return [] as LineupPlayer[][];
@@ -77,7 +77,14 @@ export function LineupPitch({ lineup, formation, events = [] }: Props) {
               return (
                 <View key={`${li}-${pi}`} style={styles.pitchPlayer}>
                   <View style={styles.avatarWrap}>
-                    <Avatar url={p.photo} name={p.name} size={56} ring={false} />
+                    <Avatar
+                      url={p.photo}
+                      name={p.name}
+                      size={54}
+                      bg="#FFFFFF"
+                      ring
+                      ringColor="rgba(255,255,255,0.65)"
+                    />
                     {p.shirtNumber != null ? (
                       <View style={styles.numBadge}>
                         <Text style={styles.numText}>{p.shirtNumber}</Text>
