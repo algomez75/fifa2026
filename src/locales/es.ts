@@ -61,6 +61,8 @@ export const es: Translation = {
     hiddenPick: 'Oculto hasta el inicio',
     noPredictions: 'Sin predicciones aún',
     predictionsBy: 'Predicciones',
+    share: 'Compartir',
+    shareTitle: 'Compartir mi ranking',
   },
   home: {
     eyebrow: '11 GOL · 2026',

@@ -60,6 +60,8 @@ export const en = {
     hiddenPick: 'Hidden until kickoff',
     noPredictions: 'No predictions yet',
     predictionsBy: 'Predictions',
+    share: 'Share',
+    shareTitle: 'Share my ranking',
   },
   home: {
     eyebrow: '11 GOL · 2026',

@@ -6,6 +6,7 @@ import {
   Linking,
   Pressable,
   RefreshControl,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -16,14 +17,18 @@ import { GlassCard } from '@/components/GlassCard';
 import { HeaderActions } from '@/components/HeaderActions';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
+import { ShareIcon } from '@/components/icons';
 import type { LeaderboardRow } from '@/lib/database.types';
 import { palette, radius } from '@/lib/theme';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTranslation } from '@/store/useAppStore';
 
+/** Public App Store listing — keep in sync with landing/script.js. */
+const APP_STORE_URL = 'https://apps.apple.com/app/11-gol/id6775887761';
+
 export default function LeaderboardScreen() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { data: rows, isLoading, isError, isFetching, refetch } = useLeaderboard();
   const userId = useAuthStore((s) => s.user?.id);
 
@@ -39,6 +44,26 @@ export default function LeaderboardScreen() {
     const idx = rows.findIndex((r) => r.user_id === userId);
     return idx >= 0 ? { row: rows[idx], rank: idx + 1 } : null;
   }, [rows, userId]);
+
+  // Share your personal ranking via the device's native share sheet.
+  const shareRanking = useCallback(async () => {
+    if (!me) return;
+    const total = rows?.length ?? 0;
+    const message =
+      language === 'es'
+        ? `🏆 Voy #${me.rank}${total ? ` de ${total}` : ''} en 11 Gol con ${me.row.points} pts prediciendo el Mundial 2026. ¿Puedes superarme? ⚽\n\n${APP_STORE_URL}`
+        : `🏆 I'm #${me.rank}${total ? ` of ${total}` : ''} on 11 Gol with ${me.row.points} pts predicting the 2026 World Cup. Can you beat me? ⚽\n\n${APP_STORE_URL}`;
+    try {
+      // URL lives inside `message` (not a separate `url`) so the link travels
+      // with the text on every target and isn't duplicated on iOS.
+      await Share.share(
+        { message, title: t.leaderboard.shareTitle },
+        { dialogTitle: t.leaderboard.shareTitle, subject: t.leaderboard.shareTitle },
+      );
+    } catch {
+      // user dismissed the sheet — nothing to do
+    }
+  }, [me, rows, language, t.leaderboard.shareTitle]);
 
   return (
     <View style={styles.screen}>
@@ -59,6 +84,14 @@ export default function LeaderboardScreen() {
                 <Text style={styles.mePts}>
                   {me.row.points} <Text style={styles.mePtsUnit}>{t.leaderboard.pts}</Text>
                 </Text>
+                <Pressable
+                  onPress={shareRanking}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.leaderboard.share}
+                  style={({ pressed }) => [styles.shareBtn, pressed && { opacity: 0.6 }]}>
+                  <ShareIcon color={palette.gold} size={17} strokeWidth={2.2} />
+                </Pressable>
               </View>
             ) : (
               <Text style={styles.meEmpty}>{t.leaderboard.notRanked}</Text>
@@ -181,7 +214,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  meStats: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
+  meStats: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  shareBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(212,175,55,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.32)',
+  },
   meRank: { color: palette.text, fontSize: 20, fontWeight: '900' },
   mePts: { color: palette.gold, fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
   mePtsUnit: { fontSize: 13, color: palette.textSecondary, fontWeight: '700' },

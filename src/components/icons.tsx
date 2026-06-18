@@ -186,6 +186,28 @@ export function SearchIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
   );
 }
 
+export function ShareIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)} fill="none">
+      <Path d="M12 15V3.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Path
+        d="M8.5 7 12 3.5 15.5 7"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M7 10H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function EyeIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)} fill="none">

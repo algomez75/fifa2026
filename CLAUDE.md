@@ -302,6 +302,23 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-17 — Share my ranking (Leaderboard, OTA)
+
+- **Minimalist share affordance on the Ranking tab.** The "Your score" card now
+  shows a small gold share chip (new `ShareIcon`, iOS-style glyph) next to your
+  rank/points — visible only when you're ranked. Tapping opens the device's
+  **native share sheet** (`react-native` `Share`) with a bilingual, personalized
+  message ("🏆 I'm #4 of N on 11 Gol with 27 pts predicting the 2026 World Cup.
+  Can you beat me? ⚽" / ES) plus the **App Store link**
+  (`apps.apple.com/app/11-gol/id6775887761`, kept in sync with `landing/script.js`)
+  so recipients can install the app. The URL lives inside the message text (no
+  separate `url` arg) to avoid iOS link duplication. New `leaderboard.share` /
+  `shareTitle` strings (en/es).
+- **Shipped via OTA** to `production`. JS-only → iOS runtime `2c3aa583…` matches
+  the live 1.0.1 build, so it reaches users; Android runtime `c50144db…`.
+  Published with `--environment production` (real Supabase ref verified in the
+  `dist/` bundle before announcing — see `feedback_eas_update_environment`).
+
 ### 2026-06-16 — Personalized engagement pushes (predict reminders + leaderboard)
 
 Two new `notify-dispatcher` notification types to pull users back in, both
