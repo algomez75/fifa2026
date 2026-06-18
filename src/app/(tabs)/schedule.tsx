@@ -152,7 +152,12 @@ export default function ScheduleScreen() {
                   </Text>
                   <View style={{ gap: 10 }}>
                     {liveNow.map((m) => (
-                      <MatchCard key={m.id} match={m} onPress={openPrediction} />
+                      <MatchCard
+                        key={m.id}
+                        match={m}
+                        prediction={predictions?.[m.id] ?? null}
+                        onPress={openPrediction}
+                      />
                     ))}
                   </View>
                 </View>

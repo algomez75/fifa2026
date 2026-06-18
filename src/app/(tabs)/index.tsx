@@ -17,6 +17,7 @@ import { teamsById, venuesById } from '@/lib/seed';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { palette } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
+import { usePredictions } from '@/hooks/usePredictions';
 import { useAppStore, useTranslation } from '@/store/useAppStore';
 
 export default function HomeScreen() {
@@ -24,6 +25,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const favorites = useAppStore((s) => s.favoriteTeamIds);
   const { data: matches, isLoading, isError, refetch } = useMatches();
+  const { data: predictions } = usePredictions();
 
   const derived = useMemo(() => {
     const all = matches ?? [];
@@ -108,7 +110,12 @@ export default function HomeScreen() {
         <Section title={t.home.yourTeams}>
           {favMatches.length ? (
             favMatches.map((m) => (
-              <MatchCard key={m.id} match={m} onPress={() => openMatchTeam(m)} />
+              <MatchCard
+                key={m.id}
+                match={m}
+                prediction={predictions?.[m.id] ?? null}
+                onPress={() => openMatchTeam(m)}
+              />
             ))
           ) : (
             <Pressable
@@ -131,7 +138,12 @@ export default function HomeScreen() {
         <Section title={t.home.todaysMatches}>
           {today.length ? (
             today.map((m) => (
-              <MatchCard key={m.id} match={m} onPress={() => openMatchTeam(m)} />
+              <MatchCard
+                key={m.id}
+                match={m}
+                prediction={predictions?.[m.id] ?? null}
+                onPress={() => openMatchTeam(m)}
+              />
             ))
           ) : (
             <GlassCard>
