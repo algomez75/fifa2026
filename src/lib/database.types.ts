@@ -19,7 +19,7 @@ export type Team = {
   name: string;
   name_es: string | null;
   flag_emoji: string | null;
-  iso2: string | null; // ISO-3166 alpha-2 for react-native-country-flag
+  iso2: string | null; // flagcdn code for react-native-country-flag: ISO-3166 alpha-2, or a GB subdivision (gb-eng / gb-sct) so England/Scotland show their own flag, not the Union Jack
   group_letter: string | null;
   host_country: boolean;
   api_football_id: number | null;

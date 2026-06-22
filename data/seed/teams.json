@@ -12,7 +12,7 @@
   { "id": "bra", "name": "Brazil", "name_es": "Brasil", "iso2": "BR", "flag_emoji": "🇧🇷", "group_letter": "C", "host_country": false, "api_football_id": null, "confederation": "CONMEBOL" },
   { "id": "mar", "name": "Morocco", "name_es": "Marruecos", "iso2": "MA", "flag_emoji": "🇲🇦", "group_letter": "C", "host_country": false, "api_football_id": null, "confederation": "CAF" },
   { "id": "hai", "name": "Haiti", "name_es": "Haití", "iso2": "HT", "flag_emoji": "🇭🇹", "group_letter": "C", "host_country": false, "api_football_id": null, "confederation": "CONCACAF" },
-  { "id": "sco", "name": "Scotland", "name_es": "Escocia", "iso2": "GB", "flag_emoji": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "group_letter": "C", "host_country": false, "api_football_id": null, "confederation": "UEFA" },
+  { "id": "sco", "name": "Scotland", "name_es": "Escocia", "iso2": "gb-sct", "flag_emoji": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "group_letter": "C", "host_country": false, "api_football_id": null, "confederation": "UEFA" },
 
   { "id": "usa", "name": "United States", "name_es": "Estados Unidos", "iso2": "US", "flag_emoji": "🇺🇸", "group_letter": "D", "host_country": true, "api_football_id": null, "confederation": "CONCACAF" },
   { "id": "par", "name": "Paraguay", "name_es": "Paraguay", "iso2": "PY", "flag_emoji": "🇵🇾", "group_letter": "D", "host_country": false, "api_football_id": null, "confederation": "CONMEBOL" },
@@ -54,7 +54,7 @@
   { "id": "uzb", "name": "Uzbekistan", "name_es": "Uzbekistán", "iso2": "UZ", "flag_emoji": "🇺🇿", "group_letter": "K", "host_country": false, "api_football_id": null, "confederation": "AFC" },
   { "id": "col", "name": "Colombia", "name_es": "Colombia", "iso2": "CO", "flag_emoji": "🇨🇴", "group_letter": "K", "host_country": false, "api_football_id": null, "confederation": "CONMEBOL" },
 
-  { "id": "eng", "name": "England", "name_es": "Inglaterra", "iso2": "GB", "flag_emoji": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "group_letter": "L", "host_country": false, "api_football_id": null, "confederation": "UEFA" },
+  { "id": "eng", "name": "England", "name_es": "Inglaterra", "iso2": "gb-eng", "flag_emoji": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "group_letter": "L", "host_country": false, "api_football_id": null, "confederation": "UEFA" },
   { "id": "cro", "name": "Croatia", "name_es": "Croacia", "iso2": "HR", "flag_emoji": "🇭🇷", "group_letter": "L", "host_country": false, "api_football_id": null, "confederation": "UEFA" },
   { "id": "gha", "name": "Ghana", "name_es": "Ghana", "iso2": "GH", "flag_emoji": "🇬🇭", "group_letter": "L", "host_country": false, "api_football_id": null, "confederation": "CAF" },
   { "id": "pan", "name": "Panama", "name_es": "Panamá", "iso2": "PA", "flag_emoji": "🇵🇦", "group_letter": "L", "host_country": false, "api_football_id": null, "confederation": "CONCACAF" }

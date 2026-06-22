@@ -302,6 +302,39 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-22 — Minimalist flag carousel for favourites (Home + Teams, OTA)
+
+- Replaced the full-width favourite-team `MatchCard`s on Home with a new
+  `FavoriteTeamsRail` — a horizontal, edge-to-edge carousel of **circular team
+  flags** (gold ring + soft glow) that **slide in staggered** (`FadeInRight`) and
+  **spring-scale on press**. Each chip deep-links to `/team/[id]` (group standing
+  + results). Empty state keeps the "choose teams" CTA; "Today's matches" below is
+  unchanged. Dropped the now-unused `favMatches` derivation in `(tabs)/index.tsx`.
+- **Reused on the Teams tab:** the "My Favorites" strip now renders the same
+  `FavoriteTeamsRail` (replaced the boxed `favCard`s) so both surfaces match.
+- **Shipped via OTA** to `production` (iOS runtime `2c3aa583…` → reaches the live
+  1.0.1 build, Android `c50144db…`). Real Supabase ref verified in `dist/`.
+
+### 2026-06-22 — England & Scotland flags (own flag, not Union Jack — OTA)
+
+- **Bug:** England and Scotland rendered the blue **Union Jack** instead of the
+  St George's Cross / Saltire. `react-native-country-flag` builds
+  `https://flagcdn.com/w80/<iso2>.png`, and both teams had `iso2 = 'GB'` → `gb.png`.
+- **Fix:** flagcdn serves UK **subdivision** flags, so `iso2` is now `gb-eng`
+  (England) / `gb-sct` (Scotland) → their own flag, cross-platform image (the
+  `flag_emoji` sub-region glyph stays as the no-`iso2` fallback). Nothing else
+  depends on `iso2` being a strict 2-letter code (only flag render + team search).
+- **Key gotcha:** team display data (name, `iso2`, `flag_emoji`) is read **only
+  from the bundled seed** (`src/lib/seed.ts` → `teamsById`), NEVER from Supabase —
+  the only `teams` column the app queries live is `coach` (useSquad). So the DB
+  `UPDATE teams` did nothing on its own; the operative fix is `data/seed/teams.json`
+  (+ regenerated `supabase/seed.sql`), which reaches users **via OTA**. The DB was
+  updated too, only to keep it consistent.
+- **Shipped via OTA** to `production`: iOS runtime `2c3aa583…` (matches the live
+  1.0.1 build → reaches users), Android `c50144db…`. Real Supabase ref verified in
+  the `dist/` bundle (no placeholder) before finishing — see
+  `feedback_eas_update_environment`.
+
 ### 2026-06-22 — Fix duplicated goal pushes (server-only, no OTA)
 
 - **Bug:** every new goal re-fired the push notifications for all prior goals
@@ -695,7 +728,10 @@ All sourced from data football-data already returns (no new paid add-on):
   `notify-dispatcher` yet.
 - Live score sync is **inert until the upstream key secret is set**; squads/ids
   use football-data.org (`FOOTBALLDATA_TOKEN`).
-- England/Scotland use ISO `GB` for flag images (emoji sub-region flags in data).
+- England/Scotland use the flagcdn **subdivision** codes `gb-eng` / `gb-sct` as
+  their `iso2` (not `GB`), so `react-native-country-flag` renders their own flag
+  (St George's Cross / Saltire) instead of the Union Jack. `flag_emoji` keeps the
+  sub-region emoji as the no-`iso2` fallback. (Data-only fix — DB + seed.)
 - Knockout matches seed with placeholder labels until results decide them.
 - `useMatches` returns seed data if the remote `matches` table is empty — an
   empty result ≠ "no matches".

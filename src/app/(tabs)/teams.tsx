@@ -11,14 +11,14 @@ import {
 import CountryFlag from 'react-native-country-flag';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { FavoriteTeamsRail } from '@/components/FavoriteTeamsRail';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HeaderActions } from '@/components/HeaderActions';
 import { EmptyState } from '@/components/States';
 import { TeamName } from '@/components/TeamName';
 import { HeartIcon, SearchIcon } from '@/components/icons';
 import type { Team } from '@/lib/database.types';
-import { teamName } from '@/lib/format';
-import { seedTeams, teamsById } from '@/lib/seed';
+import { seedTeams } from '@/lib/seed';
 import { teamColor } from '@/lib/teamColors';
 import { teamMatchesQuery } from '@/lib/teamSearch';
 import { palette, radius } from '@/lib/theme';
@@ -36,10 +36,6 @@ export default function TeamsScreen() {
     if (!q) return seedTeams;
     return seedTeams.filter((team) => teamMatchesQuery(team, q));
   }, [query]);
-
-  const favTeams = favorites
-    .map((id) => teamsById[id])
-    .filter(Boolean) as Team[];
 
   return (
     <View style={styles.screen}>
@@ -64,30 +60,13 @@ export default function TeamsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}>
-        {favTeams.length ? (
+        {favorites.length ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.teams.myFavorites}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.favRow}>
-              {favTeams.map((team) => (
-                <Pressable
-                  key={team.id}
-                  style={styles.favCard}
-                  onPress={() => router.push(`/team/${team.id}`)}>
-                  {team.iso2 ? (
-                    <CountryFlag isoCode={team.iso2} size={34} />
-                  ) : (
-                    <Text style={{ fontSize: 30 }}>{team.flag_emoji}</Text>
-                  )}
-                  <Text style={styles.favName} numberOfLines={1}>
-                    {teamName(team, language)}
-                  </Text>
-                  <HeartIcon color={palette.gold} size={14} filled />
-                </Pressable>
-              ))}
-            </ScrollView>
+            <FavoriteTeamsRail
+              teamIds={favorites}
+              onPressTeam={(id) => router.push(`/team/${id}`)}
+            />
           </View>
         ) : null}
 
@@ -175,18 +154,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 6,
   },
-  favRow: { gap: 10, paddingBottom: 8 },
-  favCard: {
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: palette.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.gold,
-    padding: 12,
-    width: 96,
-  },
-  favName: { color: palette.text, fontSize: 12, fontWeight: '700', maxWidth: 80 },
   // Full-width rows: flag-colour gradient · flag · name + confederation ·
   // favorite · group badge. Names never truncate (3-letter code fallback).
   list: { gap: 8 },

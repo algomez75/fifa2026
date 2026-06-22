@@ -32,7 +32,7 @@ INSERT INTO teams (id, name, name_es, flag_emoji, iso2, group_letter, host_count
   ('bra', 'Brazil', 'Brasil', '🇧🇷', 'BR', 'C', false, NULL, 'CONMEBOL'),
   ('mar', 'Morocco', 'Marruecos', '🇲🇦', 'MA', 'C', false, NULL, 'CAF'),
   ('hai', 'Haiti', 'Haití', '🇭🇹', 'HT', 'C', false, NULL, 'CONCACAF'),
-  ('sco', 'Scotland', 'Escocia', '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'GB', 'C', false, NULL, 'UEFA'),
+  ('sco', 'Scotland', 'Escocia', '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'gb-sct', 'C', false, NULL, 'UEFA'),
   ('usa', 'United States', 'Estados Unidos', '🇺🇸', 'US', 'D', true, NULL, 'CONCACAF'),
   ('par', 'Paraguay', 'Paraguay', '🇵🇾', 'PY', 'D', false, NULL, 'CONMEBOL'),
   ('aus', 'Australia', 'Australia', '🇦🇺', 'AU', 'D', false, NULL, 'AFC'),
@@ -65,7 +65,7 @@ INSERT INTO teams (id, name, name_es, flag_emoji, iso2, group_letter, host_count
   ('cod', 'DR Congo', 'RD Congo', '🇨🇩', 'CD', 'K', false, NULL, 'CAF'),
   ('uzb', 'Uzbekistan', 'Uzbekistán', '🇺🇿', 'UZ', 'K', false, NULL, 'AFC'),
   ('col', 'Colombia', 'Colombia', '🇨🇴', 'CO', 'K', false, NULL, 'CONMEBOL'),
-  ('eng', 'England', 'Inglaterra', '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'GB', 'L', false, NULL, 'UEFA'),
+  ('eng', 'England', 'Inglaterra', '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'gb-eng', 'L', false, NULL, 'UEFA'),
   ('cro', 'Croatia', 'Croacia', '🇭🇷', 'HR', 'L', false, NULL, 'UEFA'),
   ('gha', 'Ghana', 'Ghana', '🇬🇭', 'GH', 'L', false, NULL, 'CAF'),
   ('pan', 'Panama', 'Panamá', '🇵🇦', 'PA', 'L', false, NULL, 'CONCACAF')

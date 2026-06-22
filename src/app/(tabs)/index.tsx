@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Countdown } from '@/components/Countdown';
+import { FavoriteTeamsRail } from '@/components/FavoriteTeamsRail';
 import { GlassCard } from '@/components/GlassCard';
 import { HeaderActions } from '@/components/HeaderActions';
 import { LiveHero } from '@/components/LiveHero';
@@ -34,22 +35,13 @@ export default function HomeScreen() {
       (m) => isMatchToday(m.kickoff_utc) && m.status !== 'finished',
     );
     const upNext = nextMatch(all);
-    const favMatches = favorites
-      .map((teamId) =>
-        all.find(
-          (m) =>
-            m.status !== 'finished' &&
-            (m.home_team_id === teamId || m.away_team_id === teamId),
-        ),
-      )
-      .filter(Boolean) as Match[];
-    return { live, today, upNext, favMatches };
-  }, [matches, favorites]);
+    return { live, today, upNext };
+  }, [matches]);
 
   if (isLoading) return <ScreenFrame><LoadingState /></ScreenFrame>;
   if (isError) return <ScreenFrame><ErrorState onRetry={refetch} /></ScreenFrame>;
 
-  const { live, today, upNext, favMatches } = derived;
+  const { live, today, upNext } = derived;
   const hasLive = live.length > 0;
 
   return (
@@ -106,17 +98,13 @@ export default function HomeScreen() {
           <Text style={styles.seedNote}>{t.common.seedNotice}</Text>
         ) : null}
 
-        {/* Your teams */}
+        {/* Your teams — minimalist flag carousel → team page (group + results) */}
         <Section title={t.home.yourTeams}>
-          {favMatches.length ? (
-            favMatches.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                prediction={predictions?.[m.id] ?? null}
-                onPress={() => openMatchTeam(m)}
-              />
-            ))
+          {favorites.length ? (
+            <FavoriteTeamsRail
+              teamIds={favorites}
+              onPressTeam={(id) => router.push(`/team/${id}`)}
+            />
           ) : (
             <Pressable
               onPress={() => router.push('/teams')}
