@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Match } from '@/lib/database.types';
+
+/** Cap interpolation so a dead socket freezes the clock rather than inventing
+ *  minute 130 — 3 min covers the longest realistic gap between server syncs. */
+const MAX_DRIFT_SEC = 180;
 
 export interface LiveClock {
   /** True while the match is paused for half-time (or another break). */
@@ -23,11 +27,13 @@ const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
 /**
  * A live match clock that **ticks on the device** instead of waiting for the
- * next ~60s server sync. It anchors on the authoritative `minute` written by
- * sync-scores (re-anchored every time Realtime patches the row) and adds the
- * minutes elapsed locally since `updated_at`; if the provider sent no minute it
- * falls back to time-since-kickoff. Returns a half-time flag so the badge can
- * show "Half Time" while football-data reports PAUSED (`period = 'HT'`).
+ * next server sync. It anchors on the authoritative `minute` written by
+ * sync-scores and counts up the **device-seconds elapsed since that patch
+ * arrived** — never diffing the device clock against the server clock, so a
+ * skewed phone clock can't read the minute fast/slow. Re-anchors whenever the
+ * server `minute`/`updated_at` changes; if the provider sent no minute it falls
+ * back to time-since-kickoff. Returns a half-time flag so the badge can show
+ * "Half Time" while football-data reports PAUSED (`period = 'HT'`).
  *
  * Re-renders once per second while live; a no-op (no interval) otherwise.
  */
@@ -43,16 +49,27 @@ export function useLiveClock(match: Match): LiveClock {
     return () => clearInterval(id);
   }, [isLive]);
 
+  // Record the DEVICE time at which each new server anchor first arrived. Drift
+  // is then measured purely as device-elapsed time since receipt — immune to any
+  // absolute device/server clock offset.
+  const anchorKey = `${match.id}:${match.minute ?? ''}:${match.updated_at ?? ''}`;
+  const anchorRef = useRef<{ key: string; seenAt: number }>({ key: '', seenAt: now });
+  if (anchorRef.current.key !== anchorKey) {
+    anchorRef.current = { key: anchorKey, seenAt: Date.now() };
+  }
+
   const isHalfTime = match.period === 'HT' || match.period === 'BT';
   if (!isLive || isHalfTime) return { isHalfTime, text: null, clock: null };
 
   // Derive minute AND seconds from the drift since the server anchor, so the
-  // clock counts up smoothly between ~20s syncs and re-anchors on each patch.
+  // clock counts up smoothly between syncs and re-anchors on each patch.
   let minute: number | null = null;
   let seconds = 0;
   if (typeof match.minute === 'number') {
-    const anchorAt = match.updated_at ? new Date(match.updated_at).getTime() : now;
-    const driftSec = Math.max(0, Math.floor((now - anchorAt) / 1000));
+    const driftSec = Math.min(
+      MAX_DRIFT_SEC,
+      Math.max(0, Math.floor((now - anchorRef.current.seenAt) / 1000)),
+    );
     minute = match.minute + Math.floor(driftSec / 60);
     seconds = driftSec % 60;
   } else {

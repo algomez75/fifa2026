@@ -302,6 +302,47 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-22 — Near-real-time live sync: ~5s cadence + half-time pushes (server + OTA)
+
+- **sync-scores → ~5s** (migration 026, `cron.alter_job '5 seconds'`). Made the
+  high-frequency path CHEAP so cadence ≠ API cost: the one `/competitions/WC/matches`
+  LIST call carries score+minute+period+HT for every match and drives the
+  clock/score/half-time every ~5s; rows are written **only when something changed**
+  (no per-tick churn on finished matches — the old loop re-wrote them all every
+  tick). The expensive per-match `/matches/{id}` DETAIL is **gated** (on a score
+  change/kickoff, while a scorer is still unattributed ≤60s, or every
+  DETAIL_FLOOR — 20s live / 60s idle, tracked via `match_details.updated_at`,
+  which we now always advance even pre-lineup) so detail cost doesn't scale with
+  cadence; **player paging is lazy** (only when a detail fetch will run); scorers
+  refresh on `events>0`, standings on score/status change (not every minute tick).
+  `fd()` is now **429/5xx-aware** (one bounded retry; a long Retry-After sheds the
+  detail loop) and the response reports `rate429`/`detailFetches`/`transitions`.
+- **Goal dedupe — live fix:** football-data leaves `goals[].score` **null during
+  live play** (backfilled later), so `goalId` fell back to natKey and re-fired
+  every prior goal's push when the scorer landed (re-confirmed live on
+  GS-J3 Argentina). Fix: the running score is now **computed from the goals[]
+  order** (each goal +1 to its team) so the identity is `s|<h>-<a>|<team>` from the
+  first insert and never flips. Atomic claim still → exactly one push per goal.
+- **New live-moment pushes** (user-requested): **🔴 kickoff (actual)**, **⏸️
+  half-time + HT score**, **▶️ second half** — emitted from sync-scores (only place
+  with prior+new period in one tick), deduped per device via `push_sent` new types
+  `kickoff_live`/`halftime`/`secondhalf`, fired **only from a known prior live
+  state** so deploying mid-match can't false-fire. Respect the existing
+  `notify_all`/favorite opt-in. App taps already deep-link via `matchId`.
+- **notify-dispatcher → ~30s** (migration 027) + goal backstop age **45s→25s**
+  (sync-scores now claims within seconds, so 25s never races it). Every push type
+  stays idempotently deduped, so the faster cadence can't double-send.
+- **Client (OTA):** `useLiveClock` is now **skew-proof** — it counts device-seconds
+  elapsed since each server patch arrived (never diffs device vs server clock) and
+  **caps drift at 180s** so a dead socket freezes the minute instead of inventing
+  90+40. Tighter fallbacks: matches poll 20→10s, events 15→8s, detail 15→8s, goal
+  grace 3500→2500ms, realtime reconnect 2000→1000ms/cap 15s, `eventsPerSecond` 5→8.
+- **Server-only parts reach everyone instantly; client parts via OTA** (iOS runtime
+  `2c3aa583…`). Rollback is one `cron.alter_job` back to `'20 seconds'` / `'* * * * *'`.
+  Rate math at 5s ≈ today's req/min (only the cheap LIST rose 3→12/min). Verify on a
+  live match: `matches.minute/period` advance ~5s, `match_events` fill the scorer
+  ~5-15s `pushed` once, `push_sent` shows one kickoff/halftime/secondhalf per device.
+
 ### 2026-06-22 — Minimalist flag carousel for favourites (Home + Teams, OTA)
 
 - Replaced the full-width favourite-team `MatchCard`s on Home with a new

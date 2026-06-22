@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -26,18 +26,39 @@ import { useTranslation } from '@/store/useAppStore';
 
 /** Public App Store listing — keep in sync with landing/script.js. */
 const APP_STORE_URL = 'https://apps.apple.com/app/11-gol/id6775887761';
+/** Refetch on focus only past this age, so quick tab switches don't re-fetch. */
+const FOCUS_REFRESH_MS = 10_000;
+
+type TFn = ReturnType<typeof useTranslation>['t'];
+type OpenUser = (row: LeaderboardRow, rank: number) => void;
+
+const keyExtractor = (r: LeaderboardRow) => r.user_id;
 
 export default function LeaderboardScreen() {
   const { t, language } = useTranslation();
-  const { data: rows, isLoading, isError, isFetching, refetch } = useLeaderboard();
+  const { data: rows, isLoading, isError, refetch, dataUpdatedAt } = useLeaderboard();
   const userId = useAuthStore((s) => s.user?.id);
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Refresh the ranking whenever the tab regains focus.
+  // Refresh on focus only when the cached ranking is actually stale, so a quick
+  // tab switch doesn't fire a redundant request (and re-render) every time.
   useFocusEffect(
     useCallback(() => {
-      refetch();
-    }, [refetch]),
+      if (Date.now() - dataUpdatedAt > FOCUS_REFRESH_MS) refetch();
+    }, [refetch, dataUpdatedAt]),
   );
+
+  // Manual pull-to-refresh owns the spinner; the 15s background poll stays
+  // invisible so the list never flickers on its own.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const me = useMemo(() => {
     if (!rows || !userId) return null;
@@ -64,6 +85,29 @@ export default function LeaderboardScreen() {
       // user dismissed the sheet — nothing to do
     }
   }, [me, rows, language, t.leaderboard.shareTitle]);
+
+  // Stable handler so memoized rows don't re-render when the list refetches.
+  const openUser = useCallback<OpenUser>(
+    (row, rank) =>
+      router.push({
+        pathname: '/user/[id]',
+        params: {
+          id: row.user_id,
+          name: row.display_name,
+          avatar: row.avatar_url ?? '',
+          points: String(row.points),
+          rank: String(rank),
+        },
+      }),
+    [router],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: LeaderboardRow; index: number }) => (
+      <Row row={item} rank={index + 1} isMe={item.user_id === userId} t={t} onOpen={openUser} />
+    ),
+    [userId, t, openUser],
+  );
 
   return (
     <View style={styles.screen}>
@@ -109,19 +153,18 @@ export default function LeaderboardScreen() {
       ) : (
         <FlatList
           data={rows}
-          keyExtractor={(r) => r.user_id}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          // Virtualization tuning — keeps it smooth as the ranking grows to
+          // thousands of players during the tournament.
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={11}
           refreshControl={
-            <RefreshControl
-              refreshing={isFetching && !isLoading}
-              onRefresh={refetch}
-              tintColor={palette.gold}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.gold} />
           }
-          renderItem={({ item, index }) => (
-            <Row row={item} rank={index + 1} isMe={item.user_id === userId} t={t} />
-          )}
           ListFooterComponent={
             <Text style={styles.reportHint}>{t.leaderboard.reportHint}</Text>
           }
@@ -131,77 +174,77 @@ export default function LeaderboardScreen() {
   );
 }
 
-function Row({
-  row,
-  rank,
-  isMe,
-  t,
-}: {
+interface RowProps {
   row: LeaderboardRow;
   rank: number;
   isMe: boolean;
-  t: ReturnType<typeof useTranslation>['t'];
-}) {
-  const router = useRouter();
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
-
-  const open = () =>
-    router.push({
-      pathname: '/user/[id]',
-      params: {
-        id: row.user_id,
-        name: row.display_name,
-        avatar: row.avatar_url ?? '',
-        points: String(row.points),
-        rank: String(rank),
-      },
-    });
-
-  const report = () => {
-    if (isMe) return;
-    Alert.alert(t.leaderboard.report, t.leaderboard.reportBody, [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.leaderboard.report,
-        style: 'destructive',
-        onPress: () => {
-          const subject = encodeURIComponent(`11 Gol report: ${row.user_id}`);
-          const body = encodeURIComponent(
-            `Reporting player "${row.display_name}" (id ${row.user_id}) for inappropriate name/photo.`,
-          );
-          Linking.openURL(`mailto:info@portela11.com?subject=${subject}&body=${body}`);
-        },
-      },
-    ]);
-  };
-
-  return (
-    <Pressable
-      onPress={open}
-      onLongPress={report}
-      delayLongPress={400}
-      style={({ pressed }) => [styles.row, isMe && styles.rowMe, pressed && { opacity: 0.85 }]}>
-      <View style={styles.rankCol}>
-        {medal ? (
-          <Text style={styles.medal}>{medal}</Text>
-        ) : (
-          <Text style={styles.rankNum}>{rank}</Text>
-        )}
-      </View>
-      <Avatar url={row.avatar_url} name={row.display_name} size={38} ring={false} />
-      <View style={styles.nameCol}>
-        <Text style={styles.name} numberOfLines={1}>
-          {row.display_name}
-          {isMe ? <Text style={styles.youTag}> · {t.leaderboard.you}</Text> : null}
-        </Text>
-        <Text style={styles.sub}>
-          {row.total} {t.leaderboard.made} · {row.exact} {t.leaderboard.exactShort}
-        </Text>
-      </View>
-      <Text style={styles.points}>{row.points}</Text>
-    </Pressable>
-  );
+  t: TFn;
+  onOpen: OpenUser;
 }
+
+/** Memoized so a 15s poll only re-renders rows whose data actually changed. */
+const Row = memo(
+  function Row({ row, rank, isMe, t, onOpen }: RowProps) {
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+
+    const report = () => {
+      if (isMe) return;
+      Alert.alert(t.leaderboard.report, t.leaderboard.reportBody, [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.leaderboard.report,
+          style: 'destructive',
+          onPress: () => {
+            const subject = encodeURIComponent(`11 Gol report: ${row.user_id}`);
+            const body = encodeURIComponent(
+              `Reporting player "${row.display_name}" (id ${row.user_id}) for inappropriate name/photo.`,
+            );
+            Linking.openURL(`mailto:info@portela11.com?subject=${subject}&body=${body}`);
+          },
+        },
+      ]);
+    };
+
+    return (
+      <Pressable
+        onPress={() => onOpen(row, rank)}
+        onLongPress={report}
+        delayLongPress={400}
+        style={({ pressed }) => [styles.row, isMe && styles.rowMe, pressed && { opacity: 0.85 }]}>
+        <View style={styles.rankCol}>
+          {medal ? (
+            <Text style={styles.medal}>{medal}</Text>
+          ) : (
+            <Text style={styles.rankNum}>{rank}</Text>
+          )}
+        </View>
+        <Avatar url={row.avatar_url} name={row.display_name} size={38} ring={false} />
+        <View style={styles.nameCol}>
+          <Text style={styles.name} numberOfLines={1}>
+            {row.display_name}
+            {isMe ? <Text style={styles.youTag}> · {t.leaderboard.you}</Text> : null}
+          </Text>
+          <Text style={styles.sub}>
+            {row.total} {t.leaderboard.made} · {row.exact} {t.leaderboard.exactShort}
+          </Text>
+        </View>
+        <Text style={styles.points}>{row.points}</Text>
+      </Pressable>
+    );
+  },
+  // Skip re-render unless something this row actually shows changed.
+  (a, b) =>
+    a.rank === b.rank &&
+    a.isMe === b.isMe &&
+    a.t === b.t &&
+    a.onOpen === b.onOpen &&
+    a.row.user_id === b.row.user_id &&
+    a.row.points === b.row.points &&
+    a.row.total === b.row.total &&
+    a.row.exact === b.row.exact &&
+    a.row.display_name === b.row.display_name &&
+    a.row.avatar_url === b.row.avatar_url,
+);
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },

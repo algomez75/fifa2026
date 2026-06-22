@@ -24,6 +24,6 @@ export const supabase = createClient<Database>(
       persistSession: true,
       detectSessionInUrl: false,
     },
-    realtime: { params: { eventsPerSecond: 5 } },
+    realtime: { params: { eventsPerSecond: 8 } },
   },
 );

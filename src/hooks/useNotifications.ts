@@ -51,7 +51,17 @@ async function registerForPush(): Promise<string | null> {
 }
 
 type NotifData = {
-  type?: 'kickoff' | 'result' | 'goal' | 'lineup' | 'challenge' | 'predict' | 'leaderboard';
+  type?:
+    | 'kickoff'
+    | 'kickoff_live'
+    | 'halftime'
+    | 'secondhalf'
+    | 'result'
+    | 'goal'
+    | 'lineup'
+    | 'challenge'
+    | 'predict'
+    | 'leaderboard';
   matchId?: string;
   eventId?: string;
   challengeId?: string;

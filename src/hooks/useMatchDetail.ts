@@ -75,7 +75,7 @@ async function fetchDetail(matchId: string): Promise<MatchDetail | null> {
 }
 
 /** Rich match detail (lineups, formations, stats). Polls while fresh data may
- *  still be arriving: fast (~15s) during a live match so stats feel real-time,
+ *  still be arriving: fast (~8s) during a live match so stats feel real-time,
  *  slower (~60s) before kickoff (lineups land ~1h out), and not at all once the
  *  match is finished (its stats are final — backfilled by sync-scores). */
 export function useMatchDetail(
@@ -86,7 +86,7 @@ export function useMatchDetail(
     queryKey: ['match-detail', matchId],
     queryFn: () => fetchDetail(matchId!),
     enabled: !!matchId && isSupabaseConfigured,
-    staleTime: opts.live ? 8_000 : 45_000,
-    refetchInterval: opts.finished ? false : opts.live ? 15_000 : 60_000,
+    staleTime: opts.live ? 6_000 : 45_000,
+    refetchInterval: opts.finished ? false : opts.live ? 8_000 : 60_000,
   });
 }

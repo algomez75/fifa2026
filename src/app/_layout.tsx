@@ -11,6 +11,7 @@ import { CelebrationOverlay } from '@/components/CelebrationOverlay';
 import { useLiveEvents } from '@/hooks/useLiveEvents';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useSilentUpdate } from '@/hooks/useSilentUpdate';
+import { prefetchLeaderboard } from '@/hooks/useLeaderboard';
 import { queryClient } from '@/lib/queryClient';
 import { initAuth } from '@/store/useAuthStore';
 import { palette } from '@/lib/theme';
@@ -49,8 +50,11 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 export default function RootLayout() {
   // Bootstrap auth: restore session or sign in anonymously; keep store in sync.
+  // Then warm the ranking cache so the Leaderboard tab opens instantly.
   useEffect(() => {
-    void initAuth();
+    void initAuth().finally(() => {
+      void prefetchLeaderboard();
+    });
   }, []);
 
   return (

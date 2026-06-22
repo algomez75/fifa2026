@@ -36,9 +36,10 @@ export function useMatches() {
     queryFn: fetchMatches,
     initialData: seedSchedule,
     // Belt-and-braces alongside the Realtime channel: while a match is hot,
-    // poll every 20s so scores/standings stay fresh even if the socket died.
+    // poll every 10s so scores/clock stay fresh even if the socket died (the
+    // server now syncs every ~5s).
     refetchInterval: (query) =>
-      isSupabaseConfigured && anyMatchHot(query.state.data) ? 20_000 : false,
+      isSupabaseConfigured && anyMatchHot(query.state.data) ? 10_000 : false,
   });
 }
 

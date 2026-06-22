@@ -28,8 +28,9 @@ export interface MatchRealtimeHandlers {
 }
 
 /** How long a score-diff goal waits for its rich `match_events` row before
- *  celebrating without a scorer name. */
-const GOAL_EVENT_GRACE_MS = 3500;
+ *  celebrating without a scorer name. The server now forces the detail fetch on
+ *  the same tick as the score change, so the rich event lands fast. */
+const GOAL_EVENT_GRACE_MS = 2500;
 
 /**
  * Subscribes to `matches` UPDATEs and `match_events` INSERTs via Supabase
@@ -64,7 +65,7 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
     const pendingFallbacks = new Map<string, ReturnType<typeof setTimeout>>();
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryDelay = 2000;
+    let retryDelay = 1000;
     let disposed = false;
     let hasConnected = false; // becomes true after the first SUBSCRIBED
 
@@ -198,7 +199,7 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
         .subscribe((status) => {
           if (disposed) return;
           if (status === 'SUBSCRIBED') {
-            retryDelay = 2000;
+            retryDelay = 1000;
             // On a *re*-connect (after a drop), refetch what the socket missed
             // while it was down. Skip the very first connect (initial fetch
             // already runs).
@@ -211,7 +212,7 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
             // A dead channel never revives itself — rebuild it with backoff.
             if (retryTimer) clearTimeout(retryTimer);
             retryTimer = setTimeout(subscribe, retryDelay);
-            retryDelay = Math.min(retryDelay * 2, 30_000);
+            retryDelay = Math.min(retryDelay * 2, 15_000);
           }
         });
     };

@@ -38,8 +38,8 @@ export function useMatchEvents() {
   return useQuery({
     queryKey: matchEventsKey,
     queryFn: fetchMatchEvents,
-    staleTime: hot ? 8_000 : 30_000,
-    refetchInterval: hot ? 15_000 : false,
+    staleTime: hot ? 6_000 : 30_000,
+    refetchInterval: hot ? 8_000 : false,
     enabled: isSupabaseConfigured,
   });
 }

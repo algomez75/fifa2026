@@ -1,6 +1,9 @@
 // supabase/functions/notify-dispatcher/index.ts
 //
-// Push notification dispatcher. Runs every minute via pg_cron.
+// Push notification dispatcher. Runs every ~30s via pg_cron. All push types are
+// idempotently deduped (push_sent / match_events.pushed / matches.result_pushed /
+// AM-PM bucket), so the faster cadence only speeds up the time-sensitive backstop
+// + full-time without any risk of double-sending the cheap reminder scans.
 //
 // Sends ONE push per unique device token (never per user row — anonymous-first
 // auth means one phone can sit on many user_settings rows sharing a token; the
@@ -192,10 +195,10 @@ Deno.serve(async () => {
 
   // ── 2. Goals → one push per device, deduped globally via match_events.pushed.
   //      This is only the BACKSTOP: sync-scores pushes a fresh goal inline
-  //      within seconds and marks it pushed. Restrict to goals that have been
-  //      unpushed for ≥45s (sync-scores runs every 20s) so we never race its
-  //      inline send and double-fire — we only catch goals it genuinely missed.
-  const goalBackstopBefore = new Date(now - 45_000).toISOString();
+  //      within seconds and marks it pushed. Restrict to goals unpushed for ≥25s
+  //      (sync-scores runs every ~5s and claims within seconds) so we never race
+  //      its inline send and double-fire — we only catch goals it truly missed.
+  const goalBackstopBefore = new Date(now - 25_000).toISOString();
   const { data: goalEvents } = await supabase
     .from('match_events')
     .select('id, match_id, minute, team_id, player_name, score_home, score_away')

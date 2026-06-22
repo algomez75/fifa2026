@@ -1,21 +1,27 @@
 // supabase/functions/sync-scores/index.ts
 //
-// Live score sync from football-data.org. Runs every 60s via pg_cron.
-// Self-throttles: only calls the API when a match is in its in-progress
-// window, protecting the rate limit.
+// Live score sync from football-data.org. Runs every ~5s via pg_cron.
+// Self-throttles: only calls the API when a match is in its in-progress window.
 //
-// v2 (2026-06-11):
-//  - Guard also matches finished-with-null-scores rows so late score backfills
-//    land (the free tier publishes fullTime minutes AFTER FINISHED — v1 wrote
-//    `finished` + nulls once and never re-fetched: the GS-A1 bug).
-//  - Per-match detail fetch (/v4/matches/{id}) for in-window matches → upserts
-//    goal events (scorer, minute, running score) into `match_events`, which
-//    drives the in-app celebration + the goal push notifications.
-//  - Honest update accounting + per-step errors in the response.
-//
-// Matches are linked via matches.api_football_fixture_id == football-data
-// match id (populated by scripts/map-footballdata.mjs). Goal teams map via
-// teams.fd_team_id.
+// Real-time design (2026-06-22):
+//  - CHEAP FAST PATH: the single `/competitions/WC/matches` LIST call already
+//    carries score + minute + period + HT score for every match. That drives the
+//    clock / score / half-time at the full ~5s cadence for one request. We only
+//    write a row when something actually changed (no needless realtime churn on
+//    finished matches every tick).
+//  - BOUNDED DETAIL: the expensive per-match `/matches/{id}` fetch (scorer name,
+//    lineups, stats, cards) is gated — fetched only on a score change / kickoff,
+//    while a scorer is still unattributed, or every DETAIL_FLOOR ms — so detail
+//    cost does NOT scale with the fast cadence. Player paging is lazy (only when
+//    a detail fetch will run).
+//  - LIVE-MOMENT PUSHES: kickoff (actual), half-time (+score), second-half —
+//    emitted here (the only place holding prior+new period this tick), deduped
+//    per device via push_sent, fired only from a known prior live state.
+//  - Goal dedupe unchanged: stable goalId (cumulative score + team) + atomic
+//    claim → exactly one goal push, surviving the late scorer attribution.
+//  - fd() is now 429/5xx aware (one bounded retry) and reports rate429 so we can
+//    see headroom; a long Retry-After sheds the detail loop (scores still update
+//    from the cheap LIST data already in hand).
 //
 // Deploy:  supabase functions deploy sync-scores
 // Secret:  supabase secrets set FOOTBALLDATA_TOKEN=xxxx
@@ -27,6 +33,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const TOKEN = Deno.env.get('FOOTBALLDATA_TOKEN') ?? '';
 const FD_BASE = 'https://api.football-data.org/v4';
+
+// Detail-fetch floors: live matches refresh stats/cards faster than idle
+// (pre-kickoff lineups / post-finish stats finalization).
+const DETAIL_FLOOR_LIVE = 20_000;
+const DETAIL_FLOOR_IDLE = 60_000;
 
 function mapStatus(s: string): 'live' | 'finished' | null {
   if (s === 'IN_PLAY' || s === 'PAUSED' || s === 'SUSPENDED') return 'live';
@@ -50,30 +61,62 @@ function mapPeriod(
   return null; // scheduled / finished
 }
 
-async function fd(path: string): Promise<any | null> {
-  const res = await fetch(`${FD_BASE}${path}`, { headers: { 'X-Auth-Token': TOKEN } });
-  if (!res.ok) return null;
-  return res.json();
-}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  // 1. Guard: any match in its in-progress window? Two cases:
-  //    a) not finished and kicking off between 4h ago and 10min from now
-  //    b) finished but scores still NULL (API backfills fullTime late) within 12h
+  // football-data fetch with bounded retry + rate-limit awareness. On 429 we
+  // honour a short Retry-After once; a long one flips `rateLimited` so the tick
+  // sheds its detail loop (the cheap LIST already gave us scores/clock/period).
+  let rate429 = 0;
+  let rateLimited = false;
+  async function fd(path: string): Promise<any | null> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(`${FD_BASE}${path}`, { headers: { 'X-Auth-Token': TOKEN } });
+      } catch (_e) {
+        return null; // network blip — next tick covers it
+      }
+      if (res.ok) return res.json();
+      if (res.status === 429) {
+        rate429++;
+        const ra = Number(res.headers.get('Retry-After') ?? '0');
+        if (attempt === 0 && ra > 0 && ra <= 8) {
+          await sleep(ra * 1000);
+          continue;
+        }
+        if (ra > 8) rateLimited = true;
+        return null;
+      }
+      if (res.status >= 500 && attempt === 0) {
+        await sleep(500);
+        continue;
+      }
+      return null;
+    }
+    return null;
+  }
+
+  // 1. Guard: any match in its in-progress window?
+  //    a) not finished and kicking off between 4h ago and 90min ahead
+  //    b) finished within 3.5h (final stats finalize a few min after FINISHED)
+  //    c) finished but scores still NULL (API backfills fullTime late) within 12h
   const now = Date.now();
-  const windowStart = new Date(now - 4 * 60 * 60_000).toISOString();
+  // 12h lookback (not 4h): we now only write matches in this window, so a match
+  // that went live + finished during a long outage must still fall inside it to
+  // be rescued. In normal operation matches are marked finished within ~2h, so
+  // almost nothing non-finished sits past 4h — the window stays small.
+  const windowStart = new Date(now - 12 * 60 * 60_000).toISOString();
   const backfillStart = new Date(now - 12 * 60 * 60_000).toISOString();
-  // Keep re-fetching a match for ~1.5h after full-time so the FINAL team stats
-  // (football-data finalizes possession/shots a few minutes after FINISHED)
-  // land in match_details.
   const recentFinish = new Date(now - 3.5 * 60 * 60_000).toISOString();
-  // 90 min ahead: football-data publishes starting lineups ~1h before kickoff.
   const soon = new Date(now + 90 * 60_000).toISOString();
   const { data: active, error: gErr } = await supabase
     .from('matches')
-    .select('id, api_football_fixture_id, status, home_score')
+    .select(
+      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, updated_at',
+    )
     .or(
       `and(status.neq.finished,kickoff_utc.lte.${soon},kickoff_utc.gte.${windowStart}),` +
         `and(status.eq.finished,kickoff_utc.gte.${recentFinish}),` +
@@ -87,41 +130,103 @@ Deno.serve(async () => {
 
   const errors: string[] = [];
 
-  // 2. Fetch the full WC match list (one request) → statuses + scores.
+  // 2. Fetch the full WC match list (one cheap request) → statuses + scores +
+  //    minute + period + HT score for ALL matches.
   const json = await fd('/competitions/WC/matches');
   if (!json)
-    return Response.json({ error: 'football-data list fetch failed' }, { status: 502 });
-  const matches = (json.matches ?? []) as any[];
+    return Response.json({ error: 'football-data list fetch failed', rate429 }, { status: 502 });
+  const fdMatches = (json.matches ?? []) as any[];
+
+  // Prior DB state, keyed by football-data fixture id (only matches in our sync
+  // window — we never touch long-finished rows, killing per-tick churn).
+  const priorByFixture = new Map<number, any>();
+  for (const r of active) {
+    if (r.api_football_fixture_id != null) priorByFixture.set(r.api_football_fixture_id, r);
+  }
+
+  // What the LIST loop learns this tick:
+  const needsDetail = new Set<string>(); // score changed / went live → grab scorer now
+  const liveNow = new Set<string>(); // match is currently live (new status)
+  let scoreOrStatusChanged = false; // → refresh standings
+  interface Transition {
+    row: any;
+    type: 'kickoff_live' | 'halftime' | 'secondhalf';
+    htHome?: number | null;
+    htAway?: number | null;
+  }
+  const transitions: Transition[] = [];
 
   let updated = 0;
-  for (const m of matches) {
+  for (const m of fdMatches) {
+    const prior = priorByFixture.get(m.id);
+    if (!prior) continue; // outside our sync window → leave it alone
     const status = mapStatus(m.status);
-    if (!status) continue;
+    if (!status) continue; // SCHEDULED/TIMED/etc → no live data to write yet
+
     const ft = m.score?.fullTime ?? {};
     const ht = m.score?.halfTime ?? {};
     const pen = m.score?.penalties ?? {};
     const minute = typeof m.minute === 'number' ? m.minute : null;
-    const { data: rows, error } = await supabase
+    const period = mapPeriod(m.status, minute, m.score?.duration ?? null);
+    const next = {
+      home_score: ft.home ?? null,
+      away_score: ft.away ?? null,
+      home_score_ht: ht.home ?? null,
+      away_score_ht: ht.away ?? null,
+      home_score_penalties: pen.home ?? null,
+      away_score_penalties: pen.away ?? null,
+      minute,
+      period,
+      status,
+    };
+
+    if (status === 'live') liveNow.add(prior.id);
+
+    const priorStatus = prior.status as string;
+    const priorPeriod = (prior.period ?? null) as string | null;
+
+    // Live-moment transitions — fire only from a KNOWN prior live state so a
+    // cold first-observation (null → HT) can't false-positive.
+    if (priorStatus === 'scheduled' && status === 'live') {
+      transitions.push({ row: prior, type: 'kickoff_live' });
+    }
+    if (priorPeriod === '1H' && period === 'HT') {
+      transitions.push({ row: prior, type: 'halftime', htHome: next.home_score_ht, htAway: next.away_score_ht });
+    }
+    if (priorPeriod === 'HT' && period === '2H') {
+      transitions.push({ row: prior, type: 'secondhalf' });
+    }
+
+    const scoreChanged =
+      next.home_score !== (prior.home_score ?? null) ||
+      next.away_score !== (prior.away_score ?? null);
+    if (scoreChanged || (priorStatus === 'scheduled' && status === 'live')) needsDetail.add(prior.id);
+    if (scoreChanged || status !== priorStatus) scoreOrStatusChanged = true;
+
+    // Skip the write entirely when nothing changed → no needless realtime event
+    // (and the clock anchor only advances on a real change; the client tween
+    // smooths the gap).
+    const noChange =
+      next.home_score === (prior.home_score ?? null) &&
+      next.away_score === (prior.away_score ?? null) &&
+      next.home_score_ht === (prior.home_score_ht ?? null) &&
+      next.away_score_ht === (prior.away_score_ht ?? null) &&
+      next.home_score_penalties === (prior.home_score_penalties ?? null) &&
+      next.away_score_penalties === (prior.away_score_penalties ?? null) &&
+      next.minute === (prior.minute ?? null) &&
+      next.period === priorPeriod &&
+      next.status === priorStatus;
+    if (noChange) continue;
+
+    const { error } = await supabase
       .from('matches')
-      .update({
-        home_score: ft.home ?? null,
-        away_score: ft.away ?? null,
-        home_score_ht: ht.home ?? null,
-        away_score_ht: ht.away ?? null,
-        home_score_penalties: pen.home ?? null,
-        away_score_penalties: pen.away ?? null,
-        minute,
-        period: mapPeriod(m.status, minute, m.score?.duration ?? null),
-        status,
-      })
-      .eq('api_football_fixture_id', m.id)
-      .select('id');
+      .update(next)
+      .eq('api_football_fixture_id', m.id);
     if (error) errors.push(`update ${m.id}: ${error.message}`);
-    else if (rows && rows.length > 0) updated++;
+    else updated++;
   }
 
-  // 3. Per-match detail for in-window matches → goal events with scorer names.
-  //    (goals[].team.id maps to teams.fd_team_id; seq = index in goals[].)
+  // Teams lookup (small) — always needed for push labels + FD-id mapping.
   const { data: teams } = await supabase
     .from('teams')
     .select('id, fd_team_id, name, flag_emoji')
@@ -131,8 +236,39 @@ Deno.serve(async () => {
   const teamName = (id: string | null) => (id ? teamById.get(id)?.name ?? 'TBD' : 'TBD');
   const teamFlag = (id: string | null) => (id ? teamById.get(id)?.flag_emoji ?? '' : '');
 
+  // 3. Decide which matches actually need a DETAIL fetch this tick.
+  const activeIds = active.map((r: any) => r.id);
+  const { data: mdRows } = await supabase
+    .from('match_details')
+    .select('match_id, updated_at')
+    .in('match_id', activeIds);
+  const detailAt = new Map<string, number>(
+    (mdRows ?? []).map((r: any) => [r.match_id, Date.parse(r.updated_at)]),
+  );
+  // Matches with a goal whose scorer hasn't landed yet → keep polling for ≤60s.
+  const { data: unsettledRows } = await supabase
+    .from('match_events')
+    .select('match_id')
+    .eq('type', 'goal')
+    .is('player_name', null)
+    .gte('created_at', new Date(now - 60_000).toISOString())
+    .in('match_id', activeIds);
+  const unsettled = new Set<string>((unsettledRows ?? []).map((r: any) => r.match_id));
+
+  const detailTargets = (active as any[]).filter((row) => {
+    if (!row.api_football_fixture_id) return false;
+    if (needsDetail.has(row.id) || unsettled.has(row.id)) return true;
+    const age = detailAt.has(row.id) ? now - (detailAt.get(row.id) as number) : Infinity;
+    const floor = liveNow.has(row.id) ? DETAIL_FLOOR_LIVE : DETAIL_FLOOR_IDLE;
+    return age >= floor;
+  });
+  // Under a long rate-limit cool-down, shed the detail loop — scores/clock/period
+  // already updated from the cheap LIST data above.
+  const doDetailLoop = !rateLimited && detailTargets.length > 0;
+
   // Player lookup (normalized name within team) so events carry player_id and
-  // the app can show the scorer's photo avatar.
+  // the app can show the scorer's photo. PAGED LAZILY — only when we'll fetch
+  // detail this tick, so cheap fast-path ticks stay cheap.
   const normName = (s: string | null | undefined) =>
     (s ?? '')
       .toLowerCase()
@@ -141,22 +277,23 @@ Deno.serve(async () => {
       .replace(/[^a-z\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  // PostgREST caps responses at 1000 rows — page through all ~1250 players.
-  const allPlayers: { id: number; team_id: string; name: string }[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data: page } = await supabase
-      .from('players')
-      .select('id, team_id, name')
-      .order('id')
-      .range(from, from + 999);
-    allPlayers.push(...((page ?? []) as typeof allPlayers));
-    if (!page || page.length < 1000) break;
-  }
   const playersByTeam = new Map<string, { id: number; key: string }[]>();
-  for (const p of allPlayers ?? []) {
-    const list = playersByTeam.get(p.team_id) ?? [];
-    list.push({ id: p.id, key: normName(p.name) });
-    playersByTeam.set(p.team_id, list);
+  if (doDetailLoop) {
+    const allPlayers: { id: number; team_id: string; name: string }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await supabase
+        .from('players')
+        .select('id, team_id, name')
+        .order('id')
+        .range(from, from + 999);
+      allPlayers.push(...((page ?? []) as typeof allPlayers));
+      if (!page || page.length < 1000) break;
+    }
+    for (const p of allPlayers) {
+      const list = playersByTeam.get(p.team_id) ?? [];
+      list.push({ id: p.id, key: normName(p.name) });
+      playersByTeam.set(p.team_id, list);
+    }
   }
   const resolvePlayer = (teamId: string | null, name: string | null) => {
     if (!teamId || !name) return null;
@@ -164,7 +301,6 @@ Deno.serve(async () => {
     const list = playersByTeam.get(teamId) ?? [];
     const exact = list.filter((p) => p.key === key);
     if (exact.length === 1) return exact[0].id;
-    // abbreviated / partial: surname tail (+ first initial when present)
     const tokens = key.split(' ');
     const initial = tokens[0]?.length === 1 ? tokens[0] : null;
     const tail = (initial ? tokens.slice(1) : tokens).join(' ');
@@ -177,223 +313,279 @@ Deno.serve(async () => {
     return hits.length === 1 ? hits[0].id : null;
   };
 
-  // Home/away team ids for each match we successfully processed this run, so the
-  // inline goal push (claimed atomically at the end) can label the scoreline.
+  // Home/away team ids for matches whose detail we processed → labels the inline
+  // goal push.
   const matchTeams = new Map<string, { homeTeamId: string | null; awayTeamId: string | null }>();
 
   let events = 0;
-  for (const row of active) {
-    if (!row.api_football_fixture_id) continue;
-    const detail = await fd(`/matches/${row.api_football_fixture_id}`);
-    if (!detail) {
-      errors.push(`detail ${row.api_football_fixture_id}: fetch failed`);
-      continue;
-    }
-    // Rich detail (lineups, formations, stats, referee) → match_details.
-    const mapPlayers = (teamId: string | null, list: any[] | undefined) =>
-      (list ?? []).map((p) => ({
-        name: p.name ?? null,
-        position: p.position ?? null,
-        shirtNumber: p.shirtNumber ?? null,
-        fd_id: p.id ?? null,
-        player_id: resolvePlayer(teamId, p.name ?? null),
-        captain: p.captain ?? null,
-      }));
-    const homeTeamId = teamByFdId.get(detail.homeTeam?.id) ?? null;
-    const awayTeamId = teamByFdId.get(detail.awayTeam?.id) ?? null;
-    matchTeams.set(row.id, { homeTeamId, awayTeamId });
-    const statsOf = (t: any) =>
-      t?.statistics && typeof t.statistics === 'object' && !('msg' in t.statistics)
-        ? t.statistics
-        : null;
-    if (detail.homeTeam?.lineup?.length || statsOf(detail.homeTeam)) {
-      const { error: dErr } = await supabase.from('match_details').upsert(
-        {
-          match_id: row.id,
-          home_formation: detail.homeTeam?.formation ?? null,
-          away_formation: detail.awayTeam?.formation ?? null,
-          home_lineup: mapPlayers(homeTeamId, detail.homeTeam?.lineup),
-          away_lineup: mapPlayers(awayTeamId, detail.awayTeam?.lineup),
-          home_bench: mapPlayers(homeTeamId, detail.homeTeam?.bench),
-          away_bench: mapPlayers(awayTeamId, detail.awayTeam?.bench),
-          home_stats: statsOf(detail.homeTeam),
-          away_stats: statsOf(detail.awayTeam),
-          substitutions: (detail.substitutions ?? []).map((s: any) => ({
-            minute: s.minute ?? null,
-            team_id: teamByFdId.get(s.team?.id) ?? null,
-            out_name: s.playerOut?.name ?? null,
-            in_name: s.playerIn?.name ?? null,
-          })),
-          referee: detail.referees?.[0]?.name ?? null,
-          referees: (detail.referees ?? []).map((r: any) => ({
-            name: r.name ?? null,
-            type: r.type ?? null,
-            nationality: r.nationality ?? null,
-          })),
-          attendance: detail.attendance ?? null,
-          injury_time: detail.injuryTime ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'match_id' },
-      );
-      if (dErr) errors.push(`details ${row.id}: ${dErr.message}`);
-    }
-
-    const goals = (detail.goals ?? []) as any[];
-    const bookings = (detail.bookings ?? []) as any[];
-
-    // ── Goals: reconcile match_events to MIRROR the upstream goals[] ──────────
-    // Insert-only (the old behaviour) left VAR-annulled goals behind forever.
-    // Now we diff by a stable natural key (minute|team|scorer): added goals are
-    // inserted (+queued for an inline push), annulled goals are deleted, and the
-    // common "nothing changed" case writes nothing (no realtime churn).
-    const natKey = (e: { minute: number | null; team_id: string | null; player_name: string | null }) =>
-      `${e.minute ?? ''}|${e.team_id ?? ''}|${normName(e.player_name)}`;
-    // STABLE identity for push dedupe + row preservation: the cumulative score
-    // after a goal (+ the scoring team) is unique per goal within a match and
-    // survives football-data attributing the scorer (or fixing the minute) a
-    // few seconds AFTER first reporting the goal. natKey alone would flip when
-    // the name lands (`45|arg|` → `45|arg|messi`), making an already-pushed goal
-    // look brand-new and re-fire its push — and the full delete+reinsert would
-    // resurface every still-settling goal, re-notifying 1..N on every new goal.
-    // `team_id` disambiguates the rare feed glitch where two goals carry the
-    // same running score (e.g. GS-I2: a 1-4 reported for both sides) so they
-    // never collide onto one identity (which would drop a push + clash on `id`).
-    // Falls back to natKey only when the feed omits the running score.
-    const goalId = (e: { score_home: number | null; score_away: number | null; minute: number | null; team_id: string | null; player_name: string | null }) =>
-      e.score_home != null && e.score_away != null
-        ? `s|${e.score_home}-${e.score_away}|${e.team_id ?? ''}`
-        : `n|${natKey(e)}`;
-
-    const desired = goals.map((g, i) => {
-      const teamId = teamByFdId.get(g.team?.id) ?? null;
-      return {
-        match_id: row.id,
-        seq: i,
-        type: 'goal',
-        minute: typeof g.minute === 'number' ? g.minute : null,
-        team_id: teamId,
-        player_id: resolvePlayer(teamId, g.scorer?.name ?? null),
-        player_name: g.scorer?.name ?? null,
-        score_home: g.score?.home ?? null,
-        score_away: g.score?.away ?? null,
-      };
-    });
-
-    const { data: existing } = await supabase
-      .from('match_events')
-      .select('id, minute, team_id, player_name, score_home, score_away, pushed, created_at')
-      .eq('match_id', row.id)
-      .eq('type', 'goal');
-    const existingByKey = new Map((existing ?? []).map((e: any) => [natKey(e), e]));
-    // Same goals indexed by their STABLE score identity, used to preserve the
-    // row (id/created_at/pushed) and to decide what's genuinely new to push.
-    const existingById = new Map((existing ?? []).map((e: any) => [goalId(e), e]));
-
-    // Reconcile the table when the displayed set changed — natKey captures both
-    // a new/annulled goal AND a refined scorer/minute, so the right name lands.
-    const setChanged =
-      desired.length !== (existing ?? []).length ||
-      desired.some((d) => !existingByKey.has(natKey(d)));
-    if (setChanged) {
-      // Full replace, preserving id / pushed / created_at by STABLE identity so
-      // a goal whose scorer just got attributed keeps pushed=true (no duplicate
-      // push, no re-celebrate) and re-indexing after an annulment can't violate
-      // the (match_id,seq) unique key.
-      await supabase.from('match_events').delete().eq('match_id', row.id).eq('type', 'goal');
-      const consumed = new Set<string>();
-      const insertRows = desired.map((d) => {
-        let prior = existingById.get(goalId(d));
-        // Never preserve the same row id twice (would clash on the PK) — if two
-        // goals collapse to one identity, the second gets a fresh row.
-        if (prior && consumed.has(prior.id)) prior = undefined;
-        if (prior) consumed.add(prior.id);
-        return {
-          ...d,
-          ...(prior ? { id: prior.id, created_at: prior.created_at } : {}),
-          pushed: prior ? prior.pushed : false,
-        };
-      });
-      if (insertRows.length) {
-        const { error } = await supabase.from('match_events').insert(insertRows);
-        if (error) errors.push(`goals ${row.id}: ${error.message}`);
-        else events += insertRows.length;
+  if (doDetailLoop) {
+    for (const row of detailTargets) {
+      const detail = await fd(`/matches/${row.api_football_fixture_id}`);
+      if (!detail) {
+        errors.push(`detail ${row.api_football_fixture_id}: fetch failed`);
+        continue;
       }
-    }
-    // Annulled goals no longer in `desired` are removed by the full replace
-    // above; nothing extra to push (per product decision — silent correction).
+      const mapPlayers = (teamId: string | null, list: any[] | undefined) =>
+        (list ?? []).map((p) => ({
+          name: p.name ?? null,
+          position: p.position ?? null,
+          shirtNumber: p.shirtNumber ?? null,
+          fd_id: p.id ?? null,
+          player_id: resolvePlayer(teamId, p.name ?? null),
+          captain: p.captain ?? null,
+        }));
+      const homeTeamId = teamByFdId.get(detail.homeTeam?.id) ?? null;
+      const awayTeamId = teamByFdId.get(detail.awayTeam?.id) ?? null;
+      matchTeams.set(row.id, { homeTeamId, awayTeamId });
+      const statsOf = (t: any) =>
+        t?.statistics && typeof t.statistics === 'object' && !('msg' in t.statistics)
+          ? t.statistics
+          : null;
+      if (detail.homeTeam?.lineup?.length || statsOf(detail.homeTeam)) {
+        const { error: dErr } = await supabase.from('match_details').upsert(
+          {
+            match_id: row.id,
+            home_formation: detail.homeTeam?.formation ?? null,
+            away_formation: detail.awayTeam?.formation ?? null,
+            home_lineup: mapPlayers(homeTeamId, detail.homeTeam?.lineup),
+            away_lineup: mapPlayers(awayTeamId, detail.awayTeam?.lineup),
+            home_bench: mapPlayers(homeTeamId, detail.homeTeam?.bench),
+            away_bench: mapPlayers(awayTeamId, detail.awayTeam?.bench),
+            home_stats: statsOf(detail.homeTeam),
+            away_stats: statsOf(detail.awayTeam),
+            substitutions: (detail.substitutions ?? []).map((s: any) => ({
+              minute: s.minute ?? null,
+              team_id: teamByFdId.get(s.team?.id) ?? null,
+              out_name: s.playerOut?.name ?? null,
+              in_name: s.playerIn?.name ?? null,
+            })),
+            referee: detail.referees?.[0]?.name ?? null,
+            referees: (detail.referees ?? []).map((r: any) => ({
+              name: r.name ?? null,
+              type: r.type ?? null,
+              nationality: r.nationality ?? null,
+            })),
+            attendance: detail.attendance ?? null,
+            injury_time: detail.injuryTime ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'match_id' },
+        );
+        if (dErr) errors.push(`details ${row.id}: ${dErr.message}`);
+      } else {
+        // No lineup/stats yet (pre-kickoff) — still advance the detail-fetch
+        // marker so the age gate doesn't re-fetch this match every tick. Touches
+        // only updated_at; preserves any lineups already stored.
+        await supabase
+          .from('match_details')
+          .upsert(
+            { match_id: row.id, updated_at: new Date().toISOString() },
+            { onConflict: 'match_id' },
+          );
+      }
 
-    // ── Cards: insert-only (seq 1000+; rescinded cards are vanishingly rare) ──
-    if (bookings.length) {
-      const cardRows = bookings.map((b, i) => {
-        const teamId = teamByFdId.get(b.team?.id) ?? null;
+      const goals = (detail.goals ?? []) as any[];
+      const bookings = (detail.bookings ?? []) as any[];
+
+      // ── Goals: reconcile match_events to MIRROR the upstream goals[] ─────────
+      const natKey = (e: { minute: number | null; team_id: string | null; player_name: string | null }) =>
+        `${e.minute ?? ''}|${e.team_id ?? ''}|${normName(e.player_name)}`;
+      // STABLE identity for push dedupe + row preservation: cumulative score (+
+      // scoring team) is unique per goal and survives the scorer/minute being
+      // refined a few seconds later, so an already-pushed goal never looks new.
+      // `team_id` disambiguates the rare feed glitch where two goals report the
+      // same running score. Falls back to natKey only when the feed omits score.
+      const goalId = (e: { score_home: number | null; score_away: number | null; minute: number | null; team_id: string | null; player_name: string | null }) =>
+        e.score_home != null && e.score_away != null
+          ? `s|${e.score_home}-${e.score_away}|${e.team_id ?? ''}`
+          : `n|${natKey(e)}`;
+
+      // Running score per goal — computed from the goals[] ORDER so a goal has a
+      // stable identity the instant it appears. football-data leaves
+      // `goals[].score` NULL during live play (it backfills it later), which used
+      // to make goalId fall back to natKey and flip when the scorer/score landed
+      // a few seconds on → re-firing every prior goal's push. Prefer the feed's
+      // score once it's there, else the computed tally (each goal +1 to its team).
+      let runH = 0;
+      let runA = 0;
+      const desired = goals.map((g, i) => {
+        const teamId = teamByFdId.get(g.team?.id) ?? null;
+        if (teamId && teamId === homeTeamId) runH++;
+        else if (teamId && teamId === awayTeamId) runA++;
+        const hasScore = g.score?.home != null && g.score?.away != null;
         return {
           match_id: row.id,
-          seq: 1000 + i,
-          type: b.card === 'RED' || b.card === 'YELLOW_RED' ? 'red' : 'yellow',
-          minute: typeof b.minute === 'number' ? b.minute : null,
+          seq: i,
+          type: 'goal',
+          minute: typeof g.minute === 'number' ? g.minute : null,
           team_id: teamId,
-          player_id: resolvePlayer(teamId, b.player?.name ?? null),
-          player_name: b.player?.name ?? null,
-          score_home: null,
-          score_away: null,
+          player_id: resolvePlayer(teamId, g.scorer?.name ?? null),
+          player_name: g.scorer?.name ?? null,
+          score_home: hasScore ? g.score.home : runH,
+          score_away: hasScore ? g.score.away : runA,
         };
       });
-      const { error } = await supabase
-        .from('match_events')
-        .upsert(cardRows, { onConflict: 'match_id,seq', ignoreDuplicates: true });
-      if (error) errors.push(`cards ${row.id}: ${error.message}`);
-    }
-  }
 
-  // ── Inline goal pushes: send the instant a goal is detected (no cron hop) ───
-  // ATOMIC claim: `UPDATE ... WHERE pushed=false RETURNING` flips and returns
-  // each unpushed goal in one shot, so two overlapping invocations (or the
-  // notify-dispatcher backstop) can never both grab the same row — the loser's
-  // predicate no longer matches. This is the dedupe; we push ONLY what we
-  // claimed. Combined with the stable `goalId` preserving pushed=true across
-  // reconciliation, a goal fires exactly one push, ever. We only claim matches
-  // we actually processed this run (so a goal whose detail fetch failed stays
-  // unpushed for the backstop), and only when there are devices to notify.
-  {
-    const { devices } = await loadDevices(supabase);
-    const claimIds = [...matchTeams.keys()];
-    if (devices.length && claimIds.length) {
-      const { data: claimed } = await supabase
+      const { data: existing } = await supabase
         .from('match_events')
-        .update({ pushed: true })
-        .in('match_id', claimIds)
-        .eq('type', 'goal')
-        .eq('pushed', false)
-        .select('match_id, minute, team_id, player_name, score_home, score_away');
-      const messages: PushMessage[] = [];
-      for (const ev of claimed ?? []) {
-        const t = matchTeams.get(ev.match_id);
-        if (!t || !t.homeTeamId || !t.awayTeamId) continue;
-        const who = ev.player_name ?? teamName(ev.team_id) ?? 'Goal';
-        const min = ev.minute != null ? ` ${ev.minute}'` : '';
-        const flag = teamFlag(ev.team_id);
-        const score =
-          ev.score_home != null && ev.score_away != null
-            ? ` — ${teamName(t.homeTeamId)} ${ev.score_home}–${ev.score_away} ${teamName(t.awayTeamId)}`
-            : ` — ${teamName(t.homeTeamId)} vs ${teamName(t.awayTeamId)}`;
-        for (const d of devices) {
-          if (!wants(d, t.homeTeamId, t.awayTeamId)) continue;
-          messages.push({
-            to: d.token,
-            title: `${d.lang === 'es' ? '⚽ ¡GOL!' : '⚽ GOAL!'}${flag ? ' ' + flag : ''}`,
-            body: `${who}${min}${score}`,
-            sound: 'default',
-            data: { matchId: ev.match_id, type: 'goal' },
-          });
+        .select('id, minute, team_id, player_name, score_home, score_away, pushed, created_at')
+        .eq('match_id', row.id)
+        .eq('type', 'goal');
+      const existingByKey = new Map((existing ?? []).map((e: any) => [natKey(e), e]));
+      const existingById = new Map((existing ?? []).map((e: any) => [goalId(e), e]));
+
+      const setChanged =
+        desired.length !== (existing ?? []).length ||
+        desired.some((d) => !existingByKey.has(natKey(d)));
+      if (setChanged) {
+        // Full replace, preserving id / pushed / created_at by STABLE identity so
+        // a goal whose scorer just got attributed keeps pushed=true (no duplicate
+        // push, no re-celebrate) and re-indexing after an annulment can't violate
+        // the (match_id,seq) unique key.
+        await supabase.from('match_events').delete().eq('match_id', row.id).eq('type', 'goal');
+        const consumed = new Set<string>();
+        const insertRows = desired.map((d) => {
+          let prior = existingById.get(goalId(d));
+          if (prior && consumed.has(prior.id)) prior = undefined;
+          if (prior) consumed.add(prior.id);
+          return {
+            ...d,
+            ...(prior ? { id: prior.id, created_at: prior.created_at } : {}),
+            pushed: prior ? prior.pushed : false,
+          };
+        });
+        if (insertRows.length) {
+          const { error } = await supabase.from('match_events').insert(insertRows);
+          if (error) errors.push(`goals ${row.id}: ${error.message}`);
+          else events += insertRows.length;
         }
       }
-      if (messages.length) await sendExpoPush(dedupe(messages));
+
+      // ── Cards: insert-only (seq 1000+; rescinded cards are vanishingly rare) ─
+      if (bookings.length) {
+        const cardRows = bookings.map((b, i) => {
+          const teamId = teamByFdId.get(b.team?.id) ?? null;
+          return {
+            match_id: row.id,
+            seq: 1000 + i,
+            type: b.card === 'RED' || b.card === 'YELLOW_RED' ? 'red' : 'yellow',
+            minute: typeof b.minute === 'number' ? b.minute : null,
+            team_id: teamId,
+            player_id: resolvePlayer(teamId, b.player?.name ?? null),
+            player_name: b.player?.name ?? null,
+            score_home: null,
+            score_away: null,
+          };
+        });
+        const { error } = await supabase
+          .from('match_events')
+          .upsert(cardRows, { onConflict: 'match_id,seq', ignoreDuplicates: true });
+        if (error) errors.push(`cards ${row.id}: ${error.message}`);
+      }
     }
   }
 
-  // 4. Golden boot — refresh the tournament top scorers when anything changed.
-  if (updated > 0 || events > 0) {
+  // ── Pushes: load devices once, then (a) inline goal push, (b) live moments ──
+  const { devices } = await loadDevices(supabase);
+
+  // (a) Inline goal push — ATOMIC claim (`UPDATE ... WHERE pushed=false RETURNING`)
+  //     so concurrent ticks / the dispatcher backstop can't double-send. We push
+  //     ONLY what we claimed, for matches whose detail we processed this tick.
+  if (devices.length && matchTeams.size) {
+    const claimIds = [...matchTeams.keys()];
+    const { data: claimed } = await supabase
+      .from('match_events')
+      .update({ pushed: true })
+      .in('match_id', claimIds)
+      .eq('type', 'goal')
+      .eq('pushed', false)
+      .select('match_id, minute, team_id, player_name, score_home, score_away');
+    const messages: PushMessage[] = [];
+    for (const ev of claimed ?? []) {
+      const t = matchTeams.get(ev.match_id);
+      if (!t || !t.homeTeamId || !t.awayTeamId) continue;
+      const who = ev.player_name ?? teamName(ev.team_id) ?? 'Goal';
+      const min = ev.minute != null ? ` ${ev.minute}'` : '';
+      const flag = teamFlag(ev.team_id);
+      const score =
+        ev.score_home != null && ev.score_away != null
+          ? ` — ${teamName(t.homeTeamId)} ${ev.score_home}–${ev.score_away} ${teamName(t.awayTeamId)}`
+          : ` — ${teamName(t.homeTeamId)} vs ${teamName(t.awayTeamId)}`;
+      for (const d of devices) {
+        if (!wants(d, t.homeTeamId, t.awayTeamId)) continue;
+        messages.push({
+          to: d.token,
+          title: `${d.lang === 'es' ? '⚽ ¡GOL!' : '⚽ GOAL!'}${flag ? ' ' + flag : ''}`,
+          body: `${who}${min}${score}`,
+          sound: 'default',
+          data: { matchId: ev.match_id, type: 'goal' },
+        });
+      }
+    }
+    if (messages.length) await sendExpoPush(dedupe(messages));
+  }
+
+  // (b) Live-moment pushes — kickoff / half-time (+score) / second-half. Deduped
+  //     per device via push_sent(token,match_id,type); these types are
+  //     sync-scores-exclusive so they never race the dispatcher.
+  if (devices.length && transitions.length) {
+    const transMatchIds = [...new Set(transitions.map((tr) => tr.row.id))];
+    const { data: sentRows } = await supabase
+      .from('push_sent')
+      .select('token, match_id, type')
+      .in('match_id', transMatchIds)
+      .in('type', ['kickoff_live', 'halftime', 'secondhalf']);
+    const sent = new Set((sentRows ?? []).map((s: any) => `${s.token}:${s.match_id}:${s.type}`));
+    const messages: PushMessage[] = [];
+    const sentLog: { token: string; match_id: string; type: string }[] = [];
+    for (const tr of transitions) {
+      const homeId = tr.row.home_team_id as string | null;
+      const awayId = tr.row.away_team_id as string | null;
+      const h = teamName(homeId);
+      const a = teamName(awayId);
+      for (const d of devices) {
+        if (!wants(d, homeId, awayId)) continue;
+        const key = `${d.token}:${tr.row.id}:${tr.type}`;
+        if (sent.has(key)) continue;
+        sent.add(key);
+        const es = d.lang === 'es';
+        let title: string;
+        let body: string;
+        if (tr.type === 'kickoff_live') {
+          title = es ? '🔴 ¡Arrancó el partido!' : '🔴 Kickoff!';
+          body = es ? `${h} vs ${a} — ¡ya están en vivo! ⚽` : `${h} vs ${a} — they're live! ⚽`;
+        } else if (tr.type === 'halftime') {
+          const sc = tr.htHome != null && tr.htAway != null ? `${tr.htHome}–${tr.htAway}` : null;
+          title = es ? '⏸️ Medio tiempo' : '⏸️ Half-time';
+          body = sc
+            ? `${h} ${sc} ${a}`
+            : es
+              ? `Descanso — ${h} vs ${a}`
+              : `Half-time — ${h} vs ${a}`;
+        } else {
+          title = es ? '▶️ Segundo tiempo' : '▶️ Second half';
+          body = es ? `¡Comienza el 2º tiempo! ${h} vs ${a}` : `Second half underway! ${h} vs ${a}`;
+        }
+        messages.push({
+          to: d.token,
+          title,
+          body,
+          sound: 'default',
+          data: { matchId: tr.row.id, type: tr.type },
+        });
+        sentLog.push({ token: d.token, match_id: tr.row.id, type: tr.type });
+      }
+    }
+    if (messages.length) {
+      await sendExpoPush(dedupe(messages));
+      await supabase
+        .from('push_sent')
+        .upsert(sentLog, { onConflict: 'token,match_id,type', ignoreDuplicates: true });
+    }
+  }
+
+  // 4. Golden boot — refresh top scorers only when goal/card events changed.
+  if (events > 0) {
     const scorers = await fd('/competitions/WC/scorers?limit=20');
     const list = (scorers?.scorers ?? []) as any[];
     if (list.length) {
@@ -419,10 +611,10 @@ Deno.serve(async () => {
     }
   }
 
-  // 5. Official group standings (correct FIFA tiebreaks + recent form). Refresh
-  //    whenever scores moved; map football-data team ids → our team ids.
+  // 5. Official standings — refresh only when a score or status actually moved
+  //    (not on every minute tick).
   let standingsRows = 0;
-  if (updated > 0 || events > 0) {
+  if (scoreOrStatusChanged) {
     const st = await fd('/competitions/WC/standings');
     const groups = (st?.standings ?? []) as any[];
     const rows: any[] = [];
@@ -462,9 +654,13 @@ Deno.serve(async () => {
   return Response.json({
     updated,
     eventsSeen: events,
+    detailFetches: doDetailLoop ? detailTargets.length : 0,
+    transitions: transitions.length,
     standingsRows,
     inWindow: active.length,
-    scanned: matches.length,
+    scanned: fdMatches.length,
+    rate429,
+    rateLimited: rateLimited || undefined,
     errors: errors.length ? errors : undefined,
   });
 });
