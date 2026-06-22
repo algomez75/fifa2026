@@ -177,19 +177,9 @@ Deno.serve(async () => {
     return hits.length === 1 ? hits[0].id : null;
   };
 
-  // Goals detected as genuinely new this run → pushed inline at the end so the
-  // alert lands in seconds instead of waiting for the notify-dispatcher cron.
-  interface NewGoal {
-    matchId: string;
-    homeTeamId: string | null;
-    awayTeamId: string | null;
-    teamId: string | null;
-    playerName: string | null;
-    minute: number | null;
-    scoreHome: number | null;
-    scoreAway: number | null;
-  }
-  const newGoals: NewGoal[] = [];
+  // Home/away team ids for each match we successfully processed this run, so the
+  // inline goal push (claimed atomically at the end) can label the scoreline.
+  const matchTeams = new Map<string, { homeTeamId: string | null; awayTeamId: string | null }>();
 
   let events = 0;
   for (const row of active) {
@@ -211,6 +201,7 @@ Deno.serve(async () => {
       }));
     const homeTeamId = teamByFdId.get(detail.homeTeam?.id) ?? null;
     const awayTeamId = teamByFdId.get(detail.awayTeam?.id) ?? null;
+    matchTeams.set(row.id, { homeTeamId, awayTeamId });
     const statsOf = (t: any) =>
       t?.statistics && typeof t.statistics === 'object' && !('msg' in t.statistics)
         ? t.statistics
@@ -258,6 +249,21 @@ Deno.serve(async () => {
     // common "nothing changed" case writes nothing (no realtime churn).
     const natKey = (e: { minute: number | null; team_id: string | null; player_name: string | null }) =>
       `${e.minute ?? ''}|${e.team_id ?? ''}|${normName(e.player_name)}`;
+    // STABLE identity for push dedupe + row preservation: the cumulative score
+    // after a goal (+ the scoring team) is unique per goal within a match and
+    // survives football-data attributing the scorer (or fixing the minute) a
+    // few seconds AFTER first reporting the goal. natKey alone would flip when
+    // the name lands (`45|arg|` → `45|arg|messi`), making an already-pushed goal
+    // look brand-new and re-fire its push — and the full delete+reinsert would
+    // resurface every still-settling goal, re-notifying 1..N on every new goal.
+    // `team_id` disambiguates the rare feed glitch where two goals carry the
+    // same running score (e.g. GS-I2: a 1-4 reported for both sides) so they
+    // never collide onto one identity (which would drop a push + clash on `id`).
+    // Falls back to natKey only when the feed omits the running score.
+    const goalId = (e: { score_home: number | null; score_away: number | null; minute: number | null; team_id: string | null; player_name: string | null }) =>
+      e.score_home != null && e.score_away != null
+        ? `s|${e.score_home}-${e.score_away}|${e.team_id ?? ''}`
+        : `n|${natKey(e)}`;
 
     const desired = goals.map((g, i) => {
       const teamId = teamByFdId.get(g.team?.id) ?? null;
@@ -276,48 +282,42 @@ Deno.serve(async () => {
 
     const { data: existing } = await supabase
       .from('match_events')
-      .select('id, minute, team_id, player_name, pushed, created_at')
+      .select('id, minute, team_id, player_name, score_home, score_away, pushed, created_at')
       .eq('match_id', row.id)
       .eq('type', 'goal');
     const existingByKey = new Map((existing ?? []).map((e: any) => [natKey(e), e]));
-    const desiredKeys = new Set(desired.map(natKey));
+    // Same goals indexed by their STABLE score identity, used to preserve the
+    // row (id/created_at/pushed) and to decide what's genuinely new to push.
+    const existingById = new Map((existing ?? []).map((e: any) => [goalId(e), e]));
 
-    // Only touch the table when the set of goals actually changed (rare).
+    // Reconcile the table when the displayed set changed — natKey captures both
+    // a new/annulled goal AND a refined scorer/minute, so the right name lands.
     const setChanged =
       desired.length !== (existing ?? []).length ||
       desired.some((d) => !existingByKey.has(natKey(d)));
     if (setChanged) {
-      // Full replace, preserving id / pushed / created_at for goals that
-      // persist (so they neither re-push nor re-celebrate, and re-indexing
-      // after an annulment can't violate the (match_id,seq) unique key).
+      // Full replace, preserving id / pushed / created_at by STABLE identity so
+      // a goal whose scorer just got attributed keeps pushed=true (no duplicate
+      // push, no re-celebrate) and re-indexing after an annulment can't violate
+      // the (match_id,seq) unique key.
       await supabase.from('match_events').delete().eq('match_id', row.id).eq('type', 'goal');
+      const consumed = new Set<string>();
       const insertRows = desired.map((d) => {
-        const prior = existingByKey.get(natKey(d));
+        let prior = existingById.get(goalId(d));
+        // Never preserve the same row id twice (would clash on the PK) — if two
+        // goals collapse to one identity, the second gets a fresh row.
+        if (prior && consumed.has(prior.id)) prior = undefined;
+        if (prior) consumed.add(prior.id);
         return {
           ...d,
           ...(prior ? { id: prior.id, created_at: prior.created_at } : {}),
-          pushed: prior?.pushed ?? false,
+          pushed: prior ? prior.pushed : false,
         };
       });
       if (insertRows.length) {
         const { error } = await supabase.from('match_events').insert(insertRows);
         if (error) errors.push(`goals ${row.id}: ${error.message}`);
         else events += insertRows.length;
-      }
-      // Brand-new goals (no prior row) → queue an inline push.
-      for (const d of desired) {
-        if (!existingByKey.has(natKey(d))) {
-          newGoals.push({
-            matchId: row.id,
-            homeTeamId,
-            awayTeamId,
-            teamId: d.team_id,
-            playerName: d.player_name,
-            minute: d.minute,
-            scoreHome: d.score_home,
-            scoreAway: d.score_away,
-          });
-        }
       }
     }
     // Annulled goals no longer in `desired` are removed by the full replace
@@ -347,44 +347,48 @@ Deno.serve(async () => {
   }
 
   // ── Inline goal pushes: send the instant a goal is detected (no cron hop) ───
-  // Deduped globally via match_events.pushed, shared with notify-dispatcher's
-  // backstop, so a goal is never pushed twice.
-  if (newGoals.length) {
+  // ATOMIC claim: `UPDATE ... WHERE pushed=false RETURNING` flips and returns
+  // each unpushed goal in one shot, so two overlapping invocations (or the
+  // notify-dispatcher backstop) can never both grab the same row — the loser's
+  // predicate no longer matches. This is the dedupe; we push ONLY what we
+  // claimed. Combined with the stable `goalId` preserving pushed=true across
+  // reconciliation, a goal fires exactly one push, ever. We only claim matches
+  // we actually processed this run (so a goal whose detail fetch failed stays
+  // unpushed for the backstop), and only when there are devices to notify.
+  {
     const { devices } = await loadDevices(supabase);
-    if (devices.length) {
+    const claimIds = [...matchTeams.keys()];
+    if (devices.length && claimIds.length) {
+      const { data: claimed } = await supabase
+        .from('match_events')
+        .update({ pushed: true })
+        .in('match_id', claimIds)
+        .eq('type', 'goal')
+        .eq('pushed', false)
+        .select('match_id, minute, team_id, player_name, score_home, score_away');
       const messages: PushMessage[] = [];
-      for (const g of newGoals) {
-        if (!g.homeTeamId || !g.awayTeamId) continue;
-        const who = g.playerName ?? teamName(g.teamId) ?? 'Goal';
-        const min = g.minute != null ? ` ${g.minute}'` : '';
-        const flag = teamFlag(g.teamId);
+      for (const ev of claimed ?? []) {
+        const t = matchTeams.get(ev.match_id);
+        if (!t || !t.homeTeamId || !t.awayTeamId) continue;
+        const who = ev.player_name ?? teamName(ev.team_id) ?? 'Goal';
+        const min = ev.minute != null ? ` ${ev.minute}'` : '';
+        const flag = teamFlag(ev.team_id);
         const score =
-          g.scoreHome != null && g.scoreAway != null
-            ? ` — ${teamName(g.homeTeamId)} ${g.scoreHome}–${g.scoreAway} ${teamName(g.awayTeamId)}`
-            : ` — ${teamName(g.homeTeamId)} vs ${teamName(g.awayTeamId)}`;
+          ev.score_home != null && ev.score_away != null
+            ? ` — ${teamName(t.homeTeamId)} ${ev.score_home}–${ev.score_away} ${teamName(t.awayTeamId)}`
+            : ` — ${teamName(t.homeTeamId)} vs ${teamName(t.awayTeamId)}`;
         for (const d of devices) {
-          if (!wants(d, g.homeTeamId, g.awayTeamId)) continue;
+          if (!wants(d, t.homeTeamId, t.awayTeamId)) continue;
           messages.push({
             to: d.token,
             title: `${d.lang === 'es' ? '⚽ ¡GOL!' : '⚽ GOAL!'}${flag ? ' ' + flag : ''}`,
             body: `${who}${min}${score}`,
             sound: 'default',
-            data: { matchId: g.matchId, type: 'goal' },
+            data: { matchId: ev.match_id, type: 'goal' },
           });
         }
       }
-      if (messages.length) {
-        await sendExpoPush(dedupe(messages));
-        // Mark every still-unpushed goal of these matches as pushed so the
-        // dispatcher backstop doesn't re-send the same alerts.
-        const matchIds = [...new Set(newGoals.map((g) => g.matchId))];
-        await supabase
-          .from('match_events')
-          .update({ pushed: true })
-          .in('match_id', matchIds)
-          .eq('type', 'goal')
-          .eq('pushed', false);
-      }
+      if (messages.length) await sendExpoPush(dedupe(messages));
     }
   }
 

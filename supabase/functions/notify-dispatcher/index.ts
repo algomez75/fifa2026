@@ -190,12 +190,18 @@ Deno.serve(async () => {
     }
   }
 
-  // ── 2. Goals → one push per device, deduped globally via match_events.pushed
+  // ── 2. Goals → one push per device, deduped globally via match_events.pushed.
+  //      This is only the BACKSTOP: sync-scores pushes a fresh goal inline
+  //      within seconds and marks it pushed. Restrict to goals that have been
+  //      unpushed for ≥45s (sync-scores runs every 20s) so we never race its
+  //      inline send and double-fire — we only catch goals it genuinely missed.
+  const goalBackstopBefore = new Date(now - 45_000).toISOString();
   const { data: goalEvents } = await supabase
     .from('match_events')
     .select('id, match_id, minute, team_id, player_name, score_home, score_away')
     .eq('pushed', false)
     .eq('type', 'goal')
+    .lt('created_at', goalBackstopBefore)
     .order('created_at', { ascending: true })
     .limit(100);
 

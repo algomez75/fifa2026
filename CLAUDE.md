@@ -302,6 +302,44 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-22 — Fix duplicated goal pushes (server-only, no OTA)
+
+- **Bug:** every new goal re-fired the push notifications for all prior goals
+  (goal 4 → re-notified 1·2·3·4). **Root cause** in `sync-scores`: goal identity
+  used `natKey = minute|team|scorer`, but football-data reports a goal first with
+  `scorer = null` and **attributes the name seconds later**. When the name landed
+  the natKey flipped, so an already-pushed goal looked brand-new — and the full
+  delete+reinsert reconciliation reset `pushed=false` on every still-settling
+  goal, re-queuing them all for a push. (Confirmed against live data: GS-H3
+  Spain×Saudi sent `1-0`/`2-0`/`3-0` two-three times each.)
+- **Fix 1 — stable identity.** Decoupled **push dedupe / row preservation** from
+  **display identity**. Preservation now keys on `goalId = s|<h>-<a>|<team>` (the
+  cumulative score after the goal + scoring team) — unique per goal within a match
+  and immune to the scorer/minute being refined later (falls back to natKey only
+  when the feed omits the running score). `team_id` disambiguates the real feed
+  glitch where two goals carry the same running score (GS-I2 reported `1-4` for
+  both sides) so they don't collapse onto one identity (which would drop a push
+  and clash on the row `id`); a `consumed` guard also prevents reusing an `id`.
+  natKey still drives `setChanged` so the correct scorer name still rewrites the
+  row in place (VAR annulment unchanged). A goal whose scorer was just attributed
+  keeps `id`/`created_at`/`pushed=true` → no duplicate push, no re-celebrate.
+- **Fix 2 — atomic claim.** The inline push no longer sends from an in-memory
+  list then marks pushed; it does `UPDATE match_events SET pushed=true WHERE
+  pushed=false … RETURNING` and pushes **only the claimed rows**. The atomic
+  flip-and-return means two overlapping `sync-scores` invocations (or the
+  dispatcher) can never both grab the same goal — the loser's predicate no longer
+  matches. Claims are scoped to matches actually processed this run (a goal whose
+  detail fetch failed stays unpushed for the backstop) and only when devices exist.
+- **Hardened the dual-pipeline race:** `notify-dispatcher`'s goal **backstop** now
+  only fires for goals unpushed for **≥45s** (`created_at < now-45s`), so it never
+  competes with `sync-scores`' inline send (every 20s) — it only catches goals
+  `sync-scores` genuinely missed.
+- **Edge-function-only change** (`sync-scores` + `notify-dispatcher`) — **NOT an
+  OTA**. Deployed server-side via `supabase functions deploy` (sync-scores now
+  v17). Reaches every user immediately regardless of app version, no build/review.
+  (CLI must be logged into the `worldcup26` owner account, or use an `sbp_` access
+  token with `--project-ref xqjupomaqomneqiugbft` — see `reference_supabase_project`.)
+
 ### 2026-06-17 — Share my ranking (Leaderboard, OTA)
 
 - **Minimalist share affordance on the Ranking tab.** The "Your score" card now
