@@ -41,6 +41,23 @@ export default function UserPredictionsScreen() {
     return map;
   }, [matches]);
 
+  // Order like the live timeline: the in-play match always on top, then the
+  // nearest upcoming (soonest kickoff), then finished ones drop to the bottom
+  // (most recent first). When the live match ends, the next one rises up.
+  const sortedRows = useMemo(() => {
+    const rank = (s: UserPredictionRow['status']) =>
+      s === 'live' ? 0 : s === 'scheduled' ? 1 : 2;
+    return [...(rows ?? [])].sort((a, b) => {
+      const ra = rank(a.status);
+      const rb = rank(b.status);
+      if (ra !== rb) return ra - rb;
+      const ta = new Date(a.kickoff_utc).getTime();
+      const tb = new Date(b.kickoff_utc).getTime();
+      // live + upcoming: earliest/soonest first; finished: most recent first.
+      return ra === 2 ? tb - ta : ta - tb;
+    });
+  }, [rows]);
+
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -67,7 +84,7 @@ export default function UserPredictionsScreen() {
         <EmptyState emoji="🎯" subtitle={t.leaderboard.noPredictions} />
       ) : (
         <FlatList
-          data={rows}
+          data={sortedRows}
           keyExtractor={(r) => r.match_id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}

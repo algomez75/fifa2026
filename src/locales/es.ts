@@ -15,6 +15,8 @@ export const es: Translation = {
     live: 'EN VIVO',
     halfTime: 'Medio Tiempo',
     halfTimeShort: 'MT',
+    penalties: 'Penales',
+    penaltiesShort: 'PEN',
     vs: 'vs',
     ft: 'FIN',
     search: 'Buscar',

@@ -14,6 +14,8 @@ export const en = {
     live: 'LIVE',
     halfTime: 'Half Time',
     halfTimeShort: 'HT',
+    penalties: 'Penalties',
+    penaltiesShort: 'PENS',
     vs: 'vs',
     ft: 'FT',
     search: 'Search',

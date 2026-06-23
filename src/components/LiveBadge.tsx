@@ -20,12 +20,15 @@ import { useTranslation } from '@/store/useAppStore';
  */
 export function LiveBadge({ match, size = 'md' }: { match: Match; size?: 'sm' | 'md' }) {
   const { t } = useTranslation();
-  const { isHalfTime, clock } = useLiveClock(match);
+  const { isHalfTime, isPenalties, clock } = useLiveClock(match);
   const pulse = useSharedValue(1);
   const small = size === 'sm';
+  // Both half-time and the penalty shootout are "paused" — steady amber pill,
+  // no ticking clock.
+  const paused = isHalfTime || isPenalties;
 
   useEffect(() => {
-    if (isHalfTime) {
+    if (paused) {
       pulse.value = withTiming(1, { duration: 200 }); // steady while paused
       return;
     }
@@ -37,20 +40,24 @@ export function LiveBadge({ match, size = 'md' }: { match: Match; size?: 'sm' | 
       -1,
       false,
     );
-  }, [pulse, isHalfTime]);
+  }, [pulse, paused]);
 
   const dotStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
-  const label = isHalfTime
+  const label = isPenalties
     ? small
-      ? t.common.halfTimeShort
-      : t.common.halfTime
-    : `${t.common.live}${clock ? ` ${clock}` : ''}`;
+      ? t.common.penaltiesShort
+      : t.common.penalties
+    : isHalfTime
+      ? small
+        ? t.common.halfTimeShort
+        : t.common.halfTime
+      : `${t.common.live}${clock ? ` ${clock}` : ''}`;
 
   return (
-    <Animated.View style={[styles.pill, small && styles.pillSm, isHalfTime && styles.pillHt]}>
-      <Animated.View style={[styles.dot, isHalfTime && styles.dotHt, dotStyle]} />
-      <Text style={[styles.text, small && styles.textSm, isHalfTime && styles.textHt]}>
+    <Animated.View style={[styles.pill, small && styles.pillSm, paused && styles.pillHt]}>
+      <Animated.View style={[styles.dot, paused && styles.dotHt, dotStyle]} />
+      <Text style={[styles.text, small && styles.textSm, paused && styles.textHt]}>
         {label}
       </Text>
     </Animated.View>

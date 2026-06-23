@@ -65,6 +65,10 @@ export type Match = {
   /** Live period for the half-time label + ticking clock: '1H'|'2H'|'HT'|'ET'|'PEN'|null
    *  (set by sync-scores; 'HT' = football-data PAUSED). See migration 022. */
   period?: string | null;
+  /** Real announced added minutes (football-data injuryTime; set by sync-scores).
+   *  Caps the client clock's "+n" stoppage at reality. Null until the board goes
+   *  up / between halves. See migration 028. */
+  injury_time?: number | null;
   /** Full-time push already sent (server-side dedupe; app never writes it). */
   result_pushed?: boolean;
   updated_at: string;

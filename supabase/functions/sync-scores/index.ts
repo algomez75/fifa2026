@@ -17,8 +17,10 @@
 //  - LIVE-MOMENT PUSHES: kickoff (actual), half-time (+score), second-half —
 //    emitted here (the only place holding prior+new period this tick), deduped
 //    per device via push_sent, fired only from a known prior live state.
-//  - Goal dedupe unchanged: stable goalId (cumulative score + team) + atomic
-//    claim → exactly one goal push, surviving the late scorer attribution.
+//  - Goal dedupe: match_events are reconciled IN PLACE (upsert by (match_id,seq),
+//    never resetting pushed/created_at; deletes gated by the authoritative score)
+//    + an atomic claim on the push → exactly one goal push, immune to overlapping
+//    invocations and transient short feeds.
 //  - fd() is now 429/5xx aware (one bounded retry) and reports rate429 so we can
 //    see headroom; a long Retry-After sheds the detail loop (scores still update
 //    from the cheap LIST data already in hand).
@@ -115,7 +117,7 @@ Deno.serve(async () => {
   const { data: active, error: gErr } = await supabase
     .from('matches')
     .select(
-      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, updated_at',
+      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, injury_time, updated_at',
     )
     .or(
       `and(status.neq.finished,kickoff_utc.lte.${soon},kickoff_utc.gte.${windowStart}),` +
@@ -150,11 +152,17 @@ Deno.serve(async () => {
   let scoreOrStatusChanged = false; // → refresh standings
   interface Transition {
     row: any;
-    type: 'kickoff_live' | 'halftime' | 'secondhalf';
+    type: 'kickoff_live' | 'halftime' | 'secondhalf' | 'fulltime';
     htHome?: number | null;
     htAway?: number | null;
+    homeScore?: number | null;
+    awayScore?: number | null;
   }
   const transitions: Transition[] = [];
+  // Authoritative goal count per match (full-time score = ft.home + ft.away from
+  // the LIST). Gates the annulment delete in the detail loop so a transient short
+  // /matches/{id} goals[] can never wipe good rows.
+  const expectedGoalsByMatch = new Map<string, number>();
 
   let updated = 0;
   for (const m of fdMatches) {
@@ -168,6 +176,9 @@ Deno.serve(async () => {
     const pen = m.score?.penalties ?? {};
     const minute = typeof m.minute === 'number' ? m.minute : null;
     const period = mapPeriod(m.status, minute, m.score?.duration ?? null);
+    // Real announced added minutes — carried in the cheap LIST every ~5s. Lets
+    // the client clock CAP the "+n" stoppage at reality instead of inventing it.
+    const injuryTime = typeof m.injuryTime === 'number' ? m.injuryTime : null;
     const next = {
       home_score: ft.home ?? null,
       away_score: ft.away ?? null,
@@ -177,10 +188,12 @@ Deno.serve(async () => {
       away_score_penalties: pen.away ?? null,
       minute,
       period,
+      injury_time: injuryTime,
       status,
     };
 
     if (status === 'live') liveNow.add(prior.id);
+    expectedGoalsByMatch.set(prior.id, (next.home_score ?? 0) + (next.away_score ?? 0));
 
     const priorStatus = prior.status as string;
     const priorPeriod = (prior.period ?? null) as string | null;
@@ -195,6 +208,17 @@ Deno.serve(async () => {
     }
     if (priorPeriod === 'HT' && period === '2H') {
       transitions.push({ row: prior, type: 'secondhalf' });
+    }
+    // Full time — fire from the 5s live path (vs ~30s dispatcher) so the result
+    // push lands fast. Only from a KNOWN prior live state + non-null scores; the
+    // result_pushed claim below stops the dispatcher backstop from re-sending.
+    if (priorStatus === 'live' && status === 'finished' && next.home_score != null && next.away_score != null) {
+      transitions.push({
+        row: prior,
+        type: 'fulltime',
+        homeScore: next.home_score,
+        awayScore: next.away_score,
+      });
     }
 
     const scoreChanged =
@@ -215,6 +239,7 @@ Deno.serve(async () => {
       next.away_score_penalties === (prior.away_score_penalties ?? null) &&
       next.minute === (prior.minute ?? null) &&
       next.period === priorPeriod &&
+      next.injury_time === (prior.injury_time ?? null) &&
       next.status === priorStatus;
     if (noChange) continue;
 
@@ -387,25 +412,18 @@ Deno.serve(async () => {
       const goals = (detail.goals ?? []) as any[];
       const bookings = (detail.bookings ?? []) as any[];
 
-      // ── Goals: reconcile match_events to MIRROR the upstream goals[] ─────────
-      const natKey = (e: { minute: number | null; team_id: string | null; player_name: string | null }) =>
-        `${e.minute ?? ''}|${e.team_id ?? ''}|${normName(e.player_name)}`;
-      // STABLE identity for push dedupe + row preservation: cumulative score (+
-      // scoring team) is unique per goal and survives the scorer/minute being
-      // refined a few seconds later, so an already-pushed goal never looks new.
-      // `team_id` disambiguates the rare feed glitch where two goals report the
-      // same running score. Falls back to natKey only when the feed omits score.
-      const goalId = (e: { score_home: number | null; score_away: number | null; minute: number | null; team_id: string | null; player_name: string | null }) =>
-        e.score_home != null && e.score_away != null
-          ? `s|${e.score_home}-${e.score_away}|${e.team_id ?? ''}`
-          : `n|${natKey(e)}`;
+      // ── Goals: reconcile match_events IN PLACE to mirror upstream goals[] ────
+      // No delete-all + reinsert. That pattern reset pushed/created_at whenever an
+      // overlapping 5s invocation (or a transient short detail fetch) saw a partial
+      // goal set mid-rebuild — making every prior goal look brand-new and re-firing
+      // its push. Instead we UPSERT by the existing (match_id,seq) key and NEVER
+      // write `pushed`/`created_at`, so a settled goal can't be re-pushed or
+      // re-celebrated; annulment deletes are gated by the authoritative score.
 
       // Running score per goal — computed from the goals[] ORDER so a goal has a
-      // stable identity the instant it appears. football-data leaves
-      // `goals[].score` NULL during live play (it backfills it later), which used
-      // to make goalId fall back to natKey and flip when the scorer/score landed
-      // a few seconds on → re-firing every prior goal's push. Prefer the feed's
-      // score once it's there, else the computed tally (each goal +1 to its team).
+      // stable score the instant it appears (football-data leaves goals[].score
+      // NULL during live play and backfills it later). Prefer the feed's score
+      // once present, else the computed tally (each goal +1 to its team).
       let runH = 0;
       let runA = 0;
       const desired = goals.map((g, i) => {
@@ -428,37 +446,52 @@ Deno.serve(async () => {
 
       const { data: existing } = await supabase
         .from('match_events')
-        .select('id, minute, team_id, player_name, score_home, score_away, pushed, created_at')
+        .select('id, seq, minute, team_id, player_id, player_name, score_home, score_away')
         .eq('match_id', row.id)
         .eq('type', 'goal');
-      const existingByKey = new Map((existing ?? []).map((e: any) => [natKey(e), e]));
-      const existingById = new Map((existing ?? []).map((e: any) => [goalId(e), e]));
+      const existingBySeq = new Map<number, any>((existing ?? []).map((e: any) => [e.seq, e]));
 
-      const setChanged =
-        desired.length !== (existing ?? []).length ||
-        desired.some((d) => !existingByKey.has(natKey(d)));
-      if (setChanged) {
-        // Full replace, preserving id / pushed / created_at by STABLE identity so
-        // a goal whose scorer just got attributed keeps pushed=true (no duplicate
-        // push, no re-celebrate) and re-indexing after an annulment can't violate
-        // the (match_id,seq) unique key.
-        await supabase.from('match_events').delete().eq('match_id', row.id).eq('type', 'goal');
-        const consumed = new Set<string>();
-        const insertRows = desired.map((d) => {
-          let prior = existingById.get(goalId(d));
-          if (prior && consumed.has(prior.id)) prior = undefined;
-          if (prior) consumed.add(prior.id);
-          return {
-            ...d,
-            ...(prior ? { id: prior.id, created_at: prior.created_at } : {}),
-            pushed: prior ? prior.pushed : false,
-          };
-        });
-        if (insertRows.length) {
-          const { error } = await supabase.from('match_events').insert(insertRows);
-          if (error) errors.push(`goals ${row.id}: ${error.message}`);
-          else events += insertRows.length;
-        }
+      // Upsert only NEW or CHANGED goals (no churn on identical ticks). Because the
+      // payload omits `pushed`/`created_at`/`id`, an ON CONFLICT update leaves them
+      // intact (no re-push) and an insert takes the column defaults (false / now()).
+      const toUpsert = desired.filter((d) => {
+        const cur = existingBySeq.get(d.seq);
+        return (
+          !cur ||
+          cur.minute !== d.minute ||
+          cur.team_id !== d.team_id ||
+          cur.player_id !== d.player_id ||
+          cur.player_name !== d.player_name ||
+          cur.score_home !== d.score_home ||
+          cur.score_away !== d.score_away
+        );
+      });
+      if (toUpsert.length) {
+        const { error } = await supabase
+          .from('match_events')
+          .upsert(toUpsert, { onConflict: 'match_id,seq' });
+        if (error) errors.push(`goals ${row.id}: ${error.message}`);
+        else events += toUpsert.length;
+      }
+
+      // Delete annulled goals (a row beyond the current goals[] count) ONLY when
+      // the feed's goal count agrees with the authoritative score — so a transient
+      // short detail fetch can't wipe good rows. A real VAR annulment drops the
+      // score too, so the counts agree and the stale row is removed in place.
+      const expected = expectedGoalsByMatch.get(row.id);
+      if (
+        expected != null &&
+        desired.length === expected &&
+        (existing ?? []).some((e: any) => e.seq >= desired.length)
+      ) {
+        const { error } = await supabase
+          .from('match_events')
+          .delete()
+          .eq('match_id', row.id)
+          .eq('type', 'goal')
+          .gte('seq', desired.length)
+          .lt('seq', 1000);
+        if (error) errors.push(`goals-del ${row.id}: ${error.message}`);
       }
 
       // ── Cards: insert-only (seq 1000+; rescinded cards are vanishingly rare) ─
@@ -534,7 +567,7 @@ Deno.serve(async () => {
       .from('push_sent')
       .select('token, match_id, type')
       .in('match_id', transMatchIds)
-      .in('type', ['kickoff_live', 'halftime', 'secondhalf']);
+      .in('type', ['kickoff_live', 'halftime', 'secondhalf', 'fulltime']);
     const sent = new Set((sentRows ?? []).map((s: any) => `${s.token}:${s.match_id}:${s.type}`));
     const messages: PushMessage[] = [];
     const sentLog: { token: string; match_id: string; type: string }[] = [];
@@ -562,9 +595,15 @@ Deno.serve(async () => {
             : es
               ? `Descanso — ${h} vs ${a}`
               : `Half-time — ${h} vs ${a}`;
-        } else {
+        } else if (tr.type === 'secondhalf') {
           title = es ? '▶️ Segundo tiempo' : '▶️ Second half';
           body = es ? `¡Comienza el 2º tiempo! ${h} vs ${a}` : `Second half underway! ${h} vs ${a}`;
+        } else {
+          // fulltime
+          const sc =
+            tr.homeScore != null && tr.awayScore != null ? `${tr.homeScore}–${tr.awayScore}` : null;
+          title = es ? '🏁 Final del partido' : '🏁 Full time';
+          body = sc ? `${h} ${sc} ${a}` : es ? `Final — ${h} vs ${a}` : `Full time — ${h} vs ${a}`;
         }
         messages.push({
           to: d.token,
@@ -581,6 +620,13 @@ Deno.serve(async () => {
       await supabase
         .from('push_sent')
         .upsert(sentLog, { onConflict: 'token,match_id,type', ignoreDuplicates: true });
+    }
+    // Claim full-time matches so the dispatcher backstop (which gates on
+    // result_pushed=false) never re-sends the result push. Send first, then
+    // mark — a send failure leaves the flag false for the backstop to retry.
+    const ftIds = [...new Set(transitions.filter((tr) => tr.type === 'fulltime').map((tr) => tr.row.id))];
+    if (ftIds.length) {
+      await supabase.from('matches').update({ result_pushed: true }).in('id', ftIds).eq('result_pushed', false);
     }
   }
 

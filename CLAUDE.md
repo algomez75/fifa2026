@@ -302,6 +302,81 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-22 — Live clock true to the real match (freeze on pauses) + faster full-time (028, server + OTA)
+
+- **Problem:** the on-device clock (`useLiveClock`) interpolated minutes forward
+  unbounded, so it invented stoppage ("90+7" when the board said "+4") and kept
+  ticking a few seconds INTO a real pause before the half-time signal propagated.
+  The fix data already arrived every ~5s but was unused.
+- **Source = the same cheap LIST.** football-data's `/competitions/WC/matches`
+  already carries `injuryTime` (announced added minutes) every tick; it was only
+  landing (stale) in `match_details` via the gated DETAIL fetch. **Migration 028**
+  adds `matches.injury_time int` (nullable; already in the realtime publication,
+  public-read) and `sync-scores` now writes it from the LIST loop (added to the
+  `noChange` guard so it doesn't churn — it changes only when the board goes up).
+- **Client (OTA) — never invents time, freezes real.** `useLiveClock` caps the
+  running minute at `boundary + injury_time` (boundary 45/90/105/120 by period);
+  with no board yet (`injury_time` null) it holds at the boundary. Once it would
+  overrun, it freezes at the cap minute's final second instead of ticking fantasy
+  stoppage — which also kills the overrun into a pause. Added **ET** handling
+  (`105+n` / `120+n`) and a clean **PEN** state (`isPenalties` → badge
+  "Penalties"/"Penales", no clock); `LiveBadge` treats HT+PEN as the steady amber
+  "paused" pill. Anchor key changed from `id:minute:updated_at` → **`id:minute`**
+  (the `set_updated_at` trigger bumps `updated_at` on every write incl.
+  injury_time, which would reset the ticking seconds); added a monotonic guard so
+  a provider minute correction can't step the clock backward within a period.
+  Kept the skew-proof device-elapsed design (never diffs device vs server clock).
+- **Faster full-time push.** FT lived only in `notify-dispatcher` (~30s). Added a
+  `'fulltime'` transition to `sync-scores` (live→finished, known prior live state)
+  so it fires on the 5s path; dedupe **reuses `matches.result_pushed`** (claimed
+  atomically after send) so the dispatcher backstop never re-sends. Kickoff / HT /
+  2nd-half pushes unchanged.
+- **Shipped:** migration 028 applied via `db-exec.mjs` (Management API,
+  `SUPABASE_ACCESS_TOKEN` in `.env` + `SUPABASE_REF=xqjupomaqomneqiugbft`);
+  `sync-scores` deployed (`supabase functions deploy … --project-ref
+  xqjupomaqomneqiugbft`, smoke-tested clean `inWindow:2`) → reaches all users
+  instantly; client via **OTA** (iOS runtime `2c3aa583…` matches the live 1.0.1
+  build, Android `c50144db…`), real Supabase ref + new code
+  (`injury_time`/`Penales`) verified in the `dist/` bundle. Files:
+  `useLiveClock.ts`, `LiveBadge.tsx`, `database.types.ts`, `en.ts`/`es.ts`,
+  `sync-scores/index.ts`, migration `028_match_injury_time.sql`.
+
+### 2026-06-22 — Duplicate goal pushes: the REAL fix (in-place reconciliation, server-only)
+
+- **Still re-firing live** (confirmed by the user on GS-I3 France: the 3rd goal
+  re-sent pushes for goals 1·2·3). The earlier "computed running score" fix (v20)
+  was deployed and correct, but it wasn't the root cause. **Hard evidence:** all
+  three GS-I3 goal rows shared one identical `created_at` though scored at min
+  14/54/66 → they were **deleted and re-inserted fresh in one shot**, resetting
+  `pushed=false`, then the atomic claim re-pushed them all.
+- **Root cause = the `delete-all + reinsert` reconciliation pattern**, defeated by
+  the new ~5s cadence: (1) the 5s pg_cron is fire-and-forget, so a slow goal-tick
+  (forced detail + reconciliation + scorers + standings, **two** matches live)
+  overruns 5s and the next invocation starts mid `delete→insert`, sees a partial
+  goal set, and reinserts everything as brand-new; (2) a transient short
+  `/matches/{id}` `goals[]` likewise let `delete-all` wipe good rows. Single-thread
+  the old code was correct (worked at 20s); the 5s overlap broke it.
+- **Fix — reconcile `match_events` goals IN PLACE** (`sync-scores` v21): no more
+  delete-all. **UPSERT by the existing `(match_id,seq)`** key, with the payload
+  deliberately omitting `pushed`/`created_at`/`id` — so an ON CONFLICT *update*
+  preserves them (no re-push, no re-celebrate) and an *insert* takes the column
+  defaults (`false`/`now()`). Only NEW or genuinely-CHANGED rows are written (no
+  churn on identical ticks). Annulment **deletes are gated by the authoritative
+  score** (`expectedGoalsByMatch` = `ft.home+ft.away` from the LIST): a tail row is
+  removed only when `goals.length === expected`, so a transient short fetch can't
+  delete good rows (a real VAR annulment drops the score too, so counts agree).
+- **Why it's race-proof now:** there's no window where goals don't exist → a
+  concurrent invocation sees them and writes nothing; two invocations observing the
+  same new goal both upsert the **same seq** (conflict → update, no dup row, no
+  `pushed` reset); the existing **atomic claim** (`UPDATE…SET pushed=true WHERE
+  pushed=false RETURNING`) still guarantees exactly one push. No migration, no OTA —
+  reuses the `UNIQUE(match_id,seq)` constraint and `pushed`/`created_at` defaults.
+- **Server-only**, deployed via `supabase functions deploy sync-scores` (v21,
+  `--project-ref xqjupomaqomneqiugbft` + `sbp_` token — CLI is on the wrong
+  account). Reaches every user immediately. Rollback = redeploy v20. Verify on a
+  live match: goal N's `created_at` stays fixed when goal N+1 lands, `pushed` flips
+  once, and each goal fires exactly one device push.
+
 ### 2026-06-22 — Near-real-time live sync: ~5s cadence + half-time pushes (server + OTA)
 
 - **sync-scores → ~5s** (migration 026, `cron.alter_job '5 seconds'`). Made the
