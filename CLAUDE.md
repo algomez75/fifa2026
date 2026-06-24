@@ -302,6 +302,31 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-22 — Synchronized live clock across every screen (OTA)
+
+- **Bug:** the same live match showed a DIFFERENT ticking minute on different
+  surfaces (Home hero, Home/Schedule cards, a player's predictions, match detail).
+  Each `LiveBadge` mounts its own `useLiveClock`, and each instance recorded its
+  own `seenAt` (a per-instance `useRef`) = the moment THAT card first saw the
+  current server minute. A card mounted 40s ago and one just mounted computed
+  different drift → 67:40 vs 67:00 for the same match.
+- **Fix — shared state at module level** in `useLiveClock.ts`: (1) a **shared
+  anchor** `Map<matchId,{key,seenAt}>` so every instance of a match measures
+  drift from the SAME first-seen instant (a fresh card reads the instant an older
+  one already recorded); (2) a **shared 1s ticker** via `useSyncExternalStore`
+  (one module `setInterval` drives all live clocks in lockstep — no per-instance
+  interval phase drift; the interval only runs while ≥1 LiveBadge is mounted and
+  refreshes `tickNow` on (re)start so the first render isn't stale); (3) the
+  monotonic anti-backward-jump floor is now **shared too** (`Map<matchId,
+  {period,minute}>`) — a per-instance guard would itself desync (a fresh card has
+  no history). Still skew-proof (device-elapsed since the shared receipt, never
+  device-vs-server clock diffing). All injury-time-cap / HT / ET / PEN behaviour
+  from the prior entry is preserved.
+- **One central fix covers every screen** (all go through `LiveBadge →
+  useLiveClock`: `LiveHero`, `MatchCard`, `match/[id]`). JS-only → **OTA** (iOS
+  runtime `2c3aa583…` = live 1.0.1 build, Android `c50144db…`; real Supabase ref
+  verified in `dist/`). File: `src/hooks/useLiveClock.ts`.
+
 ### 2026-06-22 — Live clock true to the real match (freeze on pauses) + faster full-time (028, server + OTA)
 
 - **Problem:** the on-device clock (`useLiveClock`) interpolated minutes forward

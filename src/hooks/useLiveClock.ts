@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import type { Match } from '@/lib/database.types';
 
@@ -16,6 +16,71 @@ export interface LiveClock {
   /** Progressive match clock with seconds, e.g. "67:23", "45+2:13" — null when
    *  unknown. Ticks every second so the live time feels real (Apple-Sports). */
   clock: string | null;
+}
+
+// ── Shared 1s ticker ────────────────────────────────────────────────────────
+// One module-level interval drives EVERY live clock so all of them re-render on
+// the exact same tick (no per-instance setInterval phase drift). Subscribers
+// come and go with mounted LiveBadges; the interval only runs while ≥1 is alive.
+const tickListeners = new Set<() => void>();
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+let tickNow = Date.now();
+
+function subscribeTick(cb: () => void): () => void {
+  tickListeners.add(cb);
+  if (!tickInterval) {
+    tickNow = Date.now(); // refresh on (re)start so the first render isn't stale
+    tickInterval = setInterval(() => {
+      tickNow = Date.now();
+      for (const l of tickListeners) l();
+    }, 1000);
+  }
+  return () => {
+    tickListeners.delete(cb);
+    if (tickListeners.size === 0 && tickInterval) {
+      clearInterval(tickInterval);
+      tickInterval = null;
+    }
+  };
+}
+const getTickNow = () => tickNow;
+
+// ── Shared anchor ───────────────────────────────────────────────────────────
+// The instant a given (match, minute) was FIRST observed on this device, shared
+// across every LiveBadge for that match. Drift is measured from this shared
+// instant, so a card that mounted 40s ago and one that just mounted both show
+// the SAME ticking value (they used to diverge: each recorded its own mount
+// time). Keyed by match id → one entry per match (bounded), reset when the
+// server minute advances. Stays skew-proof: only ever device-elapsed since the
+// shared receipt, never device-vs-server clock diffing.
+const anchors = new Map<string, { key: string; seenAt: number }>();
+
+function sharedSeenAt(matchId: string, anchorKey: string): number {
+  const a = anchors.get(matchId);
+  if (!a || a.key !== anchorKey) {
+    const seenAt = Date.now();
+    anchors.set(matchId, { key: anchorKey, seenAt });
+    return seenAt;
+  }
+  return a.seenAt;
+}
+
+// Shared monotonic floor per match: never show a lower minute within the same
+// period (guards a late re-anchor or a rare provider minute correction from
+// stepping the clock back). SHARED so it can't itself desync screens — a fresh
+// card reads the same floor an older one already advanced. Resets on a period
+// change (1H→2H / regulation→ET start fresh).
+const progress = new Map<string, { period: string | null; minute: number }>();
+
+function monotonicMinute(matchId: string, period: string | null, minute: number): number {
+  const p = progress.get(matchId);
+  if (!p || p.period !== period) {
+    progress.set(matchId, { period, minute });
+    return minute;
+  }
+  if (minute < p.minute) return p.minute;
+  p.minute = minute;
+  return minute;
 }
 
 /** The regulation end of the current period — the running minute may overrun it
@@ -39,56 +104,37 @@ const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 /**
  * A live match clock that **ticks on the device** instead of waiting for the
  * next server sync. It anchors on the authoritative `minute` written by
- * sync-scores and counts up the **device-seconds elapsed since that patch
- * arrived** — never diffing the device clock against the server clock, so a
- * skewed phone clock can't read the minute fast/slow. Re-anchors whenever the
- * server `minute` changes; if the provider sent no minute it falls back to
- * time-since-kickoff.
+ * sync-scores and counts up the device-seconds elapsed since that minute was
+ * first seen — never diffing the device clock against the server clock, so a
+ * skewed phone clock can't read the minute fast/slow. Falls back to
+ * time-since-kickoff if the provider sent no minute.
+ *
+ * **Synchronized across every screen.** The "first seen" instant and the 1-second
+ * tick are both shared at module level, so the SAME match shows the exact same
+ * value on the Home hero, Home/Schedule cards, a player's predictions, and the
+ * match detail — all ticking in lockstep (previously each card anchored on its
+ * own mount time and drifted apart).
  *
  * Stays true to the real match clock:
  *  - **Never invents stoppage time.** The displayed minute is capped at
  *    `boundary + injury_time` (the real added minutes football-data announced);
- *    with no board yet (`injury_time` null) it holds at the boundary (45/90/…).
- *    So instead of ticking to a fantasy "90+7" it freezes at the announced
- *    "90+4" — which also stops the few-seconds overrun into a pause before the
- *    half-time signal propagates.
+ *    with no board yet (`injury_time` null) it holds at the boundary. So instead
+ *    of ticking to a fantasy "90+7" it freezes at the announced "90+4" — which
+ *    also stops the few-seconds overrun into a pause before the half-time signal
+ *    propagates.
  *  - **Freezes on a break.** Returns a half-time flag while football-data
  *    reports PAUSED (`period = 'HT'`) and a penalties flag during the shootout
  *    (`period = 'PEN'`); the badge shows "Half Time" / "Penalties" and no clock.
  *  - **Never steps backward** within a period (guards a rare provider minute
  *    correction); resets cleanly when the period changes.
  *
- * Re-renders once per second while live; a no-op (no interval) otherwise.
+ * Re-renders once per second while live (shared ticker); a no-op when not live.
  */
 export function useLiveClock(match: Match): LiveClock {
   const isLive = match.status === 'live';
-  // `now` lives in state (kept impurity out of render) and ticks every second
-  // while the match is live.
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!isLive) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [isLive]);
-
-  // Record the DEVICE time at which each new server anchor first arrived. Drift
-  // is then measured purely as device-elapsed time since receipt — immune to any
-  // absolute device/server clock offset. Keyed on MINUTE only (not updated_at):
-  // the set_updated_at trigger bumps updated_at on every write — including
-  // injury_time-only / same-minute writes — and re-anchoring on those would
-  // reset the ticking seconds to :00. injury_time only feeds the cap (read live
-  // below), so it needs no anchor.
-  const anchorKey = `${match.id}:${match.minute ?? ''}`;
-  const anchorRef = useRef<{ key: string; seenAt: number }>({ key: '', seenAt: now });
-  if (anchorRef.current.key !== anchorKey) {
-    anchorRef.current = { key: anchorKey, seenAt: Date.now() };
-  }
-
-  // Monotonic guard: never show a lower minute within the same period (a rare
-  // provider correction would otherwise step the clock backward). Resets on a
-  // period change so 1H→2H / regulation→ET start fresh.
-  const lastRef = useRef<{ period: string | null; minute: number }>({ period: null, minute: 0 });
+  // Shared, lockstep 1s tick. Subscribing always keeps hook order stable; the
+  // module interval only exists while a LiveBadge (live-only) is mounted.
+  const now = useSyncExternalStore(subscribeTick, getTickNow);
 
   const isHalfTime = match.period === 'HT' || match.period === 'BT';
   const isPenalties = match.period === 'PEN';
@@ -96,15 +142,17 @@ export function useLiveClock(match: Match): LiveClock {
     return { isHalfTime, isPenalties, text: null, clock: null };
   }
 
-  // Derive minute AND seconds from the drift since the server anchor, so the
-  // clock counts up smoothly between syncs and re-anchors on each patch.
+  // Derive minute AND seconds from the drift since the SHARED anchor, so the
+  // clock counts up smoothly between syncs and every card stays in sync. Keyed
+  // on MINUTE only (not updated_at): the set_updated_at trigger bumps updated_at
+  // on every write — including injury_time-only / same-minute writes — and
+  // re-anchoring on those would reset the ticking seconds to :00. injury_time
+  // only feeds the cap (read live below), so it needs no anchor.
   let minute: number | null = null;
   let seconds = 0;
   if (typeof match.minute === 'number') {
-    const driftSec = Math.min(
-      MAX_DRIFT_SEC,
-      Math.max(0, Math.floor((now - anchorRef.current.seenAt) / 1000)),
-    );
+    const seenAt = sharedSeenAt(match.id, `${match.id}:${match.minute}`);
+    const driftSec = Math.min(MAX_DRIFT_SEC, Math.max(0, Math.floor((now - seenAt) / 1000)));
     minute = match.minute + Math.floor(driftSec / 60);
     seconds = driftSec % 60;
   } else {
@@ -131,15 +179,10 @@ export function useLiveClock(match: Match): LiveClock {
     }
   }
 
-  // Monotonic within the period; reset on a period change.
-  if (lastRef.current.period !== (match.period ?? null)) {
-    lastRef.current = { period: match.period ?? null, minute };
-  } else if (minute < lastRef.current.minute) {
-    minute = lastRef.current.minute;
-    seconds = 59;
-  } else {
-    lastRef.current.minute = minute;
-  }
+  // Shared monotonic floor — hold the cap minute's final second if we'd step back.
+  const held = monotonicMinute(match.id, match.period ?? null, minute);
+  if (held > minute) seconds = 59;
+  minute = held;
 
   const label = formatMinute(minute, boundary);
   return { isHalfTime: false, isPenalties: false, text: label, clock: `${label}:${pad2(seconds)}` };
