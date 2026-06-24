@@ -236,6 +236,11 @@ export const es: Translation = {
     declined: 'rechazó tu reto',
     respond: 'Responder',
   },
+  matchContext: {
+    previousMatches: 'Partidos previos',
+    noPrevious: 'Aún no hay partidos previos',
+    standing: 'Posición en grupo',
+  },
   celebrate: {
     goal: '¡GOL!',
     fullTime: 'FINAL',

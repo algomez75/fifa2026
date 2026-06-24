@@ -235,6 +235,11 @@ export const en = {
     declined: 'declined your challenge',
     respond: 'Respond',
   },
+  matchContext: {
+    previousMatches: 'Previous matches',
+    noPrevious: 'No previous matches yet',
+    standing: 'Group standing',
+  },
   celebrate: {
     goal: 'GOAL!',
     fullTime: 'FULL TIME',

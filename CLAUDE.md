@@ -302,6 +302,35 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-24 — Bracket fills in qualified teams in real time (OTA)
+
+- **Feature (Apple-Sports style):** the Groups → Bracket view now drops each
+  **securely-qualified** group winner / runner-up into its R32 slot live, instead
+  of always showing "Winner A" / "Runner-up B" until the server decides the
+  fixture. Flags now render in every bracket cell.
+- **`lib/qualification.ts`** (new, pure + unit-checked): `parseGroupSlot`
+  (`"Winner A"`→pos 1 / `"Runner-up B"`→pos 2; best-third `"3rd …"` and
+  later-round `"Winner R32-1"` refs are left TBD) and `resolveGroupSlots(rows,
+  finished)`. Finished group → trust the standings order. In-progress → only
+  resolve a **mathematically clinched** position (never shows a team that could
+  still drop): 1st = no other team can even match the leader's points; 2nd = 1st
+  already clinched AND at most that leader can finish above the team. Conservative
+  on ties (a team that can only draw level counts as a threat) → resolves a touch
+  late, never wrongly.
+- **`hooks/useBracketQualifiers.ts`** (new): builds the live placeholder→teamId
+  map, recomputing on every results/standings change. Uses the **official**
+  football-data standings (correct FIFA tiebreaks — same source as `GroupTable`)
+  with a `computeStandings` fallback so it still works offline/pre-sync.
+- **`BracketTree.tsx`:** resolves `home/away_placeholder` through the map (a
+  server-set `team_id` always wins), renders `TeamFlag` + name, marks a clinched-
+  but-not-yet-official team with a small gold dot (`t.groups.qualified`), and pops
+  it in via a keyed `FadeIn` the moment it resolves. Columns stagger in
+  (`FadeInDown`), cells use `LinearTransition` for smooth reflow; tighter spacing.
+- **JS-only → OTA** (iOS runtime `2c3aa583…` = live 1.0.1 build, Android
+  `c50144db…`; real Supabase ref verified in `dist/`). Files: `lib/qualification.ts`,
+  `hooks/useBracketQualifiers.ts`, `components/BracketTree.tsx` (+ existing
+  `groups.qualified` locale string).
+
 ### 2026-06-22 — Synchronized live clock across every screen (OTA)
 
 - **Bug:** the same live match showed a DIFFERENT ticking minute on different

@@ -1,9 +1,13 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import type { Match, Stage } from '@/lib/database.types';
-import { formatMatchDay, sideName } from '@/lib/format';
+import { formatMatchDay } from '@/lib/format';
+import { teamsById } from '@/lib/seed';
 import { palette, radius, stageMeta } from '@/lib/theme';
+import { useBracketQualifiers } from '@/hooks/useBracketQualifiers';
 import { useTranslation } from '@/store/useAppStore';
+import { TeamFlag } from './TeamFlag';
 
 interface Props {
   matches: Match[];
@@ -11,9 +15,13 @@ interface Props {
 
 const COLUMN_ORDER: Stage[] = ['r32', 'r16', 'qf', 'sf', 'final'];
 
-/** Horizontally-scrollable knockout bracket: R32 → R16 → QF → SF → Final. */
+/** Horizontally-scrollable knockout bracket: R32 → R16 → QF → SF → Final.
+ *  Securely-qualified group winners/runners-up are filled into their R32 slots
+ *  in real time (Apple-Sports style) via `useBracketQualifiers`. */
 export function BracketTree({ matches }: Props) {
   const { t, language } = useTranslation();
+  // placeholder ("Winner A" / "Runner-up B") → securely-qualified teamId.
+  const qualifiers = useBracketQualifiers(matches);
 
   const byStage = (stage: Stage) =>
     matches
@@ -27,11 +35,14 @@ export function BracketTree({ matches }: Props) {
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.scroll}>
-      {COLUMN_ORDER.map((stage) => {
+      {COLUMN_ORDER.map((stage, colIndex) => {
         const col = byStage(stage);
         const meta = stageMeta[stage];
         return (
-          <View key={stage} style={styles.column}>
+          <Animated.View
+            key={stage}
+            entering={FadeInDown.delay(colIndex * 70).duration(360)}
+            style={styles.column}>
             <Text style={styles.colTitle}>
               {language === 'es' ? meta.labelEs : meta.label}
             </Text>
@@ -50,7 +61,7 @@ export function BracketTree({ matches }: Props) {
                 <BracketCell match={third} />
               </View>
             ) : null}
-          </View>
+          </Animated.View>
         );
       })}
     </ScrollView>
@@ -59,30 +70,58 @@ export function BracketTree({ matches }: Props) {
   function BracketCell({ match }: { match: Match }) {
     const isFinal = match.stage === 'final';
     return (
-      <View style={[styles.cell, isFinal && styles.cellFinal]}>
+      <Animated.View
+        layout={LinearTransition.springify().damping(18)}
+        style={[styles.cell, isFinal && styles.cellFinal]}>
         <Text style={styles.cellDate}>
           {formatMatchDay(match.kickoff_utc, language)}
         </Text>
         <Row match={match} side="home" />
         <View style={styles.cellDivider} />
         <Row match={match} side="away" />
-      </View>
+      </Animated.View>
     );
   }
 
   function Row({ match, side }: { match: Match; side: 'home' | 'away' }) {
-    const teamId = side === 'home' ? match.home_team_id : match.away_team_id;
+    const serverId = side === 'home' ? match.home_team_id : match.away_team_id;
     const placeholder =
       side === 'home' ? match.home_placeholder : match.away_placeholder;
     const score = side === 'home' ? match.home_score : match.away_score;
-    const decided = !!teamId;
+
+    // A securely-clinched group qualifier fills the slot before the fixture is
+    // officially decided; a server-set team id always wins.
+    const qualifiedId =
+      !serverId && placeholder ? qualifiers.get(placeholder) ?? null : null;
+    const teamId = serverId ?? qualifiedId;
+    const team = teamId ? teamsById[teamId] : undefined;
+    const isQualified = !serverId && !!qualifiedId;
+
     return (
       <View style={styles.cellRow}>
-        <Text
-          style={[styles.cellTeam, !decided && styles.cellTeamTbd]}
-          numberOfLines={1}>
-          {sideName(teamId, placeholder, language)}
-        </Text>
+        {/* Keyed so it re-mounts (pops in) the moment a team resolves. */}
+        <Animated.View
+          key={teamId ?? 'tbd'}
+          entering={FadeIn.duration(450)}
+          style={styles.teamWrap}>
+          {team ? (
+            <TeamFlag
+              team={team}
+              size={18}
+              showName
+              nameStyle={[styles.cellTeam, isQualified && styles.cellTeamQualified]}
+            />
+          ) : (
+            <Text
+              style={[styles.cellTeam, styles.cellTeamTbd]}
+              numberOfLines={1}>
+              {placeholder ?? 'TBD'}
+            </Text>
+          )}
+        </Animated.View>
+        {isQualified ? (
+          <View style={styles.qualDot} accessibilityLabel={t.groups.qualified} />
+        ) : null}
         <Text style={styles.cellScore}>{score == null ? '' : score}</Text>
       </View>
     );
@@ -90,8 +129,8 @@ export function BracketTree({ matches }: Props) {
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, paddingVertical: 8, gap: 14 },
-  column: { width: 180, gap: 10 },
+  scroll: { paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
+  column: { width: 178, gap: 10 },
   colTitle: {
     color: palette.gold,
     fontSize: 12,
@@ -121,14 +160,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 3,
+    gap: 6,
   },
-  cellTeam: { color: palette.text, fontSize: 13, fontWeight: '600', flex: 1 },
+  teamWrap: { flex: 1, minWidth: 0 },
+  cellTeam: { color: palette.text, fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  cellTeamQualified: { color: palette.text, fontWeight: '800' },
   cellTeamTbd: { color: palette.textTertiary, fontWeight: '500' },
+  qualDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: palette.gold,
+  },
   cellScore: {
     color: palette.gold,
     fontSize: 13,
     fontWeight: '900',
-    marginLeft: 8,
     fontVariant: ['tabular-nums'],
   },
   cellDivider: { height: 1, backgroundColor: palette.border, marginVertical: 2 },

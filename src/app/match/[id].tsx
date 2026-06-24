@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { PredictionModal } from '@/components/PredictionModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
+import { TeamMatchContext } from '@/components/TeamMatchContext';
 import { useMatchDetail, type MatchDetail } from '@/hooks/useMatchDetail';
 import { useMatchEvents } from '@/hooks/useMatchEvents';
 import { useMatches } from '@/hooks/useMatches';
@@ -251,6 +252,18 @@ export default function MatchDetailScreen() {
             </Text>
           </GlassCard>
         )}
+
+        {/* Previous matches + group standing per team (persists while live) */}
+        <View style={{ marginTop: 18 }}>
+          <TeamMatchContext
+            home={home}
+            away={away}
+            matches={matches ?? []}
+            currentMatchId={id ?? ''}
+            predictions={predictions ?? undefined}
+            onPressMatch={(m) => router.push(`/match/${m.id}` as Href)}
+          />
+        </View>
       </ScrollView>
       <PredictionModal
         match={predicting ? match : null}
