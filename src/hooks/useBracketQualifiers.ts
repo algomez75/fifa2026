@@ -1,30 +1,40 @@
 import { useMemo } from 'react';
 
 import type { Match } from '@/lib/database.types';
-import { resolveGroupSlots } from '@/lib/qualification';
+import { resolveGroupQualifiers } from '@/lib/qualification';
 import { groupLetters, seedTeams } from '@/lib/seed';
 import { computeStandings, type StandingRow } from '@/lib/standings';
 
 import { useStandings } from './useStandings';
 
+/** A bracket slot filled by the client from group standings. */
+export interface BracketSlot {
+  teamId: string;
+  /** Position (1st/2nd) is mathematically fixed; else qualified but seed is
+   *  provisional (placed by current order, may still swap live). */
+  locked: boolean;
+}
+
 /**
- * Live map of knockout placeholder → securely-qualified `teamId`:
+ * Live map of knockout placeholder → securely-qualified slot:
  *   `"Winner A"` / `"Runner-up B"` → the team mathematically through to that slot.
  *
  * Recomputes whenever results change (matches / official standings), so a team
- * snaps into the bracket the moment it clinches its group position — like Apple
- * Sports. Best-third (`"3rd …"`) and later-round (`"Winner R32-1"`) placeholders
- * are never in the map; they stay TBD until the server decides them.
+ * snaps into the bracket the moment it clinches advancement — like Apple Sports.
+ * A team is placed by its CURRENT group position; `locked` says whether that
+ * exact seed is fixed yet. Best-third (`"3rd …"`) and later-round
+ * (`"Winner R32-1"`) placeholders are never in the map; they stay TBD until the
+ * server decides them.
  *
  * Uses the official football-data standings (correct FIFA tiebreaks) when
  * available — the same source the Groups table shows — falling back to the
  * client-side computation so it still works offline / before any sync.
  */
-export function useBracketQualifiers(matches: Match[]): Map<string, string> {
+export function useBracketQualifiers(matches: Match[]): Map<string, BracketSlot> {
   const { data: official } = useStandings();
 
   return useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, BracketSlot>();
 
     // Team ids per group from the bundled seed (the canonical group makeup).
     const teamsByGroup: Record<string, string[]> = {};
@@ -55,11 +65,23 @@ export function useBracketQualifiers(matches: Match[]): Map<string, string> {
           points: s.points,
         }));
       const rows = officialRows.length ? officialRows : computeStandings(teamIds, groupMatches);
-      const finished = groupMatches.every((m) => m.status === 'finished');
 
-      const { first, second } = resolveGroupSlots(rows, finished);
-      if (first) map.set(`Winner ${letter}`, first);
-      if (second) map.set(`Runner-up ${letter}`, second);
+      const { byTeam } = resolveGroupQualifiers(rows, groupMatches);
+      // At most two teams can be `advances`; place them by current order so the
+      // bracket's 1st/2nd matches the Groups table.
+      const advancers = rows.filter((r) => byTeam.get(r.teamId)?.advances);
+      const first = advancers[0];
+      const second = advancers[1];
+      if (first)
+        map.set(`Winner ${letter}`, {
+          teamId: first.teamId,
+          locked: !!byTeam.get(first.teamId)?.lockedFirst,
+        });
+      if (second)
+        map.set(`Runner-up ${letter}`, {
+          teamId: second.teamId,
+          locked: !!byTeam.get(second.teamId)?.lockedSecond,
+        });
     }
 
     return map;

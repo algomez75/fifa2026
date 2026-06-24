@@ -302,6 +302,38 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-24 — Bracket clinch v2: scenario enumeration (shows every clinched team) (OTA)
+
+- **Why:** the v1 clinch (`resolveGroupSlots`, points-bound) counted each chaser
+  independently, missing that two of a leader's chasers play EACH OTHER (so they
+  can't both catch it). It failed to show clearly-qualified leaders — the user
+  expected USA / Germany / Argentina / Mexico to already be in the bracket.
+- **Fix — `resolveGroupQualifiers(orderedRows, groupMatches)`** (rewrote
+  `lib/qualification.ts`): **enumerates every possible outcome of the group's
+  remaining fixtures** (`3^n`, n≤6 → ≤729, ×12, memoized — trivial) and marks a
+  team `advances` only if it's top-2 in EVERY scenario. Ranks each scenario by
+  **points only, treating an equal-points pair as ambiguous** (a tie GD/H2H could
+  break either way) → tiebreakers are irrelevant to clinching, so it **never
+  shows a team that isn't truly through**, while honouring the fixture graph.
+  Also returns `lockedFirst`/`lockedSecond` (seed mathematically fixed). Finished
+  group → trust the standings order (mandatory branch: points-only enumeration
+  would drop a tied runner-up).
+- **Real-time placement (`useBracketQualifiers` → `Map<string, BracketSlot>` =
+  `{teamId, locked}`):** at most two teams advance per group; placed by current
+  standings order (1st→`Winner L`, 2nd→`Runner-up L`), recomputed on every
+  results/standings change so a team snaps in the moment it clinches and the slot
+  swaps live if the order flips. `BracketTree` shows a **solid gold dot** for a
+  locked seed, a **hollow gold ring** for a qualified-but-provisional seed
+  (`groups.qualifiedProvisional`, en/es). Server `team_id` still always wins.
+- **Validated** against the real group state (`scripts/qualification.test.ts`,
+  `npx tsx`): exactly `{mex,usa,ger,arg,fra,nor}` clinch now (none with a locked
+  seed yet), CAN/BRA/POR/ENG/ESP/NED/EGY correctly excluded; + edge units
+  (finished-group 2nd-place tie still yields a runner-up, null team id skipped).
+- **JS-only → OTA** (iOS `2c3aa583…` = live 1.0.1 build, Android `c50144db…`;
+  real Supabase ref + new strings verified in `dist/`). Files: `lib/qualification.ts`,
+  `hooks/useBracketQualifiers.ts`, `components/BracketTree.tsx`, `en.ts`/`es.ts`,
+  `scripts/qualification.test.ts`.
+
 ### 2026-06-24 — Bracket fills in qualified teams in real time (OTA)
 
 - **Feature (Apple-Sports style):** the Groups → Bracket view now drops each

@@ -107,6 +107,7 @@ export const es: Translation = {
     group: 'Grupo',
     columns: { p: 'PJ', w: 'G', d: 'E', l: 'P', gf: 'GF', ga: 'GC', gd: 'DG', pts: 'Pts' },
     qualified: 'Clasificado',
+    qualifiedProvisional: 'Clasificado (puesto sin definir)',
   },
   teams: {
     title: 'EQUIPOS',

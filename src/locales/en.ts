@@ -106,6 +106,7 @@ export const en = {
     group: 'Group',
     columns: { p: 'P', w: 'W', d: 'D', l: 'L', gf: 'GF', ga: 'GA', gd: 'GD', pts: 'Pts' },
     qualified: 'Qualified',
+    qualifiedProvisional: 'Qualified (seed not locked)',
   },
   teams: {
     title: 'TEAMS',

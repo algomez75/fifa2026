@@ -89,13 +89,17 @@ export function BracketTree({ matches }: Props) {
       side === 'home' ? match.home_placeholder : match.away_placeholder;
     const score = side === 'home' ? match.home_score : match.away_score;
 
-    // A securely-clinched group qualifier fills the slot before the fixture is
-    // officially decided; a server-set team id always wins.
-    const qualifiedId =
+    // A mathematically-qualified group team fills the slot before the fixture is
+    // officially decided; a server-set team id always wins. `locked` = its exact
+    // seed (1st/2nd) is fixed; otherwise it's qualified but the seed is still
+    // provisional (placed by current order, may swap live).
+    const slot =
       !serverId && placeholder ? qualifiers.get(placeholder) ?? null : null;
+    const qualifiedId = slot?.teamId ?? null;
     const teamId = serverId ?? qualifiedId;
     const team = teamId ? teamsById[teamId] : undefined;
     const isQualified = !serverId && !!qualifiedId;
+    const isLocked = isQualified && !!slot?.locked;
 
     return (
       <View style={styles.cellRow}>
@@ -120,7 +124,12 @@ export function BracketTree({ matches }: Props) {
           )}
         </Animated.View>
         {isQualified ? (
-          <View style={styles.qualDot} accessibilityLabel={t.groups.qualified} />
+          <View
+            style={[styles.qualDot, !isLocked && styles.qualDotProvisional]}
+            accessibilityLabel={
+              isLocked ? t.groups.qualified : t.groups.qualifiedProvisional
+            }
+          />
         ) : null}
         <Text style={styles.cellScore}>{score == null ? '' : score}</Text>
       </View>
@@ -167,10 +176,16 @@ const styles = StyleSheet.create({
   cellTeamQualified: { color: palette.text, fontWeight: '800' },
   cellTeamTbd: { color: palette.textTertiary, fontWeight: '500' },
   qualDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
     backgroundColor: palette.gold,
+  },
+  // Provisional seed: hollow gold ring (qualified to advance, 1st/2nd may swap).
+  qualDotProvisional: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: palette.gold,
   },
   cellScore: {
     color: palette.gold,
