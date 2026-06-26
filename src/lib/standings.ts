@@ -79,3 +79,40 @@ export function computeStandings(
       a.teamId.localeCompare(b.teamId),
   );
 }
+
+/**
+ * Pick the standings to trust for a group. The official football-data
+ * `standings` table has correct FIFA tiebreaks (H2H) but can go **stale**: its
+ * snapshot is taken from the upstream standings endpoint, which lags the live
+ * scores — e.g. a goal in the 90th minute updates the match but not yet the
+ * standings, and once the match is finished nothing re-syncs them, so the row
+ * can stay frozen on an earlier scoreline (counting a win as a draw).
+ *
+ * So: use the official rows only when their aggregates **agree** with the
+ * standings recomputed from the actual finished matches (always the source of
+ * truth). On any mismatch — a stale/wrong official row — fall back to the
+ * match-derived table, which can never disagree with the scores users see.
+ * Self-healing: the moment the official sync catches up, it's used again (for
+ * its better tiebreaks).
+ */
+export function reconcileStandings(
+  officialRows: StandingRow[] | undefined,
+  teamIds: string[],
+  matches: Match[],
+): StandingRow[] {
+  const computed = computeStandings(teamIds, matches);
+  if (!officialRows || officialRows.length !== computed.length) return computed;
+
+  const byId = new Map(computed.map((r) => [r.teamId, r]));
+  const consistent = officialRows.every((o) => {
+    const c = byId.get(o.teamId);
+    return (
+      !!c &&
+      c.played === o.played &&
+      c.points === o.points &&
+      c.goalsFor === o.goalsFor &&
+      c.goalsAgainst === o.goalsAgainst
+    );
+  });
+  return consistent ? officialRows : computed;
+}

@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import type { Match } from '@/lib/database.types';
 import { resolveGroupQualifiers } from '@/lib/qualification';
 import { groupLetters, seedTeams } from '@/lib/seed';
-import { computeStandings, type StandingRow } from '@/lib/standings';
+import { reconcileStandings, type StandingRow } from '@/lib/standings';
 
 import { useStandings } from './useStandings';
 
@@ -64,7 +64,9 @@ export function useBracketQualifiers(matches: Match[]): Map<string, BracketSlot>
           goalDiff: s.goal_difference,
           points: s.points,
         }));
-      const rows = officialRows.length ? officialRows : computeStandings(teamIds, groupMatches);
+      // Trust official rows only when consistent with the real results; a stale
+      // upstream standings snapshot falls back to the match-derived table.
+      const rows = reconcileStandings(officialRows, teamIds, groupMatches);
 
       const { byTeam } = resolveGroupQualifiers(rows, groupMatches);
       // At most two teams can be `advances`; place them by current order so the

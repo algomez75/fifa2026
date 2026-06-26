@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { Match } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
-import { computeStandings, type StandingRow } from '@/lib/standings';
+import { reconcileStandings, type StandingRow } from '@/lib/standings';
 import { useStandings } from '@/hooks/useStandings';
 import { palette, radius } from '@/lib/theme';
 import { teamsById } from '@/lib/seed';
@@ -38,7 +38,9 @@ export function GroupTable({ groupLetter, teamIds, matches }: Props) {
       goalDiff: s.goal_difference,
       points: s.points,
     }));
-  const rows = officialRows.length ? officialRows : computeStandings(teamIds, matches);
+  // Use the official rows only when they agree with the actual match results;
+  // a stale upstream standings snapshot falls back to the match-derived table.
+  const rows = reconcileStandings(officialRows, teamIds, matches);
 
   return (
     <View style={styles.wrap}>

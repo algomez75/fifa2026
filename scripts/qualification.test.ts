@@ -7,7 +7,7 @@
  */
 import type { Match, MatchStatus, Stage } from '../src/lib/database.types';
 import { resolveGroupQualifiers } from '../src/lib/qualification';
-import { computeStandings } from '../src/lib/standings';
+import { computeStandings, reconcileStandings, type StandingRow } from '../src/lib/standings';
 
 let seq = 0;
 function mkMatch(p: Partial<Match>): Match {
@@ -167,6 +167,59 @@ console.log('Edge — remaining match missing a team id:');
     threw = true;
   }
   assert(!threw, 'does not throw on a null team id in a remaining fixture');
+}
+
+// ── Edge: stale official standings reconciled against real match results ─────
+// Reproduces the real Group D bug: the official table froze TUR-USA at 2-2 (a
+// draw) while the match actually finished 3-2 (USA lost). reconcileStandings
+// must detect the mismatch and fall back to the match-derived table.
+console.log('Edge — stale official standings fall back to match results:');
+{
+  const gd = (h: string, hs: number, asc: number, a: string) =>
+    mkMatch({
+      group_letter: 'D',
+      status: 'finished',
+      home_team_id: h,
+      away_team_id: a,
+      home_score: hs,
+      away_score: asc,
+    });
+  const matches = [
+    gd('usa', 4, 1, 'par'),
+    gd('aus', 2, 0, 'tur'),
+    gd('usa', 2, 0, 'aus'),
+    gd('tur', 0, 1, 'par'),
+    gd('par', 0, 0, 'aus'),
+    gd('tur', 3, 2, 'usa'), // the result the stale standings missed
+  ];
+  const ids = ['usa', 'aus', 'par', 'tur'];
+  const sr = (
+    teamId: string,
+    played: number,
+    won: number,
+    drawn: number,
+    lost: number,
+    gf: number,
+    ga: number,
+    points: number,
+  ): StandingRow => ({ teamId, played, won, drawn, lost, goalsFor: gf, goalsAgainst: ga, goalDiff: gf - ga, points });
+  const stale: StandingRow[] = [
+    sr('usa', 3, 2, 1, 0, 8, 3, 7), // TUR-USA wrongly counted as a 2-2 draw
+    sr('aus', 3, 1, 1, 1, 2, 2, 4),
+    sr('par', 3, 1, 1, 1, 2, 4, 4),
+    sr('tur', 3, 0, 1, 2, 2, 5, 1),
+  ];
+  const rec = reconcileStandings(stale, ids, matches);
+  const byId = new Map(rec.map((r) => [r.teamId, r]));
+  assert(
+    byId.get('usa')!.points === 6 && byId.get('usa')!.lost === 1 && byId.get('usa')!.drawn === 0,
+    'USA shows 6 pts + the real loss (not the stale draw)',
+  );
+  assert(byId.get('usa')!.goalsAgainst === 4, 'USA GA reflects the 3 conceded vs Turkey');
+  assert(byId.get('tur')!.points === 3 && byId.get('tur')!.won === 1, 'Turkey shows the win (3 pts)');
+
+  const good = reconcileStandings(computeStandings(ids, matches), ids, matches);
+  assert(good.length === 4 && good[0].teamId === 'usa', 'consistent official rows are kept as-is');
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);

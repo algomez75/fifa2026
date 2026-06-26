@@ -302,6 +302,34 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-26 — Fix stale group standings (W-D-L didn't match results) (OTA)
+
+- **Bug:** Group D showed USA `W2 D1 L0 / 7pts` and Turkey `W0 D1 L2 / 1pt`, but
+  TUR–USA actually finished **3–2** (USA lost). The `matches` table was correct
+  (the schedule showed 3–2); the **official `standings` table was frozen on an
+  earlier 2–2** scoreline (before Turkey's 90' winner), counting that match as a
+  draw for both.
+- **Root cause:** the `standings` table is a snapshot of football-data's
+  standings endpoint, which lags the live scores; `sync-scores` only refreshes it
+  on a score/status change, so once the match finished nothing re-synced it and
+  the stale row stuck. `GroupTable` + `useBracketQualifiers` trusted that table
+  whenever it existed.
+- **Fix — `reconcileStandings(official, teamIds, matches)`** in `lib/standings.ts`:
+  recompute the table from the actual finished matches (always the source of
+  truth) and use the official rows **only when their per-team played / points /
+  GF / GA agree** with it; on any mismatch fall back to the match-derived table.
+  Self-healing — the official rows are used again (for their correct FIFA H2H
+  tiebreaks) the moment the upstream sync catches up. `GroupTable` and
+  `useBracketQualifiers` both call it (no more blind `officialRows.length ? …`).
+- **Validated** in `scripts/qualification.test.ts`: the real stale Group D
+  snapshot reconciles to USA `6pts`/1 loss, Turkey `3pts`/1 win, USA GA `4`; a
+  consistent official table is kept as-is.
+- **JS-only → OTA** (iOS `2c3aa583…` = live 1.0.1 build, Android `c50144db…`;
+  real Supabase ref verified in `dist/`). No server/migration change — the stale
+  DB row is now simply ignored by the app. Files: `lib/standings.ts`,
+  `components/GroupTable.tsx`, `hooks/useBracketQualifiers.ts`,
+  `scripts/qualification.test.ts`.
+
 ### 2026-06-24 — Bracket clinch v2: scenario enumeration (shows every clinched team) (OTA)
 
 - **Why:** the v1 clinch (`resolveGroupSlots`, points-bound) counted each chaser
