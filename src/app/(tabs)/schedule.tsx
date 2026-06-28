@@ -11,8 +11,10 @@ import { LocationPinIcon } from '@/components/icons';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
 import type { Match } from '@/lib/database.types';
 import { dayKey, formatMatchDay } from '@/lib/format';
+import { resolveMatchTeams } from '@/lib/qualification';
 import { venuesById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
+import { useBracketQualifiers } from '@/hooks/useBracketQualifiers';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
@@ -29,6 +31,9 @@ export default function ScheduleScreen() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const { data: matches, isLoading, isError, refetch } = useMatches();
+  // Live placeholder→team map (same source as the Bracket), so R32 slots fill
+  // with the securely-qualified teams in real time.
+  const qualifiers = useBracketQualifiers(matches ?? []);
 
   const onlyMyTeams = useAppStore((s) => s.onlyMyTeams);
   const setOnlyMyTeams = useAppStore((s) => s.setOnlyMyTeams);
@@ -61,9 +66,12 @@ export default function ScheduleScreen() {
         if (v?.country !== filterHost) return false;
       }
       if (onlyMyTeams && favorites.length) {
+        // Resolve knockout sides so a favorite that just clinched into an R32
+        // slot shows here too (matches the bracket).
+        const r = resolveMatchTeams(m, qualifiers);
         if (
-          !favorites.includes(m.home_team_id ?? '') &&
-          !favorites.includes(m.away_team_id ?? '')
+          !favorites.includes(r.home.teamId ?? '') &&
+          !favorites.includes(r.away.teamId ?? '')
         )
           return false;
       }
@@ -83,7 +91,30 @@ export default function ScheduleScreen() {
       past: groupByDayDesc(pastM),
       pastCount: pastM.length,
     };
-  }, [matches, filterHost, onlyMyTeams, favorites]);
+  }, [matches, filterHost, onlyMyTeams, favorites, qualifiers]);
+
+  // Render a card with the knockout sides resolved through the qualifier map:
+  // `display` fills undecided R32 sides (flag + name); `qualMark` carries the
+  // bracket's locked/provisional marker. Prediction identity stays `match.id`.
+  const cardFor = (m: Match) => {
+    const r = resolveMatchTeams(m, qualifiers);
+    const display =
+      r.home.teamId === m.home_team_id && r.away.teamId === m.away_team_id
+        ? m
+        : { ...m, home_team_id: r.home.teamId, away_team_id: r.away.teamId };
+    return (
+      <MatchCard
+        key={m.id}
+        match={display}
+        prediction={predictions?.[m.id] ?? null}
+        onPress={openPrediction}
+        qualMark={{
+          home: { qualified: r.home.isQualified, locked: r.home.isLocked },
+          away: { qualified: r.away.isQualified, locked: r.away.isLocked },
+        }}
+      />
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -150,16 +181,7 @@ export default function ScheduleScreen() {
                   <Text style={[styles.dayHeader, { color: palette.live }]}>
                     ● {t.home.liveNow}
                   </Text>
-                  <View style={{ gap: 10 }}>
-                    {liveNow.map((m) => (
-                      <MatchCard
-                        key={m.id}
-                        match={m}
-                        prediction={predictions?.[m.id] ?? null}
-                        onPress={openPrediction}
-                      />
-                    ))}
-                  </View>
+                  <View style={{ gap: 10 }}>{liveNow.map(cardFor)}</View>
                 </View>
               ) : null}
               {upcoming.length === 0 && liveNow.length === 0 ? (
@@ -174,16 +196,7 @@ export default function ScheduleScreen() {
                   <Text style={styles.dayHeader}>
                     {formatMatchDay(group.matches[0].kickoff_utc, language)}
                   </Text>
-                  <View style={{ gap: 10 }}>
-                    {group.matches.map((m) => (
-                      <MatchCard
-                        key={m.id}
-                        match={m}
-                        prediction={predictions?.[m.id] ?? null}
-                        onPress={openPrediction}
-                      />
-                    ))}
-                  </View>
+                  <View style={{ gap: 10 }}>{group.matches.map(cardFor)}</View>
                 </View>
               ))}
             </>

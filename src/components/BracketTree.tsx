@@ -3,6 +3,7 @@ import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-rea
 
 import type { Match, Stage } from '@/lib/database.types';
 import { formatMatchDay } from '@/lib/format';
+import { resolveMatchTeams } from '@/lib/qualification';
 import { teamsById } from '@/lib/seed';
 import { palette, radius, stageMeta } from '@/lib/theme';
 import { useBracketQualifiers } from '@/hooks/useBracketQualifiers';
@@ -84,22 +85,20 @@ export function BracketTree({ matches }: Props) {
   }
 
   function Row({ match, side }: { match: Match; side: 'home' | 'away' }) {
-    const serverId = side === 'home' ? match.home_team_id : match.away_team_id;
     const placeholder =
       side === 'home' ? match.home_placeholder : match.away_placeholder;
     const score = side === 'home' ? match.home_score : match.away_score;
 
     // A mathematically-qualified group team fills the slot before the fixture is
-    // officially decided; a server-set team id always wins. `locked` = its exact
-    // seed (1st/2nd) is fixed; otherwise it's qualified but the seed is still
-    // provisional (placed by current order, may swap live).
-    const slot =
-      !serverId && placeholder ? qualifiers.get(placeholder) ?? null : null;
-    const qualifiedId = slot?.teamId ?? null;
-    const teamId = serverId ?? qualifiedId;
+    // officially decided; a server-set team id always wins. `isLocked` = its
+    // exact seed (1st/2nd) is fixed; otherwise it's qualified but the seed is
+    // still provisional (placed by current order, may swap live). Shared resolver
+    // (lib/qualification) so the Schedule fills R32 slots identically.
+    const { teamId, isQualified, isLocked } =
+      side === 'home'
+        ? resolveMatchTeams(match, qualifiers).home
+        : resolveMatchTeams(match, qualifiers).away;
     const team = teamId ? teamsById[teamId] : undefined;
-    const isQualified = !serverId && !!qualifiedId;
-    const isLocked = isQualified && !!slot?.locked;
 
     return (
       <View style={styles.cellRow}>

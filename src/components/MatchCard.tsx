@@ -19,15 +19,25 @@ import { LiveBadge } from './LiveBadge';
 import { LocationPinIcon } from './icons';
 import { TeamFlag } from './TeamFlag';
 
+interface QualMark {
+  /** The side is filled by a real-time bracket qualifier (not server-decided). */
+  qualified: boolean;
+  /** Its exact seed (1st/2nd) is mathematically fixed (solid dot vs hollow ring). */
+  locked: boolean;
+}
+
 interface Props {
   match: Match;
   onPress?: (m: Match) => void;
   compact?: boolean;
   /** Optional: the current user's prediction for this match (shows a badge). */
   prediction?: Prediction | null;
+  /** Optional (Schedule R32 only): show the bracket's qualified-team marker
+   *  next to a side. Default off → all other surfaces are unaffected. */
+  qualMark?: { home?: QualMark; away?: QualMark };
 }
 
-export function MatchCard({ match, onPress, compact, prediction }: Props) {
+export function MatchCard({ match, onPress, compact, prediction, qualMark }: Props) {
   const { t, language } = useTranslation();
   const predResult = prediction ? scorePrediction(prediction, match) : null;
   const isLive = match.status === 'live';
@@ -162,6 +172,12 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
             <Text style={styles.teamName} numberOfLines={2}>
               {sideName(match.home_team_id, match.home_placeholder, language)}
             </Text>
+            {qualMark?.home?.qualified ? (
+              <View
+                style={[styles.qualDot, !qualMark.home.locked && styles.qualDotProvisional]}
+                accessibilityLabel={qualMark.home.locked ? t.groups.qualified : t.groups.qualifiedProvisional}
+              />
+            ) : null}
           </View>
 
           <View style={styles.scoreBox}>
@@ -187,6 +203,12 @@ export function MatchCard({ match, onPress, compact, prediction }: Props) {
             <Text style={styles.teamName} numberOfLines={2}>
               {sideName(match.away_team_id, match.away_placeholder, language)}
             </Text>
+            {qualMark?.away?.qualified ? (
+              <View
+                style={[styles.qualDot, !qualMark.away.locked && styles.qualDotProvisional]}
+                accessibilityLabel={qualMark.away.locked ? t.groups.qualified : t.groups.qualifiedProvisional}
+              />
+            ) : null}
           </View>
         </View>
 
@@ -339,6 +361,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 17,
   },
+  // Qualified-team marker (Schedule R32) — mirrors the bracket cell.
+  qualDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.gold, marginTop: 4 },
+  qualDotProvisional: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: palette.gold },
   scoreBox: { alignItems: 'center', minWidth: 74, paddingHorizontal: 6 },
   score: {
     color: palette.text,

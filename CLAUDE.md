@@ -302,6 +302,37 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-27 — Schedule fills R32 with qualified teams + predict them (OTA, code-complete)
+
+- **Feature:** the **Schedule** tab now drops each securely-qualified group
+  winner/runner-up into its R32 (knockout) slot **in real time**, exactly like
+  the Bracket view — instead of showing "Winner A" / "Runner-up B" with a blank
+  flag. Tapping the card still opens the prediction sheet (predictions were
+  already team-agnostic — keyed by `match_id`, RLS-locked at kickoff — so they
+  worked on placeholders; the blank flag just made them *look* un-predictable).
+- **Shared resolver — `resolveMatchTeams(match, qualifiers)`** (new in
+  `lib/qualification.ts`, pure): extracts BracketTree's inline side-resolution
+  (server id wins → else the live `useBracketQualifiers` slot → else TBD) so the
+  Bracket and Schedule fill slots from ONE source. `BracketTree` refactored to
+  call it (verbatim behaviour; `qualification.test.ts` still ALL PASS).
+- **`schedule.tsx`:** `useBracketQualifiers(matches)` (same map/cadence as the
+  bracket) + a `cardFor(m)` that resolves each match — fills undecided R32 sides
+  for DISPLAY (`{...m, home_team_id, away_team_id}`, identity/scores/status/
+  kickoff untouched so prediction stays keyed by `match.id`) and passes the
+  marker. The `onlyMyTeams` filter resolves sides too, so a favorite that just
+  clinched into an R32 slot shows. Best-third (`"3rd …"`) / later-round slots
+  stay TBD (not in the map).
+- **`MatchCard`:** additive **`qualMark?: {home?,away?}`** prop (default off →
+  Home/team/user cards unchanged) rendering the bracket's **solid gold dot**
+  (seed locked) / **hollow gold ring** (provisional) next to the resolved team,
+  reusing `t.groups.qualified` / `qualifiedProvisional`.
+- **JS-only → OTA-ready** (no migration/server change). Typecheck clean;
+  `qualification.test.ts` ALL PASS. **Pending OTA publish** (`--environment
+  production`, verify real Supabase ref in `dist/` before announcing — iOS
+  runtime `2c3aa583…` = live 1.0.1 build, Android `c50144db…`). Files:
+  `lib/qualification.ts`, `app/(tabs)/schedule.tsx`, `components/MatchCard.tsx`,
+  `components/BracketTree.tsx`.
+
 ### 2026-06-26 — Fix stale group standings (W-D-L didn't match results) (OTA)
 
 - **Bug:** Group D showed USA `W2 D1 L0 / 7pts` and Turkey `W0 D1 L2 / 1pt`, but

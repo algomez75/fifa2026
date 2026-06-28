@@ -1,6 +1,52 @@
 import type { Match } from './database.types';
 import type { StandingRow } from './standings';
 
+/** A knockout side resolved through the live bracket-qualifier map. */
+export interface ResolvedSide {
+  /** Server-set team id if decided, else the real-time qualified team, else null. */
+  teamId: string | null;
+  /** True only when an undecided side was filled by a (provisional) qualifier. */
+  isQualified: boolean;
+  /** True when that qualifier's exact seed (1st/2nd) is mathematically fixed. */
+  isLocked: boolean;
+}
+
+export interface ResolvedMatch {
+  home: ResolvedSide;
+  away: ResolvedSide;
+}
+
+/** Minimal qualifier-map shape (structurally `Map<string, BracketSlot>`). */
+type QualifierMap = Map<string, { teamId: string; locked: boolean }>;
+
+function resolveSide(
+  serverId: string | null,
+  placeholder: string | null,
+  qualifiers: QualifierMap,
+): ResolvedSide {
+  const slot = !serverId && placeholder ? qualifiers.get(placeholder) ?? null : null;
+  const qualifiedId = slot?.teamId ?? null;
+  const isQualified = !serverId && !!qualifiedId;
+  return { teamId: serverId ?? qualifiedId, isQualified, isLocked: isQualified && !!slot?.locked };
+}
+
+/**
+ * Resolve a knockout match's two sides through the bracket-qualifier map: a
+ * server-set team id always wins; otherwise an undecided side is filled with its
+ * real-time mathematically-qualified team (best-third / later-round placeholders
+ * stay null → TBD). Shared by the Bracket and the Schedule so both surfaces fill
+ * R32 slots identically. Pure — receives the already-built qualifier map.
+ */
+export function resolveMatchTeams(
+  match: Pick<Match, 'home_team_id' | 'away_team_id' | 'home_placeholder' | 'away_placeholder'>,
+  qualifiers: QualifierMap,
+): ResolvedMatch {
+  return {
+    home: resolveSide(match.home_team_id, match.home_placeholder, qualifiers),
+    away: resolveSide(match.away_team_id, match.away_placeholder, qualifiers),
+  };
+}
+
 /**
  * Parse a knockout placeholder that references a GROUP position.
  *  - "Winner A"    → { pos: 1, group: 'A' }
