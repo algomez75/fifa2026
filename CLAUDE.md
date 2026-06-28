@@ -302,6 +302,29 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-28 — History: Germany counts 4 titles (merge West Germany) (OTA)
+
+- **Bug:** the History tab's **"Most titles"** chart counted `"West Germany"`
+  (1954·1974·1990) and `"Germany"` (2014) as **separate** nations, so Germany
+  showed **3 + 1** instead of **4**. Worse, that made 9 distinct champions and the
+  chart `slice(0, 8)` dropped the 9th entry — Germany's lone 2014 title could
+  vanish entirely.
+- **Audit:** re-verified all **22 editions** (1930–2022) against the real record —
+  champion, runner-up, third, final score, top scorer, total goals, total teams —
+  and every per-edition field is correct. The Germany/West-Germany split in the
+  aggregate was the **only** error; the "Highest-scoring matches" list is accurate
+  too (1954 Austria 7–5 Switzerland on top).
+- **Fix:** a `canonicalNation()` alias map (`West Germany → Germany`) applied **only
+  in the titles aggregation** — per-edition cards keep the era-accurate label
+  ("West Germany" for 1954/1974/1990), exactly as FIFA credits those honours to
+  Germany. Corrected all-time count: **Brazil 5 · Germany 4 · Italy 4 · Argentina 3
+  · Uruguay 2 · France 2 · England 1 · Spain 1** (= 22 ✓), now 8 entries so none
+  is sliced off.
+- **JS-only → OTA** (reads bundled `seedHistory`; no DB/migration). Published to
+  `production` (iOS runtime `2c3aa583…` = live 1.0.1 build, Android `c50144db…`);
+  real Supabase ref + `West Germany` literal verified in `dist/`. Typecheck clean.
+  File: `app/(tabs)/history.tsx`.
+
 ### 2026-06-28 — Fix half-filled knockout crosses (away side never written) (server-only)
 
 - **Bug (follow-up to the 2026-06-27 knockout-ingestion entry):** after the group

@@ -11,6 +11,17 @@ import { seedHistory } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { useTranslation } from '@/store/useAppStore';
 
+/**
+ * Map a nation's historical name to its modern football identity for all-time
+ * aggregates (titles count). FIFA credits West Germany's honours to Germany, so
+ * Germany's title total is 4 (1954·1974·1990 as West Germany + 2014). Only used
+ * for counting — per-edition cards keep the era-accurate label.
+ */
+const NATION_ALIASES: Record<string, string> = {
+  'West Germany': 'Germany',
+};
+const canonicalNation = (name: string) => NATION_ALIASES[name] ?? name;
+
 export default function HistoryScreen() {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<HistoricalEdition | null>(null);
@@ -23,7 +34,13 @@ export default function HistoryScreen() {
   const titles = useMemo(() => {
     const counts = new Map<string, number>();
     for (const e of seedHistory.editions) {
-      if (e.champion) counts.set(e.champion, (counts.get(e.champion) ?? 0) + 1);
+      if (e.champion) {
+        // Credit a nation's titles to its modern football identity so the
+        // all-time honours are correct (e.g. Germany = 4, not West Germany 3 +
+        // Germany 1). Edition cards keep the era-accurate name.
+        const country = canonicalNation(e.champion);
+        counts.set(country, (counts.get(country) ?? 0) + 1);
+      }
     }
     return Array.from(counts.entries())
       .map(([country, count]) => ({ country, count }))
