@@ -9,7 +9,9 @@ import { MatchCard } from '@/components/MatchCard';
 import { EmptyState, LoadingState } from '@/components/States';
 import { ChevronLeftIcon } from '@/components/icons';
 import type { Match, Prediction, UserPredictionRow } from '@/lib/database.types';
+import { resolveMatchTeams } from '@/lib/qualification';
 import { palette, radius } from '@/lib/theme';
+import { useBracketQualifiers } from '@/hooks/useBracketQualifiers';
 import { useMatches } from '@/hooks/useMatches';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { useUserPredictions } from '@/hooks/useUserPredictions';
@@ -43,6 +45,11 @@ export default function UserPredictionsScreen() {
     return map;
   }, [matches]);
 
+  // Fill undecided R32 knockout slots with their securely-qualified teams in
+  // real time (same as the Schedule), so the challenge picker shows real flags
+  // + names instead of "Winner A".
+  const qualifiers = useBracketQualifiers(matches ?? []);
+
   // Upcoming matches you can challenge this player on (any scheduled fixture;
   // creating a challenge after kickoff is RLS-blocked anyway).
   const upcomingMatches = useMemo(
@@ -57,6 +64,27 @@ export default function UserPredictionsScreen() {
     if (!requireAccount()) return;
     setPicking(false);
     setChallenge({ match: m, mode: 'create', opponentId: id, opponentName: name || 'Player' });
+  };
+
+  // Resolve each picker match's knockout sides for display (flags + names) +
+  // the qualified marker; the resolved match flows into openChallenge so the
+  // challenge sheet shows the real teams too. Identity stays match.id.
+  const pickerCard = (m: Match) => {
+    const r = resolveMatchTeams(m, qualifiers);
+    const display =
+      r.home.teamId === m.home_team_id && r.away.teamId === m.away_team_id
+        ? m
+        : { ...m, home_team_id: r.home.teamId, away_team_id: r.away.teamId };
+    return (
+      <MatchCard
+        match={display}
+        onPress={openChallenge}
+        qualMark={{
+          home: { qualified: r.home.isQualified, locked: r.home.isLocked },
+          away: { qualified: r.away.isQualified, locked: r.away.isLocked },
+        }}
+      />
+    );
   };
 
   // Only live + already-played events here (upcoming/scheduled picks are hidden
@@ -149,7 +177,7 @@ export default function UserPredictionsScreen() {
               keyExtractor={(m) => m.id}
               contentContainerStyle={styles.list}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => <MatchCard match={item} onPress={openChallenge} />}
+              renderItem={({ item }) => pickerCard(item)}
             />
           )}
         </View>

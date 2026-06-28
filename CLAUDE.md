@@ -316,6 +316,12 @@ development-simulator / preview / production profiles).
   selecting one opens the existing `ChallengeModal` in create mode. You can now
   challenge on ANY upcoming match, not only ones the opponent predicted. Removed
   the dead per-row challenge button from `PredItem`.
+- **Picker shows resolved R32 teams (follow-up OTA).** The upcoming-match picker
+  reuses the Schedule's real-time bracket fill (`useBracketQualifiers` +
+  `resolveMatchTeams` + a `pickerCard` helper), so a knockout fixture shows the
+  qualified team flags + names (with the locked/provisional marker) instead of
+  "Winner A"; the resolved match flows into the `ChallengeModal` so the challenge
+  sheet opens on the real teams too.
 - **JS-only → OTA.** Typecheck + lint clean. File: `app/user/[id].tsx`.
 
 ### 2026-06-27 — Schedule fills R32 with qualified teams + predict them (OTA)
