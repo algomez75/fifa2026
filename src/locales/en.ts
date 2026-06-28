@@ -182,6 +182,7 @@ export const en = {
     or: 'or',
     language: 'Language',
     about: 'About',
+    howToPlay: 'How to play',
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
     support: 'Contact support',

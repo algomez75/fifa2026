@@ -302,6 +302,37 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-28 — "How to play" guide in Profile → About (EN/ES, OTA)
+
+- **Ask:** explain the prediction game — how it's scored — and document every
+  tournament phase (group stage → Round of 32 → R16 → QF → SF → 3rd place →
+  Final), bilingual, on a new page reached from **About** in the profile.
+- **New screen `app/how-to-play.tsx`** (route `/how-to-play`): a polished, scroll
+  guide with — intro · "Making a prediction" · **scoring** (gold **+3** exact /
+  **+1** right result / **0** miss pills with worked examples) · scoring notes
+  (locks at kickoff; group + knockout score the same; knockouts graded on the
+  full-time/extra-time score, penalty shootout doesn't change prediction points)
+  · **tournament format** (each phase as a row with a match-count badge: 72 group
+  matches in 12 groups of 4 → top 2 + 8 best thirds = 32 → 16/8/4/2 + 3rd + Final)
+  · an extra-time/penalties callout · leaderboard (sum of prediction + challenge
+  points, exact-count tiebreak) · **1v1 challenges** · fair-play (picks hidden
+  until kickoff).
+- **Content in `lib/rules.ts`** (`getRules(lang)` → typed `RulesContent`), same
+  cohesive-bilingual pattern as `lib/legal.ts`, so EN/ES rules live in one place
+  and the screen just renders them. Scoring text mirrors `lib/scoring.ts` (3/1/0)
+  and the challenge rules mirror `get_my_challenges()`/`ch_dist`.
+- **Wiring:** new first item in the profile **About** card (`account.howToPlay` =
+  "How to play" / "Cómo jugar") → `router.push('/how-to-play')`.
+- **JS-only → OTA.** Typecheck clean; lint of touched files clean (only the
+  pre-existing `en.ts` eslint-disable warning). Published to `production` (iOS
+  runtime `2c3aa583…` = live 1.0.1 build, Android `c50144db…`); real Supabase ref
+  + new EN/ES strings ("Dieciseisavos de final", "Marcador exacto", "Retos 1v1")
+  verified in `dist/`. (Typed-routes note: `expo export` doesn't regenerate
+  `.expo/types/router.d.ts` — only `expo start` does — so the new route was added
+  to that gitignored file locally for typecheck; the route works at runtime
+  regardless.) Files: `app/how-to-play.tsx` (new), `lib/rules.ts` (new),
+  `app/profile.tsx`, `en.ts`/`es.ts`.
+
 ### 2026-06-28 — History: Germany counts 4 titles (merge West Germany) (OTA)
 
 - **Bug:** the History tab's **"Most titles"** chart counted `"West Germany"`

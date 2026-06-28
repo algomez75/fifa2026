@@ -183,6 +183,7 @@ export const es: Translation = {
     or: 'o',
     language: 'Idioma',
     about: 'Acerca de',
+    howToPlay: 'Cómo jugar',
     privacyPolicy: 'Política de Privacidad',
     termsOfService: 'Términos de Servicio',
     support: 'Contactar soporte',

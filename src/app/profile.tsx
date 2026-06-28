@@ -195,6 +195,8 @@ function AboutSection() {
     <View style={styles.aboutWrap}>
       <Text style={styles.aboutTitle}>{t.account.about}</Text>
       <View style={styles.aboutCard}>
+        <AboutItem label={t.account.howToPlay} onPress={() => router.push('/how-to-play')} />
+        <View style={styles.aboutDivider} />
         <AboutItem label={t.account.privacyPolicy} onPress={() => router.push('/legal/privacy')} />
         <View style={styles.aboutDivider} />
         <AboutItem label={t.account.termsOfService} onPress={() => router.push('/legal/terms')} />
