@@ -19,6 +19,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { palette } from '@/lib/theme';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { useAppStore, useTranslation } from '@/store/useAppStore';
 
 export default function HomeScreen() {
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const favorites = useAppStore((s) => s.favoriteTeamIds);
   const { data: matches, isLoading, isError, refetch } = useMatches();
   const { data: predictions } = usePredictions();
+  const resolve = useResolveMatch();
 
   const derived = useMemo(() => {
     const all = matches ?? [];
@@ -43,6 +45,8 @@ export default function HomeScreen() {
 
   const { live, today, upNext } = derived;
   const hasLive = live.length > 0;
+  // Fill an undecided knockout next-match with its qualified teams.
+  const heroMatch = upNext ? resolve(upNext).match : undefined;
 
   return (
     <ScreenFrame>
@@ -66,12 +70,12 @@ export default function HomeScreen() {
               </View>
               <View style={styles.heroTeams}>
                 <TeamFlag
-                  team={upNext.home_team_id ? teamsById[upNext.home_team_id] : undefined}
+                  team={heroMatch?.home_team_id ? teamsById[heroMatch.home_team_id] : undefined}
                   size={24}
                 />
                 <Text style={styles.heroVs}>{t.common.vs}</Text>
                 <TeamFlag
-                  team={upNext.away_team_id ? teamsById[upNext.away_team_id] : undefined}
+                  team={heroMatch?.away_team_id ? teamsById[heroMatch.away_team_id] : undefined}
                   size={24}
                   reverse
                 />
@@ -125,14 +129,18 @@ export default function HomeScreen() {
         {/* Today — full-width cards, same as Your teams */}
         <Section title={t.home.todaysMatches}>
           {today.length ? (
-            today.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                prediction={predictions?.[m.id] ?? null}
-                onPress={() => openMatchTeam(m)}
-              />
-            ))
+            today.map((m) => {
+              const { match, home, away } = resolve(m);
+              return (
+                <MatchCard
+                  key={m.id}
+                  match={match}
+                  prediction={predictions?.[m.id] ?? null}
+                  onPress={() => openMatchTeam(match)}
+                  qualMark={{ home, away }}
+                />
+              );
+            })
           ) : (
             <GlassCard>
               <Text style={styles.emptyInline}>{t.home.noMatchesToday}</Text>

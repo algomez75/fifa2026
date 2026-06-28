@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
 import { ChallengeModal, type ChallengeTarget } from '@/components/ChallengeModal';
+import { MatchCard } from '@/components/MatchCard';
 import { EmptyState, LoadingState } from '@/components/States';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
 import type { Match, MyChallengeRow, NotificationRow } from '@/lib/database.types';
@@ -13,6 +14,7 @@ import { useChallenges } from '@/hooks/useChallenges';
 import { useInbox, useMarkRead } from '@/hooks/useInbox';
 import { useMatches } from '@/hooks/useMatches';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { useTranslation } from '@/store/useAppStore';
 
 export default function NotificationsScreen() {
@@ -24,6 +26,7 @@ export default function NotificationsScreen() {
   const markRead = useMarkRead();
   const { data: matches } = useMatches();
   const { requireAccount } = useRequireAccount();
+  const resolve = useResolveMatch();
   const [accept, setAccept] = useState<ChallengeTarget | null>(null);
 
   const matchesById = useMemo(() => {
@@ -101,21 +104,33 @@ export default function NotificationsScreen() {
               });
             };
 
+            const resolved = match ? resolve(match) : undefined;
+
             return (
               <Pressable
                 onPress={open}
                 disabled={!canRespond}
                 style={[styles.row, !item.read && styles.rowUnread]}>
-                <Avatar name={item.actor_name} size={36} ring={false} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.text}>
-                    <Text style={styles.actor}>{item.actor_name}</Text> {labelFor(item)}
-                  </Text>
-                  {canRespond ? (
-                    <Text style={styles.hint}>{t.challenge.acceptQuestion}</Text>
-                  ) : null}
+                <View style={styles.notifTop}>
+                  <Avatar name={item.actor_name} size={36} ring={false} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.text}>
+                      <Text style={styles.actor}>{item.actor_name}</Text> {labelFor(item)}
+                    </Text>
+                    {canRespond ? (
+                      <Text style={styles.hint}>{t.challenge.acceptQuestion}</Text>
+                    ) : null}
+                  </View>
+                  {canRespond ? <ChevronRightIcon color={palette.textTertiary} size={18} /> : null}
                 </View>
-                {canRespond ? <ChevronRightIcon color={palette.textTertiary} size={18} /> : null}
+                {/* Full match info: real flags + names (R32 resolved), date, score */}
+                {resolved ? (
+                  <MatchCard
+                    match={resolved.match}
+                    qualMark={{ home: resolved.home, away: resolved.away }}
+                    onPress={canRespond ? () => open() : undefined}
+                  />
+                ) : null}
               </Pressable>
             );
           }}
@@ -148,15 +163,14 @@ const styles = StyleSheet.create({
   link: { color: palette.gold, fontSize: 13, fontWeight: '800' },
   list: { paddingHorizontal: 20, paddingBottom: 60, gap: 8 },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: 10,
     backgroundColor: palette.card,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: palette.border,
     padding: 12,
   },
+  notifTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowUnread: { borderColor: palette.gold, backgroundColor: palette.cardElevated },
   text: { color: palette.text, fontSize: 14, lineHeight: 19 },
   actor: { fontWeight: '800' },

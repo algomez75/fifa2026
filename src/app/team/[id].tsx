@@ -19,6 +19,7 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { ageFromDob, useSquad } from '@/hooks/useSquad';
 import { useTranslation } from '@/store/useAppStore';
 
@@ -32,6 +33,7 @@ export default function TeamDetailScreen() {
   const { data: squad } = useSquad(id);
   const { data: predictions } = usePredictions();
   const { requireAccount } = useRequireAccount();
+  const resolve = useResolveMatch();
   const [predicting, setPredicting] = useState<Match | null>(null);
 
   // Favorites/predictions need a real account; prompt guests to sign in.
@@ -159,14 +161,18 @@ export default function TeamDetailScreen() {
 
         <Text style={styles.sectionTitle}>{t.team.matches}</Text>
         <View style={{ gap: 10 }}>
-          {[...teamMatches.upcoming, ...teamMatches.past].map((m) => (
-            <MatchCard
-              key={m.id}
-              match={m}
-              prediction={predictions?.[m.id] ?? null}
-              onPress={openPrediction}
-            />
-          ))}
+          {[...teamMatches.upcoming, ...teamMatches.past].map((m) => {
+            const { match, home, away } = resolve(m);
+            return (
+              <MatchCard
+                key={m.id}
+                match={match}
+                prediction={predictions?.[m.id] ?? null}
+                onPress={openPrediction}
+                qualMark={{ home, away }}
+              />
+            );
+          })}
         </View>
 
         {/* Squad */}

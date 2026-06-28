@@ -10,6 +10,7 @@ import { teamsById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { TeamFlag } from '@/components/TeamFlag';
 import { useCreateChallenge, useRespondChallenge } from '@/hooks/useChallenges';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { useTranslation } from '@/store/useAppStore';
 
 export interface ChallengeTarget {
@@ -33,6 +34,7 @@ export function ChallengeModal({
   const { t, language } = useTranslation();
   const create = useCreateChallenge();
   const respond = useRespondChallenge();
+  const resolve = useResolveMatch();
   const [side, setSide] = useState<ChallengeSide>('home');
   const [margin, setMargin] = useState(1);
   // For an incoming challenge: show what it is first ('detail'), then the pick.
@@ -45,7 +47,9 @@ export function ChallengeModal({
   }, [target]);
 
   if (!target) return null;
-  const { match } = target;
+  // Fill undecided R32 sides with the real-time qualified teams so the sheet
+  // shows real flags + names (not "Winner A"). `match.id` is unchanged.
+  const { match } = resolve(target.match);
   const home = match.home_team_id ? teamsById[match.home_team_id] : undefined;
   const away = match.away_team_id ? teamsById[match.away_team_id] : undefined;
   const busy = create.isPending || respond.isPending;

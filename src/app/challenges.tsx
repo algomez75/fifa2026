@@ -6,15 +6,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { ChallengeModal, type ChallengeTarget } from '@/components/ChallengeModal';
 import { EmptyState, LoadingState } from '@/components/States';
+import { TeamFlag } from '@/components/TeamFlag';
 import { ChevronLeftIcon } from '@/components/icons';
 import type { ChallengeSide, Match, MyChallengeRow } from '@/lib/database.types';
-import { formatMatchDay, teamName } from '@/lib/format';
+import { formatMatchDay, sideName, teamName } from '@/lib/format';
 import type { Language } from '@/lib/i18n';
 import { teamsById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { useChallenges, useRespondChallenge } from '@/hooks/useChallenges';
 import { useMatches } from '@/hooks/useMatches';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { useTranslation } from '@/store/useAppStore';
 
 export default function ChallengesScreen() {
@@ -25,6 +27,7 @@ export default function ChallengesScreen() {
   const respond = useRespondChallenge();
   const { data: matches } = useMatches();
   const { requireAccount } = useRequireAccount();
+  const resolve = useResolveMatch();
   const [accept, setAccept] = useState<ChallengeTarget | null>(null);
 
   const matchesById = useMemo(() => {
@@ -52,26 +55,30 @@ export default function ChallengesScreen() {
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <ChallengeRow
-              row={item}
-              match={matchesById[item.match_id]}
-              language={language}
-              t={t}
-              onAccept={() => {
-                if (!requireAccount()) return;
-                setAccept({
-                  match: matchesById[item.match_id],
-                  mode: 'accept',
-                  challengeId: item.id,
-                  opponentName: item.other_name,
-                  opponentSide: item.their_side,
-                  opponentMargin: item.their_margin,
-                });
-              }}
-              onDecline={() => respond.mutate({ id: item.id, accept: false })}
-            />
-          )}
+          renderItem={({ item }) => {
+            const raw = matchesById[item.match_id];
+            const match = raw ? resolve(raw).match : undefined;
+            return (
+              <ChallengeRow
+                row={item}
+                match={match}
+                language={language}
+                t={t}
+                onAccept={() => {
+                  if (!raw || !requireAccount()) return;
+                  setAccept({
+                    match: raw, // ChallengeModal resolves R32 sides internally
+                    mode: 'accept',
+                    challengeId: item.id,
+                    opponentName: item.other_name,
+                    opponentSide: item.their_side,
+                    opponentMargin: item.their_margin,
+                  });
+                }}
+                onDecline={() => respond.mutate({ id: item.id, accept: false })}
+              />
+            );
+          }}
         />
       )}
 
@@ -124,6 +131,9 @@ function ChallengeRow({
   else if (row.status === 'accepted') badge = { label: t.challenge.accepted, color: palette.success };
   else if (isPendingSent) badge = { label: t.challenge.waiting, color: palette.textSecondary };
 
+  const home = match?.home_team_id ? teamsById[match.home_team_id] : undefined;
+  const away = match?.away_team_id ? teamsById[match.away_team_id] : undefined;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -138,13 +148,17 @@ function ChallengeRow({
         ) : null}
       </View>
 
-      <Text style={styles.matchLine}>
-        {match
-          ? `${teamName(match.home_team_id ? teamsById[match.home_team_id] : undefined, language)} – ${teamName(match.away_team_id ? teamsById[match.away_team_id] : undefined, language)}`
-          : row.match_id}
-        {'  ·  '}
-        {formatMatchDay(row.kickoff_utc, language)}
-      </Text>
+      {/* Match: real flags + names (R32 resolved) + date */}
+      <View style={styles.matchRow}>
+        <TeamFlag team={home} size={18} showName={false} />
+        <Text style={styles.matchTeams} numberOfLines={1}>
+          {match
+            ? `${sideName(match.home_team_id, match.home_placeholder, language)} – ${sideName(match.away_team_id, match.away_placeholder, language)}`
+            : row.match_id}
+        </Text>
+        <TeamFlag team={away} size={18} showName={false} />
+      </View>
+      <Text style={styles.matchDay}>{formatMatchDay(row.kickoff_utc, language)}</Text>
 
       {row.status !== 'pending' || row.role === 'challenger' ? (
         <View style={styles.picks}>
@@ -213,7 +227,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     overflow: 'hidden',
   },
-  matchLine: { color: palette.textSecondary, fontSize: 13 },
+  matchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  matchTeams: { color: palette.text, fontSize: 13.5, fontWeight: '700', flex: 1 },
+  matchDay: { color: palette.textSecondary, fontSize: 12, marginTop: -2 },
   picks: { gap: 3 },
   pick: { color: palette.text, fontSize: 13 },
   pickWho: { color: palette.textSecondary, fontWeight: '700' },

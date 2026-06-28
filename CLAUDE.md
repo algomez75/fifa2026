@@ -302,6 +302,28 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-27 — Resolved R32 teams everywhere a match is shown (challenges/notifications/home/team) (OTA)
+
+- **New `useResolveMatch()` hook** centralizes the Schedule's real-time R32 fill
+  (`useBracketQualifiers` + `resolveMatchTeams`): `resolve(match)` → `{ match
+  (augmented), home/away: { qualified, locked } }`. Drop-in anywhere a match
+  renders so a knockout fixture always shows real flags + names + the
+  locked/provisional marker instead of "Winner A".
+- **Applied across every remaining match surface** (Schedule + the R32-predict
+  flow were already done):
+  - `ChallengeModal` resolves its `target.match` internally → the accept/create
+    sheet always shows real teams (fixes accept opened from notifications /
+    challenges, where the match arrived raw).
+  - **Notifications**: each challenge notification now embeds a full resolved
+    `MatchCard` (flags, names, stage, date/score) below the actor line.
+  - **Challenges** screen: each row shows resolved flags + names + date.
+  - **Team detail**: a qualified team's R32 fixture shows the real opponent.
+  - **Home**: the next-match hero + today cards resolve their teams.
+- **JS-only → OTA.** Typecheck clean; no new lint errors (the two ChallengeModal
+  lint hits are the pre-existing form-reset `useEffect`). New file
+  `hooks/useResolveMatch.ts`; touched `ChallengeModal`, `notifications`,
+  `challenges`, `team/[id]`, `(tabs)/index`.
+
 ### 2026-06-27 — Player profile: live + played only, challenge moved to header (OTA)
 
 - **Profile predictions list (`/user/[id]`, tapped from the Ranking) now shows
