@@ -302,7 +302,7 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
-### 2026-06-27 — Schedule fills R32 with qualified teams + predict them (OTA, code-complete)
+### 2026-06-27 — Schedule fills R32 with qualified teams + predict them (OTA)
 
 - **Feature:** the **Schedule** tab now drops each securely-qualified group
   winner/runner-up into its R32 (knockout) slot **in real time**, exactly like
@@ -326,10 +326,13 @@ development-simulator / preview / production profiles).
   Home/team/user cards unchanged) rendering the bracket's **solid gold dot**
   (seed locked) / **hollow gold ring** (provisional) next to the resolved team,
   reusing `t.groups.qualified` / `qualifiedProvisional`.
-- **JS-only → OTA-ready** (no migration/server change). Typecheck clean;
-  `qualification.test.ts` ALL PASS. **Pending OTA publish** (`--environment
-  production`, verify real Supabase ref in `dist/` before announcing — iOS
-  runtime `2c3aa583…` = live 1.0.1 build, Android `c50144db…`). Files:
+- **JS-only → shipped via OTA** (no migration/server change). Typecheck clean;
+  `qualification.test.ts` ALL PASS; lint of touched files clean. Published to
+  `production` with `--environment production` (commit `d01fa99`): iOS runtime
+  `2c3aa583…` (= live 1.0.1 build → reaches users) group
+  `7ec8e515-29bb-4433-aa2b-643d891e22ed`, Android `c50144db…` group
+  `a9bc0044-425e-4d79-83d7-92cc719be4d8`. Real Supabase ref verified in the
+  `dist/` bundle (2× `xqjupomaqomneqiugbft`, 0 placeholder). Files:
   `lib/qualification.ts`, `app/(tabs)/schedule.tsx`, `components/MatchCard.tsx`,
   `components/BracketTree.tsx`.
 
