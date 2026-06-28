@@ -5,11 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
 import { ChallengeModal, type ChallengeTarget } from '@/components/ChallengeModal';
+import { challengePickLabel } from '@/components/ChallengeDetails';
 import { EmptyState, LoadingState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
 import { ChevronLeftIcon } from '@/components/icons';
-import type { ChallengeSide, Match, MyChallengeRow } from '@/lib/database.types';
-import { formatMatchDay, sideName, teamName } from '@/lib/format';
+import type { Match, MyChallengeRow } from '@/lib/database.types';
+import { formatMatchDay, sideName } from '@/lib/format';
 import type { Language } from '@/lib/i18n';
 import { teamsById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
@@ -87,24 +88,6 @@ export default function ChallengesScreen() {
   );
 }
 
-function pickLabel(
-  side: ChallengeSide | null,
-  margin: number | null,
-  match: Match | undefined,
-  t: ReturnType<typeof useTranslation>['t'],
-  lang: Language,
-): string {
-  if (!side) return '—';
-  if (side === 'draw') return t.challenge.draw;
-  const team = match
-    ? side === 'home'
-      ? match.home_team_id && teamsById[match.home_team_id]
-      : match.away_team_id && teamsById[match.away_team_id]
-    : undefined;
-  const name = team ? teamName(team, lang) : side;
-  return `${name} ${t.challenge.byGoals} ${margin ?? 0}`;
-}
-
 function ChallengeRow({
   row,
   match,
@@ -164,12 +147,12 @@ function ChallengeRow({
         <View style={styles.picks}>
           <Text style={styles.pick}>
             <Text style={styles.pickWho}>{t.challenge.yourPick}: </Text>
-            {pickLabel(row.my_side, row.my_margin, match, t, language)}
+            {challengePickLabel(row.my_side, row.my_margin, match, t, language)}
           </Text>
           {row.their_side ? (
             <Text style={styles.pick}>
               <Text style={styles.pickWho}>{t.challenge.theirPick}: </Text>
-              {pickLabel(row.their_side, row.their_margin, match, t, language)}
+              {challengePickLabel(row.their_side, row.their_margin, match, t, language)}
             </Text>
           ) : null}
         </View>

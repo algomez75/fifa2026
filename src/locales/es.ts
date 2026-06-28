@@ -227,6 +227,8 @@ export const es: Translation = {
     goals: 'goles',
     waiting: 'Esperando al rival',
     pts: 'pts',
+    termsTitle: 'Lo pactado',
+    stakes: 'Gana el pronóstico más cercano +3 · empate +1',
   },
   notif: {
     title: 'Notificaciones',

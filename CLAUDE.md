@@ -302,6 +302,30 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-28 — Notifications show the full challenge terms to both players (OTA)
+
+- **Ask:** when a challenge is accepted, both players should see in their inbox
+  exactly what was pacted (each side's pick + margin + the stakes), not just the
+  match card.
+- **New shared `ChallengeDetails`** (`components/ChallengeDetails.tsx`): renders the
+  agreed terms from a `MyChallengeRow` — both picks ("You: Mexico by 2" /
+  "{other}: Draw"), the stakes line (`challenge.stakes` = "closest prediction wins
+  +3 · tie +1"), and the status/outcome badge. POV-correct, so the challenger and
+  the opponent each see "You" vs the other player. Exports `challengePickLabel`
+  (lifted out of `challenges.tsx`, which now imports it — DRY).
+- **No server change for "both players":** the trigger only notifies the
+  challenger on accept, but the opponent's original `challenge_received` row
+  **persists** and `get_my_challenges` returns the now-`accepted` challenge from
+  their POV — so rendering `ChallengeDetails` on every challenge notification means
+  the challenger sees it on `challenge_accepted` and the opponent on their kept
+  `challenge_received`. Both see the same terms. Also covers received (pre-accept →
+  shows the challenger's pick) and declined.
+- **JS-only → OTA** (iOS `2c3aa583…` = live 1.0.1 build, Android `c50144db…`; real
+  Supabase ref + new `stakes`/`termsTitle` strings verified in `dist/`). Typecheck
+  clean; the one notifications lint hit is the pre-existing `Date.now()`-in-render
+  `canRespond` check, not new. Files: `components/ChallengeDetails.tsx` (new),
+  `app/notifications.tsx`, `app/challenges.tsx`, `en.ts`/`es.ts`.
+
 ### 2026-06-27 — Server ingests knockout matchups from football-data (real R32+ crosses) (server-only)
 
 - **The missing data source.** The client already resolved R32 *group* slots

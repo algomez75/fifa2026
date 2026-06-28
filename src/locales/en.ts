@@ -226,6 +226,8 @@ export const en = {
     goals: 'goals',
     waiting: 'Waiting for opponent',
     pts: 'pts',
+    termsTitle: 'The bet',
+    stakes: 'Closest prediction wins +3 · tie +1',
   },
   notif: {
     title: 'Notifications',

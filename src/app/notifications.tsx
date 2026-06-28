@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
+import { ChallengeDetails } from '@/components/ChallengeDetails';
 import { ChallengeModal, type ChallengeTarget } from '@/components/ChallengeModal';
 import { MatchCard } from '@/components/MatchCard';
 import { EmptyState, LoadingState } from '@/components/States';
@@ -130,6 +131,12 @@ export default function NotificationsScreen() {
                     qualMark={{ home: resolved.home, away: resolved.away }}
                     onPress={canRespond ? () => open() : undefined}
                   />
+                ) : null}
+                {/* What was pacted: both picks + stakes + outcome — shown to both
+                    players (challenger via "accepted", opponent via their kept
+                    "received" notification once it's accepted). */}
+                {challenge ? (
+                  <ChallengeDetails row={challenge} match={resolved?.match} />
                 ) : null}
               </Pressable>
             );
