@@ -125,7 +125,10 @@ Deno.serve(async () => {
         `and(status.eq.finished,home_score.is.null,kickoff_utc.gte.${backfillStart}),` +
         // Undecided knockout fixtures (any date): pull them in so the LIST loop
         // can fill home/away_team_id the moment football-data assigns the matchup.
-        `and(stage.neq.group,status.neq.finished,home_team_id.is.null)`,
+        // Match while EITHER side is still null — football-data assigns homeTeam
+        // first, so keying on home-only dropped the row the instant home filled
+        // and the away side (e.g. a best-third) never got written.
+        `and(stage.neq.group,status.neq.finished,or(home_team_id.is.null,away_team_id.is.null))`,
     );
   if (gErr) return Response.json({ error: gErr.message }, { status: 500 });
   if (!active || active.length === 0)

@@ -302,6 +302,36 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-28 — Fix half-filled knockout crosses (away side never written) (server-only)
+
+- **Bug (follow-up to the 2026-06-27 knockout-ingestion entry):** after the group
+  stage ended, the Bracket showed each R32 with its **home** team but several
+  **away** sides stuck on the placeholder ("3rd E/H/I/J/K", even "Runner-up J" —
+  a plain group runner-up that's definitely known). Live DB: R32 was `16/16` home
+  but only `12/16` away; football-data's LIST already carried all 16 away teams
+  (England–DR Congo, Belgium–Senegal, Spain–Austria, Switzerland–Algeria).
+- **Root cause — the `active` query clause.** Part A pulled undecided knockouts in
+  with `and(stage.neq.group,status.neq.finished,home_team_id.is.null)`. football-data
+  assigns `homeTeam.id` **first**; the moment `sync-scores` wrote `home_team_id`,
+  the row stopped matching `home_team_id.is.null`, **fell out of the sync set**, and
+  its away side (often a best-third, assigned a bit later) never got written —
+  unless the fixture happened to enter its ±90min kickoff window. So home-known /
+  away-unknown crosses froze indefinitely.
+- **Fix — match while EITHER side is null:**
+  `and(stage.neq.group,status.neq.finished,or(home_team_id.is.null,away_team_id.is.null))`.
+  The row stays in the sync set until **both** sides are written, then drops out
+  (no churn — once both filled it matches neither null branch). The detail-target
+  far-future guard already excludes these from the expensive `/matches/{id}` fetch,
+  so zero added API cost. Covers R16→Final the same way as each round is decided.
+- **Verified:** deployed `sync-scores` (`--project-ref xqjupomaqomneqiugbft`); on
+  the next cron tick R32 went `12/16 → 16/16` away (R32-8 eng–cod, R32-10 bel–sen,
+  R32-12 esp–aut, R32-13 sui–alg) and the active set settled back to `inWindow:17`
+  (the 16 still-undecided R16+ + the live match), confirming no re-write churn.
+- **Server-only → reaches every user instantly, NO OTA** (Bracket / Schedule /
+  Ranking / notifications all read `home_team_id`/`away_team_id` live; the server
+  id always wins). Reversible (redeploy the prior version). File:
+  `supabase/functions/sync-scores/index.ts` (one clause).
+
 ### 2026-06-28 — Notifications show the full challenge terms to both players (OTA)
 
 - **Ask:** when a challenge is accepted, both players should see in their inbox
