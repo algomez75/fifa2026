@@ -302,6 +302,22 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-27 — Player profile: live + played only, challenge moved to header (OTA)
+
+- **Profile predictions list (`/user/[id]`, tapped from the Ranking) now shows
+  only LIVE + already-played events** — upcoming/scheduled picks are hidden (they
+  were locked/blank anyway). Same timeline order: in-play on top, then finished
+  newest-first (`sortedRows` filters `status !== 'scheduled'`; empty-state keys on
+  the filtered length so an all-upcoming profile still shows the empty state).
+- **Challenges preserved + improved.** The ⚔️ challenge entry used to live on a
+  player's upcoming prediction rows (now hidden), so it moved to a **"⚔️ Retar"
+  button in the profile header** → opens an upcoming-match **picker** (any
+  `scheduled` fixture, soonest first, rendered as tappable `MatchCard`s) →
+  selecting one opens the existing `ChallengeModal` in create mode. You can now
+  challenge on ANY upcoming match, not only ones the opponent predicted. Removed
+  the dead per-row challenge button from `PredItem`.
+- **JS-only → OTA.** Typecheck + lint clean. File: `app/user/[id].tsx`.
+
 ### 2026-06-27 — Schedule fills R32 with qualified teams + predict them (OTA)
 
 - **Feature:** the **Schedule** tab now drops each securely-qualified group
