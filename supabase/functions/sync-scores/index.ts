@@ -117,12 +117,15 @@ Deno.serve(async () => {
   const { data: active, error: gErr } = await supabase
     .from('matches')
     .select(
-      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, injury_time, updated_at',
+      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, injury_time, kickoff_utc, updated_at',
     )
     .or(
       `and(status.neq.finished,kickoff_utc.lte.${soon},kickoff_utc.gte.${windowStart}),` +
         `and(status.eq.finished,kickoff_utc.gte.${recentFinish}),` +
-        `and(status.eq.finished,home_score.is.null,kickoff_utc.gte.${backfillStart})`,
+        `and(status.eq.finished,home_score.is.null,kickoff_utc.gte.${backfillStart}),` +
+        // Undecided knockout fixtures (any date): pull them in so the LIST loop
+        // can fill home/away_team_id the moment football-data assigns the matchup.
+        `and(stage.neq.group,status.neq.finished,home_team_id.is.null)`,
     );
   if (gErr) return Response.json({ error: gErr.message }, { status: 500 });
   if (!active || active.length === 0)
@@ -164,12 +167,48 @@ Deno.serve(async () => {
   // /matches/{id} goals[] can never wipe good rows.
   const expectedGoalsByMatch = new Map<string, number>();
 
+  // Teams lookup (small) — needed in the loop to translate football-data's
+  // homeTeam.id → our team id (knockout matchup fill), and later for push labels.
+  const { data: teams } = await supabase
+    .from('teams')
+    .select('id, fd_team_id, name, flag_emoji')
+    .not('fd_team_id', 'is', null);
+  const teamByFdId = new Map((teams ?? []).map((t: any) => [t.fd_team_id, t.id]));
+  const teamById = new Map((teams ?? []).map((t: any) => [t.id, t]));
+  const teamName = (id: string | null) => (id ? teamById.get(id)?.name ?? 'TBD' : 'TBD');
+  const teamFlag = (id: string | null) => (id ? teamById.get(id)?.flag_emoji ?? '' : '');
+
   let updated = 0;
   for (const m of fdMatches) {
     const prior = priorByFixture.get(m.id);
     if (!prior) continue; // outside our sync window → leave it alone
+
+    // Knockout matchup fill: football-data assigns homeTeam/awayTeam the moment a
+    // fixture is decided (even while still TIMED). Translate fd ids → ours and
+    // fill only a side that's still null (never overwrite a known id with null).
+    const fillHome = teamByFdId.get(m.homeTeam?.id) ?? null;
+    const fillAway = teamByFdId.get(m.awayTeam?.id) ?? null;
+    const teamFill: Record<string, string> = {};
+    if (fillHome && prior.home_team_id == null) teamFill.home_team_id = fillHome;
+    if (fillAway && prior.away_team_id == null) teamFill.away_team_id = fillAway;
+    const nextHomeTeam = teamFill.home_team_id ?? prior.home_team_id ?? null;
+    const nextAwayTeam = teamFill.away_team_id ?? prior.away_team_id ?? null;
+
     const status = mapStatus(m.status);
-    if (!status) continue; // SCHEDULED/TIMED/etc → no live data to write yet
+    if (!status) {
+      // Not live/finished yet (SCHEDULED/TIMED) → no scores to write, but persist
+      // a newly-known knockout matchup so the bracket / upcoming / pushes get the
+      // real teams early. Written once; next tick teamFill is empty → no churn.
+      if (Object.keys(teamFill).length) {
+        const { error } = await supabase
+          .from('matches')
+          .update(teamFill)
+          .eq('api_football_fixture_id', m.id);
+        if (error) errors.push(`fill ${m.id}: ${error.message}`);
+        else updated++;
+      }
+      continue;
+    }
 
     const ft = m.score?.fullTime ?? {};
     const ht = m.score?.halfTime ?? {};
@@ -190,6 +229,7 @@ Deno.serve(async () => {
       period,
       injury_time: injuryTime,
       status,
+      ...teamFill,
     };
 
     if (status === 'live') liveNow.add(prior.id);
@@ -240,6 +280,8 @@ Deno.serve(async () => {
       next.minute === (prior.minute ?? null) &&
       next.period === priorPeriod &&
       next.injury_time === (prior.injury_time ?? null) &&
+      nextHomeTeam === (prior.home_team_id ?? null) &&
+      nextAwayTeam === (prior.away_team_id ?? null) &&
       next.status === priorStatus;
     if (noChange) continue;
 
@@ -250,16 +292,6 @@ Deno.serve(async () => {
     if (error) errors.push(`update ${m.id}: ${error.message}`);
     else updated++;
   }
-
-  // Teams lookup (small) — always needed for push labels + FD-id mapping.
-  const { data: teams } = await supabase
-    .from('teams')
-    .select('id, fd_team_id, name, flag_emoji')
-    .not('fd_team_id', 'is', null);
-  const teamByFdId = new Map((teams ?? []).map((t: any) => [t.fd_team_id, t.id]));
-  const teamById = new Map((teams ?? []).map((t: any) => [t.id, t]));
-  const teamName = (id: string | null) => (id ? teamById.get(id)?.name ?? 'TBD' : 'TBD');
-  const teamFlag = (id: string | null) => (id ? teamById.get(id)?.flag_emoji ?? '' : '');
 
   // 3. Decide which matches actually need a DETAIL fetch this tick.
   const activeIds = active.map((r: any) => r.id);
@@ -283,6 +315,14 @@ Deno.serve(async () => {
   const detailTargets = (active as any[]).filter((row) => {
     if (!row.api_football_fixture_id) return false;
     if (needsDetail.has(row.id) || unsettled.has(row.id)) return true;
+    // Far-future fixtures (e.g. undecided knockouts pulled in only to fill their
+    // matchup) have no lineup/stats yet → never fetch their detail.
+    if (
+      !liveNow.has(row.id) &&
+      row.kickoff_utc &&
+      Date.parse(row.kickoff_utc) > now + 100 * 60_000
+    )
+      return false;
     const age = detailAt.has(row.id) ? now - (detailAt.get(row.id) as number) : Infinity;
     const floor = liveNow.has(row.id) ? DETAIL_FLOOR_LIVE : DETAIL_FLOOR_IDLE;
     return age >= floor;

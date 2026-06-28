@@ -302,6 +302,38 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-27 — Server ingests knockout matchups from football-data (real R32+ crosses) (server-only)
+
+- **The missing data source.** The client already resolved R32 *group* slots
+  provisionally (`useBracketQualifiers`/`resolveMatchTeams`), but the authoritative
+  knockout crosses — winners' brackets, **best-thirds**, and each later round as it's
+  decided — only football-data knows. football-data's cheap LIST
+  (`/competitions/WC/matches`, polled every ~5s) **already carries
+  `homeTeam.id`/`awayTeam.id`** for knockout fixtures the moment they're assigned
+  (verified live: LAST_32 RSA vs CAN), and `sync-scores` already read them — but
+  **only for push labels, never written to `matches`**. So all 32 knockout rows sat
+  at `home_team_id = null` while Apple-Sports-style apps showed the crosses.
+- **Fix (`sync-scores`):** translate `m.homeTeam?.id`→our id via the existing
+  `teamByFdId` map and **write `home_team_id`/`away_team_id`** in the LIST loop —
+  filling only a still-null side (never overwriting a known id). Persists even for
+  `TIMED`/`SCHEDULED` fixtures (before kickoff) via a minimal pre-`continue` update;
+  written **once** then the `noChange` guard skips it (no churn). The `active` query
+  was widened with `and(stage.neq.group,status.neq.finished,home_team_id.is.null)` to
+  pull in undecided knockouts regardless of date; the detail loop **excludes
+  far-future** (`kickoff > now+100min`) fixtures so it never burns 32 detail fetches.
+  Covers R32→R16→QF→SF→3rd→Final progressively (each round's winner appears as the
+  next round's `homeTeam`).
+- **Reaches the live app with NO OTA** — every surface already reads `home_team_id`
+  (bracket, Schedule/Home upcoming, ranking predictions, **notifications** via
+  `teamName(id)`), so the real crosses appeared instantly; also fixes knockout **goal
+  pushes** that were skipped when team ids were null (`sync-scores` line ~539). Pairs
+  with the client `useResolveMatch` work below (client = early provisional group fill;
+  server = authoritative incl. thirds).
+- **Verified live:** after deploy, R32 went 0→14/16 home + 12/16 away with real ids
+  (rsa/can/ger/par/ned/mar/usa/arg/…); the rest fill as Group K + best-thirds finalize.
+  No migration; columns exist (003). Deployed `sync-scores` (`--project-ref
+  xqjupomaqomneqiugbft`). File: `supabase/functions/sync-scores/index.ts`.
+
 ### 2026-06-27 — Resolved R32 teams everywhere a match is shown (challenges/notifications/home/team) (OTA)
 
 - **New `useResolveMatch()` hook** centralizes the Schedule's real-time R32 fill
