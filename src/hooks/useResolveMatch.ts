@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import type { Match } from '@/lib/database.types';
-import { resolveMatchTeams } from '@/lib/qualification';
+import { resolveBracket } from '@/lib/qualification';
 
 import { useBracketQualifiers } from './useBracketQualifiers';
 import { useMatches } from './useMatches';
@@ -14,19 +14,28 @@ export interface ResolvedDisplayMatch {
   away: { qualified: boolean; locked: boolean };
 }
 
+const TBD = { qualified: false, locked: false };
+
 /**
- * Returns a `resolve(match)` that fills undecided R32 knockout slots with their
- * securely-qualified teams in real time (the same source as the Bracket /
- * Schedule), plus the locked/provisional markers. Use anywhere a match is shown
- * so a knockout fixture always renders real flags + names instead of
+ * Returns a `resolve(match)` that fills undecided knockout slots with their
+ * real-time team in every round — a securely-qualified group team for R32, and
+ * the winner/loser of a finished feeder for R16→Final (Apple-Sports progression,
+ * resolved to a fixed point so it propagates through the rounds). Use anywhere a
+ * match is shown so a knockout fixture renders real flags + names instead of
  * "Winner A". Predictions/challenges still key off the unchanged `match.id`.
  */
 export function useResolveMatch() {
   const { data: matches } = useMatches();
   const qualifiers = useBracketQualifiers(matches ?? []);
+  // One fixed-point resolve for the whole bracket, shared across every resolve().
+  const bracket = useMemo(
+    () => resolveBracket(matches ?? [], qualifiers),
+    [matches, qualifiers],
+  );
   return useCallback(
     (m: Match): ResolvedDisplayMatch => {
-      const r = resolveMatchTeams(m, qualifiers);
+      const r = bracket.get(m.id); // only knockout matches are in the map
+      if (!r) return { match: m, home: TBD, away: TBD };
       const match =
         r.home.teamId === m.home_team_id && r.away.teamId === m.away_team_id
           ? m
@@ -37,6 +46,6 @@ export function useResolveMatch() {
         away: { qualified: r.away.isQualified, locked: r.away.isLocked },
       };
     },
-    [qualifiers],
+    [bracket],
   );
 }

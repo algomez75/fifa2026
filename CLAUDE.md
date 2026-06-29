@@ -302,6 +302,46 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-29 — Apple-Sports bracket: tree layout + 2D snap-scroll + real-time progression (OTA)
+
+- **Ask:** rebuild the Groups→Bracket view like Apple Sports — scrolling right
+  hides past rounds and reveals the next; a real TREE where a winner drops into
+  the same path as its next match (Canada won R32-1 → sits in the R16 slot
+  awaiting Morocco/Netherlands); the GS R32 R16 QF SF F navigator with a sliding
+  2-cell window; GS as the first page.
+- **Designed via a research+design workflow** (3 parallel agents: stack audit ·
+  Reanimated-4/SDK-56 2D-scroll · progression resolver → synthesis), then an
+  adversarial review workflow (3 lenses → per-finding verify, 13 raw → 2 confirmed).
+- **Tree layout** (`components/bracket/layout.ts`, pure): each match is placed at
+  the vertical midpoint of its two feeders, from the real WC26 feeding graph. R32
+  leaf order is a DFS from the Final — `2,5,1,3,11,12,9,10,4,6,7,8,14,16,13,15` —
+  which makes every R16 pair two ADJACENT leaves (planar, no crossing
+  connectors) and matches the reference screenshots exactly.
+- **Real-time progression** (`lib/qualification.ts`): new `parseProgressionSlot`
+  (`"Winner R32-2"`/`"Loser SF-1"`), `winningSide`/`winnerOf`/`loserOf` (regulation
+  /ET score then penalties), and `resolveBracket` which resolves every knockout
+  side — server id → group clinch (R32) → winner/loser of a FINISHED feeder → TBD.
+  Resolves to a **fixed point** so a finished intermediate round (whose own ids
+  aren't server-written yet) still feeds the next round; only `confirmed` ids
+  propagate (never a provisional group clinch). `useResolveMatch` now uses it, so
+  Schedule/Home/notifications also show R16→Final progression. 24 unit tests pass.
+- **2D scroll + navigator** (`components/BracketTree.tsx` rewrite +
+  `bracket/{BracketCell,BracketConnectors,BracketGroupsColumn,BracketNavigator}`):
+  outer vertical `ScrollView` wraps an inner horizontal `Animated.ScrollView`
+  (`useScrollOffset` → returns the horizontal offset; `snapToInterval = COL_W`
+  where `COL_W = (screenW−2·H_PAD)/2` so exactly 2 stages fill the screen and max
+  scroll = `4·COL_W`). The navigator's translucent 2-cell window interpolates
+  `scrollX → translateX` to track the scroll and reaches `[SF,F]` at full scroll;
+  per-label color animates white↔dim; tap jumps via `scheduleOnUI(scrollTo)` (the
+  non-deprecated Reanimated-4 path). Connectors are absolute Views. GS column =
+  12 compact standings (rank·flag·name·pts; falls back to the 3-letter code on
+  ≤320pt). Final + a separate Third-Place box on the last page.
+- **JS-only → OTA** (no migration/server change; reads `home_team_id` + resolves
+  client-side). Typecheck + lint clean, `npx tsx scripts/qualification.test.ts`
+  ALL PASS (24), web bundle builds clean. Published to `production` (iOS runtime
+  `2c3aa583…` = live 1.0.1 build, Android `c50144db…`); real Supabase ref +
+  progression logic verified in `dist/`. `groups.tsx` Groups segment unchanged.
+
 ### 2026-06-28 — "How to play" guide in Profile → About (EN/ES, OTA)
 
 - **Ask:** explain the prediction game — how it's scored — and document every

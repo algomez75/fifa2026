@@ -6,7 +6,15 @@
  * a locked seed yet — plus a few edge units. Exits non-zero on any failure.
  */
 import type { Match, MatchStatus, Stage } from '../src/lib/database.types';
-import { resolveGroupQualifiers } from '../src/lib/qualification';
+import {
+  loserOf,
+  parseGroupSlot,
+  parseProgressionSlot,
+  resolveBracket,
+  resolveGroupQualifiers,
+  winnerOf,
+  winningSide,
+} from '../src/lib/qualification';
 import { computeStandings, reconcileStandings, type StandingRow } from '../src/lib/standings';
 
 let seq = 0;
@@ -220,6 +228,68 @@ console.log('Edge — stale official standings fall back to match results:');
 
   const good = reconcileStandings(computeStandings(ids, matches), ids, matches);
   assert(good.length === 4 && good[0].teamId === 'usa', 'consistent official rows are kept as-is');
+}
+
+// ── Knockout progression: parser + winner/loser + resolveBracket single-step ──
+console.log('Knockout — progression resolver:');
+{
+  // Parsers stay disjoint: group slots vs match-progression refs.
+  assert(parseProgressionSlot('Winner R32-2')?.ref === 'R32-2', 'parseProgressionSlot reads R32-2');
+  assert(parseProgressionSlot('Loser SF-1')?.kind === 'loser', 'parseProgressionSlot reads Loser SF-1');
+  assert(parseProgressionSlot('Winner A') === null, 'parseProgressionSlot rejects group slot "Winner A"');
+  assert(parseProgressionSlot('3rd A/B/C/D/F') === null, 'parseProgressionSlot rejects best-third ref');
+  assert(parseGroupSlot('Winner R32-2') === null, 'parseGroupSlot rejects a match ref');
+
+  // winnerOf / loserOf by score, by penalties, and undecided.
+  const byScore = mkMatch({ status: 'finished', home_team_id: 'rsa', away_team_id: 'can', home_score: 0, away_score: 1 });
+  assert(winnerOf(byScore) === 'can' && loserOf(byScore) === 'rsa', 'winner/loser by score');
+  const byPens = mkMatch({ status: 'finished', home_team_id: 'bra', away_team_id: 'arg', home_score: 1, away_score: 1, home_score_penalties: 2, away_score_penalties: 4 });
+  assert(winnerOf(byPens) === 'arg' && loserOf(byPens) === 'bra', 'winner/loser by penalties');
+  const live = mkMatch({ status: 'live', home_team_id: 'mex', away_team_id: 'usa', home_score: 1, away_score: 0 });
+  assert(winningSide(live) === null && winnerOf(live) === null, 'no winner for a live match');
+
+  // resolveBracket: a finished R32 advances its winner into the R16 slot; away stays TBD.
+  const empty = new Map<string, { teamId: string; locked: boolean }>();
+  const matches = [
+    mkMatch({ id: 'R32-1', stage: 'r32', home_team_id: 'rsa', away_team_id: 'can', home_placeholder: 'Runner-up A', away_placeholder: 'Runner-up B', status: 'finished', home_score: 0, away_score: 1 }),
+    mkMatch({ id: 'R32-3', stage: 'r32', home_team_id: 'ned', away_team_id: 'mar', home_placeholder: 'Winner F', away_placeholder: 'Runner-up C', status: 'scheduled' }),
+    mkMatch({ id: 'R16-2', stage: 'r16', home_placeholder: 'Winner R32-1', away_placeholder: 'Winner R32-3', status: 'scheduled' }),
+  ];
+  const br = resolveBracket(matches, empty);
+  const r16 = br.get('R16-2')!;
+  assert(r16.home.teamId === 'can' && r16.home.confirmed, 'R16-2 home = Canada (winner of finished R32-1), confirmed');
+  assert(r16.away.teamId === null, 'R16-2 away stays TBD until R32-3 finishes');
+  assert(br.get('R32-1')!.home.teamId === 'rsa', 'R32 keeps its server ids');
+
+  // Server-set id beats progression.
+  const withServer = [
+    mkMatch({ id: 'R32-1', stage: 'r32', home_team_id: 'rsa', away_team_id: 'can', status: 'finished', home_score: 0, away_score: 1 }),
+    mkMatch({ id: 'R16-2', stage: 'r16', home_team_id: 'xyz', home_placeholder: 'Winner R32-1', away_placeholder: 'Winner R32-3', status: 'scheduled' }),
+  ];
+  assert(resolveBracket(withServer, empty).get('R16-2')!.home.teamId === 'xyz', 'server-set R16 id wins over progression');
+
+  // Loser feeds the third-place match.
+  const sf = [
+    mkMatch({ id: 'SF-1', stage: 'sf', home_team_id: 'fra', away_team_id: 'ger', status: 'finished', home_score: 2, away_score: 0 }),
+    mkMatch({ id: '3RD-1', stage: 'third', home_placeholder: 'Loser SF-1', away_placeholder: 'Loser SF-2', status: 'scheduled' }),
+  ];
+  assert(resolveBracket(sf, empty).get('3RD-1')!.home.teamId === 'ger', '3rd-place home = loser of SF-1 (Germany)');
+
+  // Multi-hop: a FINISHED intermediate feeder whose own team ids are still null
+  // must still progress its winner into the next round (fixed-point resolve).
+  const multi = [
+    mkMatch({ id: 'R32-2', stage: 'r32', home_team_id: 'usa', away_team_id: 'ita', status: 'finished', home_score: 2, away_score: 0 }),
+    mkMatch({ id: 'R32-5', stage: 'r32', home_team_id: 'bra', away_team_id: 'cmr', status: 'finished', home_score: 1, away_score: 0 }),
+    mkMatch({ id: 'R16-1', stage: 'r16', home_placeholder: 'Winner R32-2', away_placeholder: 'Winner R32-5', status: 'finished', home_score: 1, away_score: 0 }), // null team ids on purpose
+    mkMatch({ id: 'QF-1', stage: 'qf', home_placeholder: 'Winner R16-1', away_placeholder: 'Winner R16-2', status: 'scheduled' }),
+  ];
+  const mbr = resolveBracket(multi, empty);
+  assert(mbr.get('R16-1')!.home.teamId === 'usa', 'R16-1 home = winner of R32-2 (usa)');
+  assert(
+    mbr.get('QF-1')!.home.teamId === 'usa' && mbr.get('QF-1')!.home.confirmed,
+    'QF-1 home = winner of finished R16-1 (usa) — multi-hop progression',
+  );
+  assert(mbr.get('QF-1')!.away.teamId === null, 'QF-1 away stays TBD (R16-2 absent)');
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);

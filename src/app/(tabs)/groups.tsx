@@ -81,11 +81,8 @@ export default function GroupsScreen() {
         </Animated.View>
       ) : (
         <Animated.View key="bracket" entering={FadeIn.duration(220)} style={{ flex: 1 }}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.bracketScroll}>
-            <BracketTree matches={matches ?? []} />
-          </ScrollView>
+          {/* BracketTree owns its own 2D (horizontal-snap + vertical) scroll. */}
+          <BracketTree matches={matches ?? []} />
         </Animated.View>
       )}
     </View>
@@ -132,5 +129,4 @@ const styles = StyleSheet.create({
   segText: { color: palette.textSecondary, fontSize: 14, fontWeight: '700' },
   segTextActive: { color: palette.gold },
   scroll: { paddingHorizontal: 20, paddingBottom: 140 },
-  bracketScroll: { paddingBottom: 140 },
 });

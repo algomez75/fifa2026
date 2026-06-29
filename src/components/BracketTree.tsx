@@ -1,205 +1,165 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { useCallback, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Animated, {
+  FadeInDown,
+  scrollTo,
+  useAnimatedRef,
+  useScrollOffset,
+} from 'react-native-reanimated';
+import { scheduleOnUI } from 'react-native-worklets';
 
-import type { Match, Stage } from '@/lib/database.types';
-import { formatMatchDay } from '@/lib/format';
-import { resolveMatchTeams } from '@/lib/qualification';
-import { teamsById } from '@/lib/seed';
-import { palette, radius, stageMeta } from '@/lib/theme';
+import type { Match } from '@/lib/database.types';
+import { resolveBracket } from '@/lib/qualification';
+import { palette, stageMeta } from '@/lib/theme';
 import { useBracketQualifiers } from '@/hooks/useBracketQualifiers';
 import { useTranslation } from '@/store/useAppStore';
-import { TeamFlag } from './TeamFlag';
+
+import { BracketCell } from './bracket/BracketCell';
+import { BracketConnectors } from './bracket/BracketConnectors';
+import { BracketGroupsColumn } from './bracket/BracketGroupsColumn';
+import { BracketNavigator } from './bracket/BracketNavigator';
+import { CELL_H, COL, COL_GAP, H_PAD, NUM_COLS, V_PAD, bracketLayout } from './bracket/layout';
 
 interface Props {
   matches: Match[];
 }
 
-const COLUMN_ORDER: Stage[] = ['r32', 'r16', 'qf', 'sf', 'final'];
-
-/** Horizontally-scrollable knockout bracket: R32 → R16 → QF → SF → Final.
- *  Securely-qualified group winners/runners-up are filled into their R32 slots
- *  in real time (Apple-Sports style) via `useBracketQualifiers`. */
+/**
+ * Apple-Sports-style knockout bracket: a 2D-scrollable tree. Each match sits
+ * vertically centered between the two matches that feed it (real WC26 feeding
+ * graph), with connector lines; finished feeders advance their winner into the
+ * next slot in real time. Horizontally it snaps one stage at a time (past rounds
+ * slide off left, upcoming rounds reveal right) with a synced GS→F navigator;
+ * vertically it pans (the GS column holds all 12 group tables).
+ */
 export function BracketTree({ matches }: Props) {
   const { t, language } = useTranslation();
-  // placeholder ("Winner A" / "Runner-up B") → securely-qualified teamId.
+  const { width: screenW } = useWindowDimensions();
+
+  const COL_W = Math.round((screenW - H_PAD * 2) / 2); // exactly 2 stages fit
+  const cellW = COL_W - COL_GAP;
+  const canvasW = NUM_COLS * COL_W;
+
   const qualifiers = useBracketQualifiers(matches);
+  const resolved = useMemo(() => resolveBracket(matches, qualifiers), [matches, qualifiers]);
+  const { cells, knockoutHeight } = useMemo(() => bracketLayout(), []);
+  const byId = useMemo(() => {
+    const m = new Map<string, Match>();
+    for (const x of matches) m.set(x.id, x);
+    return m;
+  }, [matches]);
 
-  const byStage = (stage: Stage) =>
-    matches
-      .filter((m) => m.stage === stage)
-      .sort((a, b) => (a.match_number ?? 0) - (b.match_number ?? 0));
+  // GS column height drives the canvas (it's taller than the knockout columns).
+  const [groupsH, setGroupsH] = useState(2100);
+  const canvasH = Math.max(knockoutHeight, groupsH) + V_PAD * 2;
 
-  const third = matches.find((m) => m.stage === 'third');
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollX = useScrollOffset(scrollRef);
 
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.scroll}>
-      {COLUMN_ORDER.map((stage, colIndex) => {
-        const col = byStage(stage);
-        const meta = stageMeta[stage];
-        return (
-          <Animated.View
-            key={stage}
-            entering={FadeInDown.delay(colIndex * 70).duration(360)}
-            style={styles.column}>
-            <Text style={styles.colTitle}>
-              {language === 'es' ? meta.labelEs : meta.label}
-            </Text>
-            <View style={styles.colBody}>
-              {col.map((m) => (
-                <BracketCell key={m.id} match={m} />
-              ))}
-            </View>
-            {stage === 'final' && third ? (
-              <View style={styles.thirdWrap}>
-                <Text style={styles.thirdTitle}>
-                  {language === 'es'
-                    ? stageMeta.third.labelEs
-                    : stageMeta.third.label}
-                </Text>
-                <BracketCell match={third} />
-              </View>
-            ) : null}
-          </Animated.View>
-        );
-      })}
-    </ScrollView>
+  const jumpTo = useCallback(
+    (i: number) => {
+      const x = Math.min(i, NUM_COLS - 2) * COL_W; // clamp so SF+F is the last page
+      scheduleOnUI(() => {
+        'worklet';
+        scrollTo(scrollRef, x, 0, true);
+      });
+    },
+    [COL_W, scrollRef],
   );
 
-  function BracketCell({ match }: { match: Match }) {
-    const isFinal = match.stage === 'final';
-    return (
-      <Animated.View
-        layout={LinearTransition.springify().damping(18)}
-        style={[styles.cell, isFinal && styles.cellFinal]}>
-        <Text style={styles.cellDate}>
-          {formatMatchDay(match.kickoff_utc, language)}
-        </Text>
-        <Row match={match} side="home" />
-        <View style={styles.cellDivider} />
-        <Row match={match} side="away" />
-      </Animated.View>
-    );
-  }
+  const finalPos = cells.get('FINAL-1');
+  const thirdMatch = byId.get('3RD-1');
+  const thirdResolved = resolved.get('3RD-1');
 
-  function Row({ match, side }: { match: Match; side: 'home' | 'away' }) {
-    const placeholder =
-      side === 'home' ? match.home_placeholder : match.away_placeholder;
-    const score = side === 'home' ? match.home_score : match.away_score;
+  return (
+    <View style={{ flex: 1 }}>
+      <BracketNavigator scrollX={scrollX} colW={COL_W} onJump={jumpTo} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <Animated.ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={COL_W}
+          snapToAlignment="start"
+          disableIntervalMomentum
+          decelerationRate="fast"
+          scrollEventThrottle={16}
+          style={{ height: canvasH }}
+          contentContainerStyle={{ width: canvasW + H_PAD * 2, paddingHorizontal: H_PAD }}>
+          <View style={{ width: canvasW, height: canvasH }}>
+            {/* connectors behind the cells */}
+            <BracketConnectors cells={cells} colW={COL_W} cellW={cellW} vPad={V_PAD} />
 
-    // A mathematically-qualified group team fills the slot before the fixture is
-    // officially decided; a server-set team id always wins. `isLocked` = its
-    // exact seed (1st/2nd) is fixed; otherwise it's qualified but the seed is
-    // still provisional (placed by current order, may swap live). Shared resolver
-    // (lib/qualification) so the Schedule fills R32 slots identically.
-    const { teamId, isQualified, isLocked } =
-      side === 'home'
-        ? resolveMatchTeams(match, qualifiers).home
-        : resolveMatchTeams(match, qualifiers).away;
-    const team = teamId ? teamsById[teamId] : undefined;
+            {/* col 0 — group standings (vertically scrollable) */}
+            <View
+              style={{ position: 'absolute', left: 0, top: V_PAD, width: COL_W }}
+              onLayout={(e) => setGroupsH(e.nativeEvent.layout.height)}>
+              <BracketGroupsColumn matches={matches} width={cellW} />
+            </View>
 
-    return (
-      <View style={styles.cellRow}>
-        {/* Keyed so it re-mounts (pops in) the moment a team resolves. */}
-        <Animated.View
-          key={teamId ?? 'tbd'}
-          entering={FadeIn.duration(450)}
-          style={styles.teamWrap}>
-          {team ? (
-            <TeamFlag
-              team={team}
-              size={18}
-              showName
-              nameStyle={[styles.cellTeam, isQualified && styles.cellTeamQualified]}
-            />
-          ) : (
-            <Text
-              style={[styles.cellTeam, styles.cellTeamTbd]}
-              numberOfLines={1}>
-              {placeholder ?? 'TBD'}
-            </Text>
-          )}
-        </Animated.View>
-        {isQualified ? (
-          <View
-            style={[styles.qualDot, !isLocked && styles.qualDotProvisional]}
-            accessibilityLabel={
-              isLocked ? t.groups.qualified : t.groups.qualifiedProvisional
-            }
-          />
-        ) : null}
-        <Text style={styles.cellScore}>{score == null ? '' : score}</Text>
-      </View>
-    );
-  }
+            {/* knockout cells, positioned by the tree layout */}
+            {[...cells.entries()].map(([id, pos]) => {
+              const m = byId.get(id);
+              const r = resolved.get(id);
+              if (!m || !r) return null;
+              return (
+                <Animated.View
+                  key={id}
+                  entering={FadeInDown.duration(260)}
+                  style={{
+                    position: 'absolute',
+                    left: pos.col * COL_W,
+                    top: pos.cy - CELL_H / 2 + V_PAD,
+                    width: cellW,
+                  }}>
+                  <BracketCell
+                    match={m}
+                    resolved={r}
+                    language={language}
+                    t={t}
+                    width={cellW}
+                    isFinal={id === 'FINAL-1'}
+                  />
+                </Animated.View>
+              );
+            })}
+
+            {/* third-place box, below the Final */}
+            {thirdMatch && thirdResolved && finalPos ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  left: COL.final * COL_W,
+                  top: finalPos.cy + CELL_H / 2 + 44 + V_PAD,
+                  width: cellW,
+                }}>
+                <Text style={styles.thirdTitle}>
+                  {language === 'es' ? stageMeta.third.labelEs : stageMeta.third.label}
+                </Text>
+                <BracketCell
+                  match={thirdMatch}
+                  resolved={thirdResolved}
+                  language={language}
+                  t={t}
+                  width={cellW}
+                />
+              </View>
+            ) : null}
+          </View>
+        </Animated.ScrollView>
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
-  column: { width: 178, gap: 10 },
-  colTitle: {
-    color: palette.gold,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  colBody: { gap: 10, flex: 1, justifyContent: 'space-around' },
-  cell: {
-    backgroundColor: palette.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.border,
-    padding: 10,
-  },
-  cellFinal: { borderColor: palette.gold, backgroundColor: palette.cardElevated },
-  cellDate: {
-    color: palette.textTertiary,
-    fontSize: 9,
-    fontWeight: '700',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  cellRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 3,
-    gap: 6,
-  },
-  teamWrap: { flex: 1, minWidth: 0 },
-  cellTeam: { color: palette.text, fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  cellTeamQualified: { color: palette.text, fontWeight: '800' },
-  cellTeamTbd: { color: palette.textTertiary, fontWeight: '500' },
-  qualDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: palette.gold,
-  },
-  // Provisional seed: hollow gold ring (qualified to advance, 1st/2nd may swap).
-  qualDotProvisional: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: palette.gold,
-  },
-  cellScore: {
-    color: palette.gold,
-    fontSize: 13,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-  },
-  cellDivider: { height: 1, backgroundColor: palette.border, marginVertical: 2 },
-  thirdWrap: { marginTop: 18, gap: 8 },
   thirdTitle: {
     color: palette.textSecondary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
+    marginBottom: 6,
     textAlign: 'center',
   },
 });
