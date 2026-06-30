@@ -17,6 +17,8 @@ export const es: Translation = {
     halfTimeShort: 'MT',
     penalties: 'Penales',
     penaltiesShort: 'PEN',
+    extraTime: 'Tiempo Extra',
+    extraTimeShort: 'TE',
     vs: 'vs',
     ft: 'FIN',
     search: 'Buscar',

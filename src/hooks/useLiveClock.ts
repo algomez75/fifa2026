@@ -7,8 +7,14 @@ import type { Match } from '@/lib/database.types';
 const MAX_DRIFT_SEC = 180;
 
 export interface LiveClock {
-  /** True while the match is paused for half-time (or another break). */
+  /** True during the REGULATION half-time break (paused, before 90'). */
   isHalfTime: boolean;
+  /** True during a break in the EXTRA-TIME phase of a knockout — paused after 90'
+   *  (before extra time kicks off, or at the extra-time half-time). Shown as
+   *  "Extra Time" rather than "Half Time". */
+  isExtraTimeBreak: boolean;
+  /** True while extra time is being PLAYED (clock ticking 90+ / 105+ / 120+). */
+  isExtraTime: boolean;
   /** True during the penalty shootout — no running minute to show. */
   isPenalties: boolean;
   /** Ready-to-render minute, e.g. "67", "45+2", "90+3" — null when unknown. */
@@ -136,10 +142,18 @@ export function useLiveClock(match: Match): LiveClock {
   // module interval only exists while a LiveBadge (live-only) is mounted.
   const now = useSyncExternalStore(subscribeTick, getTickNow);
 
-  const isHalfTime = match.period === 'HT' || match.period === 'BT';
+  // A PAUSED break (HT/BT) after the 90' regulation in a knockout is part of the
+  // extra-time phase (the break before extra time, or the extra-time half-time) —
+  // football-data reports it the same way as a regulation half-time (status
+  // PAUSED → period 'HT'), so we disambiguate by the minute + knockout stage. We
+  // never invent it: a group match always finishes at 90' (never PAUSED there).
+  const paused = match.period === 'HT' || match.period === 'BT';
   const isPenalties = match.period === 'PEN';
-  if (!isLive || isHalfTime || isPenalties) {
-    return { isHalfTime, isPenalties, text: null, clock: null };
+  const isExtraTimeBreak =
+    paused && match.stage !== 'group' && (match.minute ?? 0) >= 90;
+  const isHalfTime = paused && !isExtraTimeBreak;
+  if (!isLive || paused || isPenalties) {
+    return { isHalfTime, isExtraTimeBreak, isExtraTime: false, isPenalties, text: null, clock: null };
   }
 
   // Derive minute AND seconds from the drift since the SHARED anchor, so the
@@ -164,7 +178,15 @@ export function useLiveClock(match: Match): LiveClock {
     }
   }
 
-  if (minute == null) return { isHalfTime: false, isPenalties: false, text: null, clock: null };
+  if (minute == null)
+    return {
+      isHalfTime: false,
+      isExtraTimeBreak: false,
+      isExtraTime: false,
+      isPenalties: false,
+      text: null,
+      clock: null,
+    };
   minute = Math.max(1, minute);
 
   // Cap the running minute at the REAL added time (boundary + injury_time); with
@@ -185,5 +207,12 @@ export function useLiveClock(match: Match): LiveClock {
   minute = held;
 
   const label = formatMinute(minute, boundary);
-  return { isHalfTime: false, isPenalties: false, text: label, clock: `${label}:${pad2(seconds)}` };
+  return {
+    isHalfTime: false,
+    isExtraTimeBreak: false,
+    isExtraTime: match.period === 'ET',
+    isPenalties: false,
+    text: label,
+    clock: `${label}:${pad2(seconds)}`,
+  };
 }

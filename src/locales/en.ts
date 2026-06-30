@@ -16,6 +16,8 @@ export const en = {
     halfTimeShort: 'HT',
     penalties: 'Penalties',
     penaltiesShort: 'PENS',
+    extraTime: 'Extra Time',
+    extraTimeShort: 'ET',
     vs: 'vs',
     ft: 'FT',
     search: 'Search',

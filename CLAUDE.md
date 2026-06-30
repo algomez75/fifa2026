@@ -302,6 +302,31 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-29 — Live badge shows the real knockout stage (Extra Time / Penalties, not "Half Time") (OTA)
+
+- **Ask:** in knockouts (R32 onward) a tie goes to extra time then penalties; once
+  past the 90' the live card must not say "Half Time" — it should show the real
+  stage (extra time / penalties), Apple-Sports style, **without changing logic**.
+- **Root issue:** football-data reports every break as `PAUSED` → `period='HT'`, so
+  the regulation half-time, the **break before extra time**, and the **extra-time
+  half-time** all rendered "Half Time". Extra-time PLAY (`period='ET'`) showed the
+  plain "LIVE" word (only the 105'/120' clock hinted at ET).
+- **Fix (client display only):** `useLiveClock` disambiguates the paused break by
+  minute + stage — a `PAUSED` break **after 90' in a knockout** (`stage!=='group'` &&
+  `minute>=90`) is the extra-time phase (`isExtraTimeBreak`), not regulation
+  half-time; it also exposes `isExtraTime` for ET in play. A group match never
+  PAUSEs at 90' (it finishes), so the inference never false-fires. `LiveBadge` shows
+  **"Tiempo Extra" / "Extra Time"** for the ET break, **"TE 105:23" / "ET 105:23"**
+  (short tag + ticking 105'/120' clock) during ET play, **"Penales" / "Penalties"**
+  for the shootout; regulation **"Medio Tiempo"** unchanged. New `extraTime`/
+  `extraTimeShort` strings (en/es). The ET clock boundaries (105/120 + injury) were
+  already correct — only the label was wrong.
+- **Covers every live surface in one place** (all badges go through `LiveBadge →
+  useLiveClock`: Home `LiveHero`, `MatchCard`, match detail). JS-only → **OTA** (iOS
+  runtime `2c3aa583…` = live 1.0.1 build, Android `c50144db…`); real Supabase ref +
+  new "Tiempo Extra"/"Extra Time" strings verified in `dist/`. Typecheck clean. Files:
+  `useLiveClock.ts`, `LiveBadge.tsx`, `en.ts`/`es.ts`.
+
 ### 2026-06-29 — Apple-Sports bracket: tree layout + 2D snap-scroll + real-time progression (OTA)
 
 - **Ask:** rebuild the Groups→Bracket view like Apple Sports — scrolling right
