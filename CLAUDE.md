@@ -302,6 +302,48 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-29 — Full-app optimization audit + batch 1 fixes (OTA)
+
+- **Ask:** total app review for errors, crashes, slowness, and unnecessary data
+  loads. Ran a **13-agent audit workflow** (6 dimensions — crashes · render perf ·
+  data/network · type safety · hooks · RN/Expo — each adversarially verified, then
+  synthesized). **Result: 0 critical / 0 crashes / 0 correctness-breaking bugs**;
+  36 raw → **26 confirmed** findings, clustered in wasted live-window network and
+  uncached images. (Two audit claims were rejected on inspection: gating
+  `useInbox`/`useChallenges` on `!isAnonymous` would break notifications for guests,
+  who DO predict/get challenged.)
+- **Batch 1 shipped (safe, high-ROI):**
+  - **Disk-cached flags.** New `components/Flag.tsx` = pixel-exact `expo-image`
+    drop-in for `react-native-country-flag` (same `flagcdn.com/w80/<iso>.png` URL +
+    `width:size*1.6,height:size`) with `cachePolicy="memory-disk"`. Replaced all 5
+    `CountryFlag` call sites (`TeamFlag` → every MatchCard, Teams grid, team detail,
+    `FavoriteTeamsRail`, schedule host chip), so the ~48 flags stop re-downloading
+    on every cold start.
+  - **Killed idle polls.** `useStandings` now polls only while a **group** match is
+    hot (static all knockouts); `useMatchDetail` gains a `soon` gate
+    (`kickoffSoon`) so a far-future scheduled match doesn't poll every 60s;
+    `useInbox` reads the uid from the auth store (keyed by it, `['inbox']` prefix
+    still matches invalidations) instead of a `supabase.auth.getUser()` **network
+    round-trip every 20s** app-wide.
+  - **Lighter startup.** `prefetchLeaderboard` deferred behind
+    `InteractionManager.runAfterInteractions` so the ranking aggregate doesn't
+    contend with Home's first-paint fetches.
+  - **Quick wins.** `LiveHero` `onScroll` only re-renders the carousel when the
+    page actually changes; `useLiveClock` caps a null-period 1st half at 45' (not
+    90'); `useMatchEvents` no longer dumps null-team goals/cards on the away side.
+- **Deferred (bigger / needs QA, not yet done):** virtualize Teams + Schedule
+  (`FlatList`/`SectionList` vs current `ScrollView`+`.map`); scope/limit the
+  `useMatchEvents` whole-tournament fetch + drop its hot-poll `players` join (needs
+  care: realtime is the primary path, finished cards read the shared cache); add
+  `standings`/`match_details` to the typed `Database` and drop the `as` casts.
+- **JS-only → OTA** (iOS runtime `2c3aa583…` = live 1.0.1 build, Android
+  `c50144db…`). Typecheck + lint of touched files clean; real Supabase ref +
+  `flagcdn.com/w80` (the expo-image Flag) verified in `dist/`. Files:
+  `components/Flag.tsx` (new), `TeamFlag.tsx`, `FavoriteTeamsRail.tsx`, `LiveHero.tsx`,
+  `team/[id].tsx`, `(tabs)/teams.tsx`, `(tabs)/schedule.tsx`, `_layout.tsx`,
+  `match/[id].tsx`, `useStandings.ts`, `useMatchDetail.ts`, `useInbox.ts`,
+  `useLiveClock.ts`, `useMatchEvents.ts`.
+
 ### 2026-06-29 — Live badge shows the real knockout stage (Extra Time / Penalties, not "Half Time") (OTA)
 
 - **Ask:** in knockouts (R32 onward) a tie goes to extra time then penalties; once

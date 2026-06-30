@@ -1,5 +1,6 @@
-import CountryFlag from 'react-native-country-flag';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+
+import { Flag } from './Flag';
 
 import type { Team } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
@@ -30,7 +31,7 @@ export function TeamFlag({
 
   const flag = iso ? (
     <View style={[styles.flagWrap, { borderRadius: 4 }]}>
-      <CountryFlag isoCode={iso} size={size} />
+      <Flag isoCode={iso} size={size} />
     </View>
   ) : (
     <View

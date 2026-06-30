@@ -1,5 +1,4 @@
-import CountryFlag from 'react-native-country-flag';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import Animated, {
   FadeInRight,
   useAnimatedStyle,
@@ -8,7 +7,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { teamsById } from '@/lib/seed';
-import { palette, radius } from '@/lib/theme';
+import { Flag } from './Flag';
+import { palette } from '@/lib/theme';
 
 const CIRCLE = 56;
 
@@ -72,7 +72,7 @@ function FlagChip({
         <Animated.View style={[styles.chip, chipStyle]}>
           <Animated.View style={[styles.flagCircle, ringStyle]}>
             {team?.iso2 ? (
-              <CountryFlag isoCode={team.iso2} size={CIRCLE} />
+              <Flag isoCode={team.iso2} size={CIRCLE} />
             ) : (
               <Text style={styles.emoji}>{team?.flag_emoji ?? '🏳️'}</Text>
             )}

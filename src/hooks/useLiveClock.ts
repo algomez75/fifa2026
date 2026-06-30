@@ -93,9 +93,12 @@ function monotonicMinute(matchId: string, period: string | null, minute: number)
  *  by at most the announced added time. PEN/HT have no running boundary. */
 function boundaryFor(period: string | null | undefined, minute: number): number | null {
   if (period === '1H') return 45;
-  if (period === '2H' || period == null) return 90;
+  if (period === '2H') return 90;
   if (period === 'ET') return minute > 105 ? 120 : 105; // 1st / 2nd extra-time half
-  return null; // PEN / HT / unknown — no running boundary
+  // No period yet (kickoff / reconnect): derive the half from the minute so a
+  // 1st-half clock isn't capped/labelled at 90'.
+  if (period == null) return minute > 45 ? 90 : 45;
+  return null; // PEN / HT — no running boundary
 }
 
 /** Add the in-period stoppage "+n" once the running minute overruns its

@@ -60,9 +60,12 @@ export function LiveHero({ matches, onPressMatch }: Props) {
         snapToInterval={cardWidth + CARD_GAP}
         decelerationRate="fast"
         contentContainerStyle={{ gap: CARD_GAP, paddingRight: 28 }}
-        onScroll={(e) =>
-          setPage(Math.round(e.nativeEvent.contentOffset.x / (cardWidth + CARD_GAP)))
-        }
+        onScroll={(e) => {
+          // Only re-render when the active page actually changes (returning the
+          // same value makes React bail out) — not on every scroll frame.
+          const next = Math.round(e.nativeEvent.contentOffset.x / (cardWidth + CARD_GAP));
+          setPage((p) => (p === next ? p : next));
+        }}
         scrollEventThrottle={32}>
         {matches.map((m) => (
           <LiveMatchBoard key={m.id} match={m} width={cardWidth} onPress={onPressMatch} />

@@ -8,10 +8,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import CountryFlag from 'react-native-country-flag';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { FavoriteTeamsRail } from '@/components/FavoriteTeamsRail';
+import { Flag } from '@/components/Flag';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HeaderActions } from '@/components/HeaderActions';
 import { EmptyState } from '@/components/States';
@@ -85,7 +85,7 @@ export default function TeamsScreen() {
                   <CardGradient team={team} />
                   <View style={styles.rowFlag}>
                     {team.iso2 ? (
-                      <CountryFlag isoCode={team.iso2} size={30} />
+                      <Flag isoCode={team.iso2} size={30} />
                     ) : (
                       <Text style={{ fontSize: 26 }}>{team.flag_emoji}</Text>
                     )}

@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { type ErrorBoundaryProps, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, Text } from 'react-native';
+import { InteractionManager, Pressable, ScrollView, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -50,10 +50,14 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 export default function RootLayout() {
   // Bootstrap auth: restore session or sign in anonymously; keep store in sync.
-  // Then warm the ranking cache so the Leaderboard tab opens instantly.
+  // The ranking cache is only a warm-up for the Leaderboard tab (the user lands
+  // on Home), so defer it until after the first interactions/animations settle —
+  // it must not contend with Home's matches/events fetches on the cold-start path.
   useEffect(() => {
     void initAuth().finally(() => {
-      void prefetchLeaderboard();
+      InteractionManager.runAfterInteractions(() => {
+        void prefetchLeaderboard();
+      });
     });
   }, []);
 

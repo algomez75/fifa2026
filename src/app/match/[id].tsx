@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/States';
 import { TeamFlag } from '@/components/TeamFlag';
 import { TeamMatchContext } from '@/components/TeamMatchContext';
-import { useMatchDetail, type MatchDetail } from '@/hooks/useMatchDetail';
+import { kickoffSoon, useMatchDetail, type MatchDetail } from '@/hooks/useMatchDetail';
 import { useMatchEvents } from '@/hooks/useMatchEvents';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
@@ -46,6 +46,9 @@ export default function MatchDetailScreen() {
   const { data: detail } = useMatchDetail(id, {
     live: match?.status === 'live',
     finished: match?.status === 'finished',
+    // Only poll a scheduled match's detail once kickoff is within ~90min
+    // (lineups land ~1h out) — a match days away has empty detail to poll.
+    soon: kickoffSoon(match),
   });
   const { data: events } = useMatchEvents();
   const { data: predictions } = usePredictions();

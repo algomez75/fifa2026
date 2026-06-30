@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { anyMatchHot, useMatches } from './useMatches';
 
 /** One official group-standings row (synced from football-data by sync-scores). */
 export interface OfficialStanding {
@@ -37,11 +38,17 @@ async function fetchStandings(): Promise<OfficialStanding[]> {
  * fall back to the client-side `computeStandings`.
  */
 export function useStandings() {
+  const { data: matches } = useMatches();
+  // Official standings only move while a GROUP match is being played (or just
+  // finished). During the entire knockout phase — and between group matchdays —
+  // they're static, so the 60s poll on Home/Schedule was a pure no-op. Fetch
+  // once on mount, then poll only while a group match is hot.
+  const groupHot = anyMatchHot((matches ?? []).filter((m) => m.stage === 'group'));
   return useQuery({
     queryKey: ['standings'],
     queryFn: fetchStandings,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: groupHot ? 60_000 : false,
     enabled: isSupabaseConfigured,
   });
 }

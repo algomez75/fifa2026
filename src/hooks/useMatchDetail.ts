@@ -74,19 +74,36 @@ async function fetchDetail(matchId: string): Promise<MatchDetail | null> {
   return detail;
 }
 
+/** Kickoff within ~90min (lineups land ~1h out) — gates detail polling for a
+ *  scheduled match. A plain function so the `Date.now()` read stays out of the
+ *  render body (same pattern as `anyMatchHot`), satisfying the purity rule. */
+export function kickoffSoon(
+  match: { status: string; kickoff_utc: string } | undefined,
+): boolean {
+  if (!match || match.status !== 'scheduled') return false;
+  return new Date(match.kickoff_utc).getTime() - Date.now() < 90 * 60_000;
+}
+
 /** Rich match detail (lineups, formations, stats). Polls while fresh data may
  *  still be arriving: fast (~8s) during a live match so stats feel real-time,
- *  slower (~60s) before kickoff (lineups land ~1h out), and not at all once the
- *  match is finished (its stats are final — backfilled by sync-scores). */
+ *  slower (~60s) once kickoff is `soon` (lineups land ~1h out), and not at all
+ *  for a far-future scheduled match (detail is empty — nothing to poll) or once
+ *  the match is finished (its stats are final — backfilled by sync-scores). */
 export function useMatchDetail(
   matchId: string | undefined,
-  opts: { live?: boolean; finished?: boolean } = {},
+  opts: { live?: boolean; finished?: boolean; soon?: boolean } = {},
 ) {
   return useQuery({
     queryKey: ['match-detail', matchId],
     queryFn: () => fetchDetail(matchId!),
     enabled: !!matchId && isSupabaseConfigured,
     staleTime: opts.live ? 6_000 : 45_000,
-    refetchInterval: opts.finished ? false : opts.live ? 8_000 : 60_000,
+    refetchInterval: opts.finished
+      ? false
+      : opts.live
+        ? 8_000
+        : opts.soon
+          ? 60_000
+          : false,
   });
 }

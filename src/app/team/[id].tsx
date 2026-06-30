@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import CountryFlag from 'react-native-country-flag';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Flag } from '@/components/Flag';
 
 import { Avatar } from '@/components/Avatar';
 import { GradientHeader } from '@/components/GradientHeader';
@@ -120,7 +121,7 @@ export default function TeamDetailScreen() {
           <View style={styles.identity}>
             {team.iso2 ? (
               <View style={styles.flagShadow}>
-                <CountryFlag isoCode={team.iso2} size={56} />
+                <Flag isoCode={team.iso2} size={56} />
               </View>
             ) : (
               <Text style={{ fontSize: 52 }}>{team.flag_emoji}</Text>

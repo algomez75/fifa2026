@@ -50,7 +50,9 @@ export function useMatchGoals(matchId: string, homeTeamId: string | null) {
   const goals = (data ?? []).filter((e) => e.match_id === matchId && e.type === 'goal');
   return {
     home: goals.filter((g) => g.team_id != null && g.team_id === homeTeamId),
-    away: goals.filter((g) => g.team_id == null || g.team_id !== homeTeamId),
+    // Only attribute to a side when BOTH ids are known — a null team_id (or a
+    // not-yet-resolved homeTeamId) must not dump every goal on the away side.
+    away: goals.filter((g) => g.team_id != null && homeTeamId != null && g.team_id !== homeTeamId),
     all: goals,
   };
 }
@@ -61,8 +63,9 @@ export function useMatchCards(matchId: string, homeTeamId: string | null) {
   const cards = (data ?? []).filter(
     (e) => e.match_id === matchId && (e.type === 'red' || e.type === 'yellow'),
   );
-  const side = (g: GoalEvent) =>
-    g.team_id != null && g.team_id === homeTeamId ? 'home' : 'away';
+  // null when the side can't be determined (unknown team) → counted on neither.
+  const side = (g: GoalEvent): 'home' | 'away' | null =>
+    g.team_id == null || homeTeamId == null ? null : g.team_id === homeTeamId ? 'home' : 'away';
   return {
     reds: cards.filter((c) => c.type === 'red'),
     homeReds: cards.filter((c) => c.type === 'red' && side(c) === 'home'),

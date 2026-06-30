@@ -1,9 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import CountryFlag from 'react-native-country-flag';
-
 import { MatchCard } from '@/components/MatchCard';
+import { Flag } from '@/components/Flag';
 import { PredictionModal } from '@/components/PredictionModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HeaderActions } from '@/components/HeaderActions';
@@ -287,7 +286,7 @@ function HostChip({
     <Pressable
       onPress={onPress}
       style={[styles.flagChip, active ? styles.flagChipActive : styles.flagChipOff]}>
-      <CountryFlag isoCode={HOST_ISO[host]} size={42} />
+      <Flag isoCode={HOST_ISO[host]} size={42} />
     </Pressable>
   );
 }
