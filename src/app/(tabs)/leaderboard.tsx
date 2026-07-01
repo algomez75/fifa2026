@@ -226,6 +226,7 @@ const Row = memo(
           </Text>
           <Text style={styles.sub}>
             {row.total} {t.leaderboard.made} · {row.exact} {t.leaderboard.exactShort}
+            {row.challenge_points ? ` · ⚔️ ${row.challenge_points}` : ''}
           </Text>
         </View>
         <Text style={styles.points}>{row.points}</Text>
@@ -242,6 +243,7 @@ const Row = memo(
     a.row.points === b.row.points &&
     a.row.total === b.row.total &&
     a.row.exact === b.row.exact &&
+    a.row.challenge_points === b.row.challenge_points &&
     a.row.display_name === b.row.display_name &&
     a.row.avatar_url === b.row.avatar_url,
 );

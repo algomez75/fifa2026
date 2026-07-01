@@ -125,11 +125,11 @@ const en: RulesContent = {
 
   leaderboardTitle: 'The leaderboard',
   leaderboardBody:
-    'Your rank is the sum of all your prediction points plus any points won in 1v1 challenges. The number of exact scores breaks ties. Everyone competes in one global ranking — share yours from the Ranking tab.',
+    'Your rank is the sum of your prediction points only — pure prediction skill. Challenge points do not inflate your total; instead they break ties: if two players are level on prediction points, whoever has won more head-to-head challenge points ranks higher (then the number of exact scores). Everyone competes in one global ranking — share yours from the Ranking tab.',
 
   challengeTitle: '1v1 challenges',
   challengeBody:
-    'Challenge another player on any upcoming match: you each pick a winner (home, away, or draw) and a goal margin. When the match ends, the pick closest to the real result wins +3; if both are equally close it is a tie and each gets +1. A wrong winner always loses to a correct one. Challenges also lock at kickoff, and the points count toward your leaderboard total. Start one from a player’s profile in the Ranking.',
+    'Challenge another player on any upcoming match: you each pick a winner (home, away, or draw) and a goal margin. When the match ends, the pick closest to the real result wins +3; if both are equally close it is a tie and each gets +1. A wrong winner always loses to a correct one. Challenges also lock at kickoff. Your challenge points are kept separately and act as a tiebreaker in the ranking — they do not add to your prediction total. Start one from a player’s profile in the Ranking.',
 
   fairTitle: 'Fair play',
   fairBody:
@@ -216,11 +216,11 @@ const es: RulesContent = {
 
   leaderboardTitle: 'El ranking',
   leaderboardBody:
-    'Tu posición es la suma de todos tus puntos de predicción más los puntos ganados en retos 1v1. El número de marcadores exactos desempata. Todos compiten en un único ranking global — comparte el tuyo desde la pestaña Ranking.',
+    'Tu posición es la suma únicamente de tus puntos de predicción — puro acierto prediciendo. Los puntos de reto no inflan tu total; en su lugar desempatan: si dos jugadores están igualados en puntos de predicción, quien haya ganado más puntos en retos 1v1 queda por encima (y luego el número de marcadores exactos). Todos compiten en un único ranking global — comparte el tuyo desde la pestaña Ranking.',
 
   challengeTitle: 'Retos 1v1',
   challengeBody:
-    'Reta a otro jugador en cualquier partido próximo: cada uno elige un ganador (local, visitante o empate) y una diferencia de goles. Al terminar el partido, el pronóstico más cercano al resultado real gana +3; si ambos quedan igual de cerca es empate y cada uno suma +1. Un ganador equivocado siempre pierde frente a uno acertado. Los retos también se cierran al iniciar el partido, y los puntos cuentan para tu total en el ranking. Inicia uno desde el perfil de un jugador en el Ranking.',
+    'Reta a otro jugador en cualquier partido próximo: cada uno elige un ganador (local, visitante o empate) y una diferencia de goles. Al terminar el partido, el pronóstico más cercano al resultado real gana +3; si ambos quedan igual de cerca es empate y cada uno suma +1. Un ganador equivocado siempre pierde frente a uno acertado. Los retos también se cierran al iniciar el partido. Tus puntos de reto se guardan aparte y funcionan como desempate en el ranking — no se suman a tu total de predicción. Inicia uno desde el perfil de un jugador en el Ranking.',
 
   fairTitle: 'Juego limpio',
   fairBody:

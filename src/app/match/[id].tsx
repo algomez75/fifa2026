@@ -267,7 +267,6 @@ export default function MatchDetailScreen() {
             away={away}
             matches={matches ?? []}
             currentMatchId={id ?? ''}
-            predictions={predictions ?? undefined}
             onPressMatch={(m) => router.push(`/match/${m.id}` as Href)}
           />
         </View>

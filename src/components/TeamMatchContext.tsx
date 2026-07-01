@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { Match, Prediction, Team } from '@/lib/database.types';
+import type { Match, Team } from '@/lib/database.types';
 import { teamName } from '@/lib/format';
 import { seedTeams } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
 import { useTranslation } from '@/store/useAppStore';
 import { GlassCard } from './GlassCard';
 import { GroupTable } from './GroupTable';
-import { MatchCard } from './MatchCard';
+import { MatchResultRow } from './MatchResultRow';
 import { TeamFlag } from './TeamFlag';
 
 interface Props {
@@ -18,15 +18,14 @@ interface Props {
   matches: Match[];
   /** The match being viewed — excluded from each team's "previous" list. */
   currentMatchId: string;
-  predictions?: Record<string, Prediction>;
   onPressMatch?: (m: Match) => void;
 }
 
 /**
  * Apple-Sports-style context block shown below the lineups on the match detail
  * screen: two tabs (one per team) revealing that team's previous results and its
- * current group standing. Reuses `MatchCard` + `GroupTable` so styling stays in
- * sync with the rest of the app. Always rendered (incl. live), so the context
+ * current group standing. Reuses `MatchResultRow` + `GroupTable` so styling stays
+ * in sync with the rest of the app. Always rendered (incl. live), so the context
  * persists through every match state.
  */
 export function TeamMatchContext({
@@ -34,7 +33,6 @@ export function TeamMatchContext({
   away,
   matches,
   currentMatchId,
-  predictions,
   onPressMatch,
 }: Props) {
   const { t, language } = useTranslation();
@@ -93,24 +91,20 @@ export function TeamMatchContext({
         />
       </View>
 
-      {/* Previous matches */}
+      {/* Previous matches — Apple-Sports compact rows in one card */}
       <Text style={styles.subTitle}>{t.matchContext.previousMatches}</Text>
-      {previous.length ? (
-        <View style={{ gap: 10 }}>
-          {previous.map((m) => (
-            <MatchCard
-              key={m.id}
-              match={m}
-              prediction={predictions?.[m.id] ?? null}
-              onPress={onPressMatch}
-            />
-          ))}
-        </View>
-      ) : (
-        <GlassCard>
+      <GlassCard>
+        {previous.length ? (
+          previous.map((m, i) => (
+            <View key={m.id}>
+              {i > 0 ? <View style={styles.divider} /> : null}
+              <MatchResultRow match={m} onPress={onPressMatch} />
+            </View>
+          ))
+        ) : (
           <Text style={styles.note}>{t.matchContext.noPrevious}</Text>
-        </GlassCard>
-      )}
+        )}
+      </GlassCard>
 
       {/* Group standing */}
       {group ? (
@@ -181,6 +175,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 10,
   },
+  divider: { height: 1, backgroundColor: palette.border },
   note: {
     color: palette.textTertiary,
     fontSize: 12,

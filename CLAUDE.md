@@ -138,8 +138,9 @@ eas.json                     EAS build/submit profiles (development/preview/prod
 - **Predictions & scoring.** `lib/scoring.ts` = **exact 3 / correct result 1 /
   miss 0**. Predictions are locked at kickoff both in UI (`PredictionModal`) and
   by RLS (insert/update only allowed while `kickoff_utc > NOW()`). The
-  leaderboard is computed server-side by the `get_leaderboard()` RPC and now sums
-  **prediction points + challenge points** (migration 013).
+  leaderboard is computed server-side by the `get_leaderboard()` RPC: `points` is
+  **prediction points only**; challenge points are accumulated per user
+  (`challenge_points`) and used **only as a tiebreaker** (migration 030).
 - **Challenges (1v1).** A challenger picks a winner-**side** (`home`/`away`/`draw`)
   plus a goal **margin** for a match; the opponent accepts with their own pick (or
   declines), both locked at kickoff by RLS. When the match finishes the closer
@@ -199,11 +200,14 @@ eas.json                     EAS build/submit profiles (development/preview/prod
 - `user_settings` — RLS owner-only, favorites array, notify prefs, timezone,
   language, `expo_push_token`.
 - `historical_editions` (22, 1930–2022) + `historical_matches` (12).
-- **`get_leaderboard()`** — `SECURITY DEFINER` SQL RPC: aggregates each user's
-  **prediction points (3/1/0) + challenge points (3/1/0)** into `points`, plus
-  `predicted`/`exact`/`total` counts and `challenge_points`, joined to public
-  profile fields, **without exposing anyone's individual picks**. Now v3
-  (migration 013, was added in 011, extended in 012). Granted to anon + auth.
+- **`get_leaderboard()`** — `SECURITY DEFINER` SQL RPC: `points` = each user's
+  **prediction points (3/1/0) only**; challenge points (3/1/0) are returned
+  separately as `challenge_points` and applied **only as a tiebreaker** in the
+  `ORDER BY` (`points → challenge_points → exact → total`), plus
+  `predicted`/`exact`/`total` counts, joined to public profile fields, **without
+  exposing anyone's individual picks**. Now v4 (migration 030; v3 in 013 summed
+  challenge points into the total, added in 011, extended in 012). Granted to
+  anon + auth.
 - **`get_user_predictions(target)`** — `SECURITY DEFINER` RPC for `/user/[id]`:
   a player's predictions with fair-play **reveal** — another user's pick for a
   match that hasn't kicked off is returned NULL (`revealed=false`) so it can't be
@@ -234,7 +238,9 @@ table, kickoff-locked RLS, `get_leaderboard()` RPC) · `012_leaderboard_v2`
 (`total` count + `get_user_predictions()` fair-play reveal) · `013_challenges`
 (`challenges` + `notifications` tables + RLS, `ch_side`/`ch_dist`,
 `on_challenge_change` trigger, `get_my_challenges()`, `get_leaderboard()` v3 with
-challenge points).
+challenge points) · `030_leaderboard_challenge_tiebreak` (`get_leaderboard()` v4 —
+challenge points removed from the `points` total, now a tiebreaker only). *(014–029
+are documented in the change log below.)*
 
 ---
 
@@ -301,6 +307,46 @@ development-simulator / preview / production profiles).
 ## Change log
 
 > Newest first. Keep this updated when shipping features or schema changes.
+
+### 2026-06-30 — Match detail: previous-matches + group tabs (Apple-Sports) · challenge points → ranking tiebreak only (030, server + OTA)
+
+- **Ask (2 parts):** (1) tapping the Home "next match" hero opens the match detail
+  as-is, and **below the confirmed lineups** add two tabs (one per team) showing
+  each team's **previous matches** + its **group standing**, kept for every state
+  (incl. live), Apple-Sports style, reusing components; (2) **1v1 challenge points
+  should no longer count toward the global ranking total** — accumulate them per
+  user and use them **only as a tiebreaker** between users.
+- **Client (OTA):**
+  - New **`TeamMatchContext`** (`components/TeamMatchContext.tsx`) rendered at the
+    bottom of `match/[id]` (always, incl. live): two team tabs (same visual as the
+    formation selector) → the active team's finished matches (newest first, minus
+    this one) as compact rows + its `GroupTable` (group stage only; knockout shows
+    just the results). The hero already routed to `/match/[id]`, so no nav change.
+  - New reusable **`MatchResultRow`** (`components/MatchResultRow.tsx`) = the
+    Apple-Sports compact result row (centered stage · date on top; flag + big score
+    on each side with the **winner emphasised / loser dimmed**; "FT" / live minute /
+    kickoff time in the middle; team name under each flag). Rows sit in one
+    `GlassCard` split by dividers.
+  - **Leaderboard** row now shows a subtle `⚔️ N` (accumulated challenge points) so
+    the tiebreaker is visible; memo comparator updated. "How to play"
+    (`lib/rules.ts`, EN/ES) reworded: ranking = prediction points only, challenge
+    points are a tiebreaker. New `matchContext` en/es strings.
+- **Server (migration 030 → reaches everyone instantly):** `get_leaderboard()` **v4**
+  — `points` = **prediction points only** (dropped `+ chal.chal_points`);
+  `challenge_points` still returned; `ORDER BY points DESC, challenge_points DESC,
+  exact DESC, total DESC` so challenge points only decide ties. Reversible (redeploy
+  the 013 v3 body).
+- **Shipped:** migration 030 applied via `db-exec.mjs` (Management API,
+  `SUPABASE_ACCESS_TOKEN` in `.env` + `SUPABASE_REF=xqjupomaqomneqiugbft`) and
+  verified live (`pg_get_functiondef`: pred-only `points`, tiebreak `ORDER BY`;
+  sample rows show `points`/`challenge_points` split). Client via **OTA** to
+  `production` (`--environment production`, iOS runtime `2c3aa583…` = live 1.0.1,
+  Android `c50144db…`); real Supabase ref verified in the compiled `dist/` bundles
+  (placeholder only in the `.map` sourcemaps). Typecheck + lint of touched files
+  clean. Files: `components/TeamMatchContext.tsx` (new),
+  `components/MatchResultRow.tsx` (new), `app/match/[id].tsx`,
+  `app/(tabs)/leaderboard.tsx`, `lib/rules.ts`, `en.ts`/`es.ts`, migration
+  `030_leaderboard_challenge_tiebreak.sql`.
 
 ### 2026-06-29 — Delayed / postponed / suspended matches: correct time + status + push (029, server + OTA)
 
@@ -1313,7 +1359,9 @@ All sourced from data football-data already returns (no new paid add-on):
 - **Challenges lock at kickoff** in both UI and RLS (create + respond). Challenge
   points are computed server-side in `get_leaderboard()`/`get_my_challenges()` via
   `ch_dist` (wrong winner always loses to any correct-winner pick) — don't score
-  them client-side.
+  them client-side. Since migration 030 challenge points do **not** add to the
+  global `points` total — they're accumulated per user (`challenge_points`) and
+  only break ties in the ranking. Don't re-add them to the total client-side.
 - **Challenge notifications are in-app only** (the `on_challenge_change` trigger →
   `notifications`, polled by `useInbox`). Push delivery isn't wired into
   `notify-dispatcher` yet.
