@@ -15,6 +15,7 @@ import { palette, radius, stageMeta } from '@/lib/theme';
 import { teamsById, venuesById } from '@/lib/seed';
 import { useTranslation } from '@/store/useAppStore';
 import { Avatar } from './Avatar';
+import { DelayBadge } from './DelayBadge';
 import { LiveBadge } from './LiveBadge';
 import { LocationPinIcon } from './icons';
 import { TeamFlag } from './TeamFlag';
@@ -90,7 +91,9 @@ export function MatchCard({ match, onPress, compact, prediction, qualMark }: Pro
               <Text style={styles.stage} numberOfLines={1}>
                 {groupLabel}
               </Text>
-              {isLive ? (
+              {match.delay_status ? (
+                <DelayBadge match={match} />
+              ) : isLive ? (
                 <LiveBadge match={match} size="sm" />
               ) : isFinished ? (
                 <Text style={styles.ft}>{t.common.ft}</Text>
@@ -151,7 +154,9 @@ export function MatchCard({ match, onPress, compact, prediction, qualMark }: Pro
           <>
         <View style={styles.topRow}>
           <Text style={styles.stage}>{groupLabel}</Text>
-          {isLive ? (
+          {match.delay_status ? (
+            <DelayBadge match={match} />
+          ) : isLive ? (
             <LiveBadge match={match} size="sm" />
           ) : isFinished ? (
             <Text style={styles.ft}>{t.common.ft}</Text>

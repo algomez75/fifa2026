@@ -69,6 +69,12 @@ export type Match = {
    *  Caps the client clock's "+n" stoppage at reality. Null until the board goes
    *  up / between halves. See migration 028. */
   injury_time?: number | null;
+  /** Non-normal timing state (football-data): 'delayed' (past kickoff, not
+   *  started) | 'postponed' | 'suspended' (mid-play, score frozen) | 'cancelled'
+   *  | null. `status` stays scheduled|live|finished. See migration 029. */
+  delay_status?: 'delayed' | 'postponed' | 'suspended' | 'cancelled' | null;
+  /** Kickoff before a reschedule — so the app can show "moved from X". */
+  original_kickoff_utc?: string | null;
   /** Full-time push already sent (server-side dedupe; app never writes it). */
   result_pushed?: boolean;
   updated_at: string;

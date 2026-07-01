@@ -61,6 +61,7 @@ type NotifData = {
     | 'lineup'
     | 'challenge'
     | 'predict'
+    | 'delay'
     | 'leaderboard';
   matchId?: string;
   eventId?: string;

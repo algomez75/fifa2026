@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Countdown } from '@/components/Countdown';
+import { DelayBadge } from '@/components/DelayBadge';
 import { GlassCard } from '@/components/GlassCard';
 import { LineupPitch } from '@/components/LineupPitch';
 import { LiveBadge } from '@/components/LiveBadge';
@@ -97,7 +98,9 @@ export default function MatchDetailScreen() {
             <Pressable onPress={() => router.back()} hitSlop={12}>
               <Text style={styles.back}>‹</Text>
             </Pressable>
-            {isLive ? (
+            {match.delay_status ? (
+              <DelayBadge match={match} />
+            ) : isLive ? (
               <LiveBadge match={match} />
             ) : isFinished ? (
               <Text style={styles.ft}>{t.common.ft}</Text>
@@ -142,8 +145,9 @@ export default function MatchDetailScreen() {
             </View>
           </View>
 
-          {/* Countdown to kickoff while the match hasn't started */}
-          {scheduled ? (
+          {/* Countdown to kickoff while the match hasn't started (postponed counts
+              to the refreshed time; delayed/suspended/cancelled just show the badge) */}
+          {scheduled && (!match.delay_status || match.delay_status === 'postponed') ? (
             <View style={styles.countdownWrap}>
               <Text style={styles.countdownLabel}>{t.home.kickoffIn}</Text>
               <Countdown target={match.kickoff_utc} compact />

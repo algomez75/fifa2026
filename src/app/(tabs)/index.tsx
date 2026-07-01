@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Countdown } from '@/components/Countdown';
+import { DelayBadge } from '@/components/DelayBadge';
 import { FavoriteTeamsRail } from '@/components/FavoriteTeamsRail';
 import { GlassCard } from '@/components/GlassCard';
 import { HeaderActions } from '@/components/HeaderActions';
@@ -88,9 +89,15 @@ export default function HomeScreen() {
                   📍 {venuesById[upNext.venue_id].name} · {venuesById[upNext.venue_id].city}
                 </Text>
               ) : null}
-              <View style={{ marginTop: 14 }}>
-                <Countdown target={upNext.kickoff_utc} onComplete={refetch} />
-              </View>
+              {heroMatch?.delay_status ? (
+                <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
+                  <DelayBadge match={heroMatch} />
+                </View>
+              ) : (
+                <View style={{ marginTop: 14 }}>
+                  <Countdown target={upNext.kickoff_utc} onComplete={refetch} />
+                </View>
+              )}
             </Pressable>
           ) : (
             <EmptyState emoji="🏆" title={t.common.emptyTitle} />

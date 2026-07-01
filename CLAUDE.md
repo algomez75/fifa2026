@@ -302,6 +302,42 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-06-29 — Delayed / postponed / suspended matches: correct time + status + push (029, server + OTA)
+
+- **Ask:** when a match is delayed for any cause, show the correct time + status,
+  and push an alert on a >15-min delay with the cause. Researched via a **3-agent
+  sweep** (data ingestion · client display · football-data/API-Football delay
+  statuses).
+- **Gaps found:** `sync-scores` NEVER refreshed `kickoff_utc` and its `mapStatus`
+  dropped POSTPONED/CANCELLED (→ null → no write), so a delayed match kept the
+  stale time; the client had no delayed/postponed/suspended concept (Countdown
+  silently hit 00:00). Neither provider gives a free-text **cause** — only the
+  status + the (in-place-updated) new `utcDate`; "delayed/late" is inferred.
+  Decision (user): **cause = the status only** (no manual override).
+- **Migration 029:** `matches.delay_status` (`delayed|postponed|suspended|
+  cancelled|null`) + `original_kickoff_utc`. ADDITIVE — `status` stays
+  scheduled|live|finished so every existing filter is untouched.
+- **`sync-scores` (server-only → reaches everyone instantly):** refreshes
+  `kickoff_utc` when football-data moves `utcDate` (snapshots the original once);
+  writes `delay_status` from POSTPONED/CANCELLED/SUSPENDED and **infers `delayed`**
+  when a TIMED match is >15 min past kickoff & not live; clears it on live/finished
+  (SUSPENDED stays `status='live'` + `delay_status='suspended'` → score frozen).
+  New **delay push** (reuses `_shared/push.ts` + `push_sent` dedupe per
+  `delay-<status>`): "⏱️ aplazado — nueva hora en la app" / "⏸️ suspendido · 2–1" /
+  "⏱️ retrasado, empieza pronto" / "❌ cancelado".
+- **Client (OTA):** `Match.delay_status`/`original_kickoff_utc`; new **`DelayBadge`**
+  (amber pill + the refreshed new time for postponed/delayed) in `MatchCard` (both
+  layouts → every surface), the `match/[id]` scoreboard header, and the Home
+  next-match hero (replaces the countdown when delayed). New en/es strings;
+  `useNotifications` routes a `delay` push to the match.
+- **Shipped:** migration 029 applied via `db-exec.mjs` (Management API) +
+  `sync-scores` deployed (`--project-ref xqjupomaqomneqiugbft`, smoke-tested clean
+  `inWindow:14`); client via OTA (iOS `2c3aa583…` = live 1.0.1, Android
+  `c50144db…`), real Supabase ref verified in `dist/`. Typecheck + lint clean.
+  Files: migration `029_match_delay.sql`, `sync-scores/index.ts`,
+  `components/DelayBadge.tsx` (new), `MatchCard.tsx`, `match/[id].tsx`,
+  `(tabs)/index.tsx`, `database.types.ts`, `useNotifications.ts`, `en.ts`/`es.ts`.
+
 ### 2026-06-29 — Full-app optimization audit + batch 1 fixes (OTA)
 
 - **Ask:** total app review for errors, crashes, slowness, and unnecessary data

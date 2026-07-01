@@ -117,7 +117,7 @@ Deno.serve(async () => {
   const { data: active, error: gErr } = await supabase
     .from('matches')
     .select(
-      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, injury_time, kickoff_utc, updated_at',
+      'id, api_football_fixture_id, status, home_team_id, away_team_id, home_score, away_score, home_score_ht, away_score_ht, home_score_penalties, away_score_penalties, minute, period, injury_time, kickoff_utc, delay_status, original_kickoff_utc, updated_at',
     )
     .or(
       `and(status.neq.finished,kickoff_utc.lte.${soon},kickoff_utc.gte.${windowStart}),` +
@@ -158,11 +158,13 @@ Deno.serve(async () => {
   let scoreOrStatusChanged = false; // → refresh standings
   interface Transition {
     row: any;
-    type: 'kickoff_live' | 'halftime' | 'secondhalf' | 'fulltime';
+    type: 'kickoff_live' | 'halftime' | 'secondhalf' | 'fulltime' | 'delay';
     htHome?: number | null;
     htAway?: number | null;
     homeScore?: number | null;
     awayScore?: number | null;
+    /** For type 'delay': the new timing state (delayed|postponed|suspended|cancelled). */
+    delayStatus?: string;
   }
   const transitions: Transition[] = [];
   // Authoritative goal count per match (full-time score = ft.home + ft.away from
@@ -198,14 +200,56 @@ Deno.serve(async () => {
     const nextAwayTeam = teamFill.away_team_id ?? prior.away_team_id ?? null;
 
     const status = mapStatus(m.status);
+
+    // ── Kickoff refresh + delay state ──────────────────────────────────────────
+    // football-data POSTPONED/SUSPENDED/CANCELLED are first-class statuses and it
+    // updates `utcDate` in place on a reschedule (no original/new pair). "Delayed"
+    // (running late) isn't a status — we infer it (past kickoff, not started).
+    // Cause = the provider status; neither API exposes a free-text reason.
+    const fdKickoff = typeof m.utcDate === 'string' ? m.utcDate : null;
+    const storedKickoff = (prior.kickoff_utc ?? null) as string | null;
+    const kickoffMoved = !!(
+      fdKickoff &&
+      storedKickoff &&
+      Math.abs(Date.parse(fdKickoff) - Date.parse(storedKickoff)) > 60_000
+    );
+    const effectiveKickoff = kickoffMoved ? fdKickoff : storedKickoff;
+    const kickoffFields: Record<string, any> = {};
+    if (kickoffMoved) {
+      kickoffFields.kickoff_utc = fdKickoff;
+      // Snapshot the original kickoff ONCE so the app can show "moved from X".
+      if (prior.original_kickoff_utc == null) kickoffFields.original_kickoff_utc = storedKickoff;
+    }
+    let delayStatus: string | null = null;
+    if (m.status === 'POSTPONED') delayStatus = 'postponed';
+    else if (m.status === 'CANCELLED') delayStatus = 'cancelled';
+    else if (m.status === 'SUSPENDED') delayStatus = 'suspended';
+    else if (!status && effectiveKickoff && Date.parse(effectiveKickoff) < now - 15 * 60_000) {
+      delayStatus = 'delayed'; // TIMED/SCHEDULED but >15 min past kickoff & not live
+    }
+    const priorDelay = (prior.delay_status ?? null) as string | null;
+    // Queue a delay push on a NEW delay state (deduped per delay_status downstream).
+    if (delayStatus && delayStatus !== priorDelay) {
+      const sc = (m.score?.fullTime ?? {}) as any;
+      transitions.push({
+        row: prior,
+        type: 'delay',
+        delayStatus,
+        homeScore: sc.home ?? null,
+        awayScore: sc.away ?? null,
+      });
+    }
+
     if (!status) {
-      // Not live/finished yet (SCHEDULED/TIMED) → no scores to write, but persist
-      // a newly-known knockout matchup so the bracket / upcoming / pushes get the
-      // real teams early. Written once; next tick teamFill is empty → no churn.
-      if (Object.keys(teamFill).length) {
+      // Not live/finished (SCHEDULED/TIMED/POSTPONED/CANCELLED) → no live scores to
+      // write, but persist a newly-known knockout matchup, a moved kickoff, and the
+      // delay state. Written only on a real change; next tick → no churn.
+      const upd: Record<string, any> = { ...teamFill, ...kickoffFields };
+      if (delayStatus !== priorDelay) upd.delay_status = delayStatus;
+      if (Object.keys(upd).length) {
         const { error } = await supabase
           .from('matches')
-          .update(teamFill)
+          .update(upd)
           .eq('api_football_fixture_id', m.id);
         if (error) errors.push(`fill ${m.id}: ${error.message}`);
         else updated++;
@@ -232,7 +276,11 @@ Deno.serve(async () => {
       period,
       injury_time: injuryTime,
       status,
+      // Clears any prior delay when a match goes live/finished; 'suspended' while
+      // football-data status is SUSPENDED (status stays 'live', score frozen).
+      delay_status: delayStatus,
       ...teamFill,
+      ...kickoffFields,
     };
 
     if (status === 'live') liveNow.add(prior.id);
@@ -285,7 +333,9 @@ Deno.serve(async () => {
       next.injury_time === (prior.injury_time ?? null) &&
       nextHomeTeam === (prior.home_team_id ?? null) &&
       nextAwayTeam === (prior.away_team_id ?? null) &&
-      next.status === priorStatus;
+      next.status === priorStatus &&
+      delayStatus === priorDelay &&
+      !kickoffMoved;
     if (noChange) continue;
 
     const { error } = await supabase
@@ -610,7 +660,16 @@ Deno.serve(async () => {
       .from('push_sent')
       .select('token, match_id, type')
       .in('match_id', transMatchIds)
-      .in('type', ['kickoff_live', 'halftime', 'secondhalf', 'fulltime']);
+      .in('type', [
+        'kickoff_live',
+        'halftime',
+        'secondhalf',
+        'fulltime',
+        'delay-delayed',
+        'delay-postponed',
+        'delay-suspended',
+        'delay-cancelled',
+      ]);
     const sent = new Set((sentRows ?? []).map((s: any) => `${s.token}:${s.match_id}:${s.type}`));
     const messages: PushMessage[] = [];
     const sentLog: { token: string; match_id: string; type: string }[] = [];
@@ -621,7 +680,8 @@ Deno.serve(async () => {
       const a = teamName(awayId);
       for (const d of devices) {
         if (!wants(d, homeId, awayId)) continue;
-        const key = `${d.token}:${tr.row.id}:${tr.type}`;
+        const pushType = tr.type === 'delay' ? `delay-${tr.delayStatus}` : tr.type;
+        const key = `${d.token}:${tr.row.id}:${pushType}`;
         if (sent.has(key)) continue;
         sent.add(key);
         const es = d.lang === 'es';
@@ -641,6 +701,25 @@ Deno.serve(async () => {
         } else if (tr.type === 'secondhalf') {
           title = es ? '▶️ Segundo tiempo' : '▶️ Second half';
           body = es ? `¡Comienza el 2º tiempo! ${h} vs ${a}` : `Second half underway! ${h} vs ${a}`;
+        } else if (tr.type === 'delay') {
+          // Cause = the provider status (no free-text reason from the API); the
+          // app shows the exact new time (kickoff_utc was refreshed this tick).
+          const ds = tr.delayStatus;
+          if (ds === 'postponed') {
+            title = es ? '⏱️ Partido aplazado' : '⏱️ Match postponed';
+            body = es ? `${h} vs ${a} — nueva hora en la app` : `${h} vs ${a} — new time in the app`;
+          } else if (ds === 'suspended') {
+            const sc =
+              tr.homeScore != null && tr.awayScore != null ? `${tr.homeScore}–${tr.awayScore}` : null;
+            title = es ? '⏸️ Partido suspendido' : '⏸️ Match suspended';
+            body = sc ? `${h} ${sc} ${a}` : `${h} vs ${a}`;
+          } else if (ds === 'cancelled') {
+            title = es ? '❌ Partido cancelado' : '❌ Match cancelled';
+            body = `${h} vs ${a}`;
+          } else {
+            title = es ? '⏱️ Partido retrasado' : '⏱️ Match delayed';
+            body = es ? `${h} vs ${a} — empieza pronto` : `${h} vs ${a} — starting soon`;
+          }
         } else {
           // fulltime
           const sc =
@@ -655,7 +734,7 @@ Deno.serve(async () => {
           sound: 'default',
           data: { matchId: tr.row.id, type: tr.type },
         });
-        sentLog.push({ token: d.token, match_id: tr.row.id, type: tr.type });
+        sentLog.push({ token: d.token, match_id: tr.row.id, type: pushType });
       }
     }
     if (messages.length) {
