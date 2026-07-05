@@ -308,6 +308,48 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-05 — Always fresh on reopen: foreground refresh pipeline + Supabase token auto-refresh (OTA)
+
+- **Ask:** after being minimized the app took a while to update and sometimes
+  showed stale info on reopen; it must refresh instantly on foreground, on
+  whatever page is open (and any page opened next).
+- **Root causes (3):** (1) **expired JWT after a long suspend** — iOS freezes
+  supabase-js's auto-refresh timer in the background and the app never wired
+  the official RN `startAutoRefresh`/`stopAutoRefresh` lifecycle hooks, so on
+  resume every PostgREST call 401'd (public reads too — the expired token still
+  goes in the Authorization header) until a lazy refresh ~30s later; TanStack
+  keeps cached data on error, so the UI silently showed old info. (2) **No
+  global foreground refetch** — only `['matches']`/`['match_events']` were
+  invalidated on foreground (inside `useMatchRealtime`); leaderboard, inbox,
+  challenges, standings, match detail, predictions, squad waited for their next
+  poll tick / staleTime. (3) **Cold start masked by seed** — `useMatches`'
+  `initialData: seedSchedule` counted as *fresh* for `staleTime` (30s), so a
+  cold open could sit on bundled seed (no live scores) for up to 30s before the
+  first real fetch.
+- **Fix (all JS-only):**
+  - `lib/supabase.ts`: AppState → `supabase.auth.startAutoRefresh()` on active /
+    `stopAutoRefresh()` otherwise (the official Supabase RN pattern);
+    `startAutoRefresh` runs an immediate tick, so a token that expired while
+    minimized is renewed the moment the app reopens.
+  - `lib/queryClient.ts` foreground pipeline (replaces the bare focusManager
+    wiring): on active → `ensureFreshSession()` first (`auth.getSession()`
+    refreshes an expired token; raced with a 1.5s cap so offline never blocks)
+    → `focusManager.setFocused(true)` (resumes paused `refetchInterval`s +
+    focus refetch) → **`queryClient.invalidateQueries()`** — every mounted
+    screen refetches immediately and every other cached query is marked stale
+    so it refetches on mount when the user navigates to it. Sub-2s dips through
+    `'inactive'` (notification shade, control centre, Face ID) skip the full
+    invalidate unless the app actually reached `'background'`.
+  - `hooks/useMatches.ts`: `initialDataUpdatedAt: 0` — seed still renders
+    instantly but is born-stale, so the real fetch fires immediately on a cold
+    start instead of after 30s.
+- Realtime socket resubscription on foreground already existed
+  (`useMatchRealtime`) and now overlaps cleanly with the global invalidate
+  (TanStack dedupes/cancels in-flight refetches). Typecheck + lint clean.
+- **Shipped via OTA** to `production` (iOS runtime `2c3aa583…` = live 1.0.1
+  build, Android `c50144db…`); real Supabase ref verified in the `dist/`
+  bundle. Files: `lib/queryClient.ts`, `lib/supabase.ts`, `hooks/useMatches.ts`.
+
 ### 2026-06-30 — Match detail: previous-matches + group tabs (Apple-Sports) · challenge points → ranking tiebreak only (030, server + OTA)
 
 - **Ask (2 parts):** (1) tapping the Home "next match" hero opens the match detail

@@ -35,6 +35,10 @@ export function useMatches() {
     queryKey: matchesKey,
     queryFn: fetchMatches,
     initialData: seedSchedule,
+    // The bundled seed renders instantly but must never MASK fresh data: mark
+    // it born-stale so a cold start fetches the real matches immediately
+    // (otherwise initialData counts as fresh for staleTime = 30s of old info).
+    initialDataUpdatedAt: 0,
     // Belt-and-braces alongside the Realtime channel: while a match is hot,
     // poll every 10s so scores/clock stay fresh even if the socket died (the
     // server now syncs every ~5s).
