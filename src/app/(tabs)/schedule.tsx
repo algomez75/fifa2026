@@ -52,7 +52,12 @@ export default function ScheduleScreen() {
       router.push(`/match/${m.id}` as Href);
       return;
     }
-    const predictable = new Date(m.kickoff_utc).getTime() > Date.now();
+    // A TBD fixture opens the modal in its "teams to be decided" state — skip
+    // the sign-in prompt for it (there's nothing to save yet).
+    const predictable =
+      new Date(m.kickoff_utc).getTime() > Date.now() &&
+      !!m.home_team_id &&
+      !!m.away_team_id;
     if (predictable && !requireAccount()) return;
     setPredicting(m);
   };

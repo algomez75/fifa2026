@@ -50,6 +50,8 @@ export const en = {
     result: 'Correct result +1',
     miss: 'No points',
     signInToSave: 'Your prediction is saved to your account.',
+    teamsTbd: 'Teams to be decided — you can predict once both are set.',
+    noDraw: 'No draws in the knockout rounds — pick a winner.',
   },
   leaderboard: {
     title: 'RANKING',

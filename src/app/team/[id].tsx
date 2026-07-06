@@ -42,8 +42,13 @@ export default function TeamDetailScreen() {
     if (requireAccount()) void toggleFavorite(teamId);
   };
   const openPrediction = (m: Match) => {
+    // TBD fixtures open the modal in its "teams to be decided" state — no
+    // sign-in prompt needed (there's nothing to save yet).
     const predictable =
-      m.status === 'scheduled' && new Date(m.kickoff_utc).getTime() > Date.now();
+      m.status === 'scheduled' &&
+      new Date(m.kickoff_utc).getTime() > Date.now() &&
+      !!m.home_team_id &&
+      !!m.away_team_id;
     if (predictable && !requireAccount()) return;
     setPredicting(m);
   };

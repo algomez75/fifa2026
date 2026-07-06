@@ -16,6 +16,7 @@ import { kickoffSoon, useMatchDetail, type MatchDetail } from '@/hooks/useMatchD
 import { useMatchEvents } from '@/hooks/useMatchEvents';
 import { useMatches } from '@/hooks/useMatches';
 import { usePredictions } from '@/hooks/usePredictions';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { formatKickoffTime, matchDayLabel, shortName, teamName } from '@/lib/format';
 import { teamsById, venuesById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
@@ -43,7 +44,12 @@ export default function MatchDetailScreen() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const { data: matches } = useMatches();
-  const match = (matches ?? []).find((m) => m.id === id);
+  const resolve = useResolveMatch();
+  // Fill undecided knockout sides (same resolver as the Bracket/Schedule) so
+  // the scoreboard, the team-context tabs, and the prediction modal all show
+  // the real teams the moment they're known.
+  const raw = (matches ?? []).find((m) => m.id === id);
+  const match = raw ? resolve(raw).match : undefined;
   const { data: detail } = useMatchDetail(id, {
     live: match?.status === 'live',
     finished: match?.status === 'finished',

@@ -51,6 +51,8 @@ export const es: Translation = {
     result: 'Resultado correcto +1',
     miss: 'Sin puntos',
     signInToSave: 'Tu predicción se guarda en tu cuenta.',
+    teamsTbd: 'Equipos por definir — podrás predecir cuando ambos estén listos.',
+    noDraw: 'En eliminatorias no hay empate — elige un ganador.',
   },
   leaderboard: {
     title: 'RANKING',

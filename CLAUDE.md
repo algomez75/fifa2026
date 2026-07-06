@@ -308,6 +308,38 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-05 — Predictions: no draws in knockouts + locked until both teams are set (OTA)
+
+- **Ask (2 rules):** (1) from the R32 ("dieciseisavos") on, a prediction can
+  never be a draw — knockout matches always produce a winner; (2) a fixture
+  whose sides aren't decided yet (placeholder "Winner R32-3") must not be
+  predictable until BOTH teams are known and visible.
+- **All centralized in `PredictionModal`** (single component every surface
+  opens — Schedule, team detail, match detail):
+  - `noDraw` — for `stage !== 'group'`, while `home === away` the Save button
+    is disabled (+ gold hint `predict.noDraw`: "En eliminatorias no hay
+    empate — elige un ganador"). Applies to the initial 0–0 too, forcing a
+    winner pick; a legacy draw prediction re-opens disabled until changed.
+    `save()` also guards, so nothing can submit a knockout draw client-side.
+  - `teamsTbd` — if either resolved side is still null (and not locked), the
+    steppers render locked with a "–" value and the Save area is replaced by
+    `predict.teamsTbd` ("Equipos por definir…"). Callers pass the
+    bracket-resolved match, so "known" = the card visibly shows both teams
+    (server id or finished-feeder progression), exactly like the Bracket.
+  - `match/[id]` now resolves through **`useResolveMatch`** too (it was the
+    only prediction surface still reading the raw row), so its scoreboard +
+    context tabs + predict CTA see resolved teams consistently.
+  - Schedule/team `openPrediction`: a TBD fixture skips the sign-in prompt
+    (nothing to save) and just opens the modal in its TBD state.
+- Note: client-side rule only (RLS still allows any 0–30 pair pre-kickoff);
+  the two pre-existing PredictionModal lint hits (form-reset `useEffect`,
+  `Date.now()` in `locked`) are untouched. New `predict.teamsTbd`/`noDraw`
+  strings (en/es).
+- **JS-only → OTA** to `production` (iOS runtime `2c3aa583…` = live 1.0.1
+  build, Android `c50144db…`); real Supabase ref verified in `dist/`. Files:
+  `components/PredictionModal.tsx`, `app/match/[id].tsx`,
+  `app/(tabs)/schedule.tsx`, `app/team/[id].tsx`, `en.ts`/`es.ts`.
+
 ### 2026-07-05 — Schedule "Upcoming" fills knockout teams with full bracket progression (OTA)
 
 - **Ask:** the Schedule → Upcoming tab must show upcoming (knockout) matches

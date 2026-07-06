@@ -35,6 +35,12 @@ export function PredictionModal({ match, prediction, onClose }: Props) {
 
   const locked =
     new Date(match.kickoff_utc).getTime() <= Date.now() || match.status !== 'scheduled';
+  // A knockout fixture whose sides aren't decided yet (placeholder "Winner
+  // R32-3") can't be predicted — wait until both teams are known.
+  const teamsTbd = !locked && (!match.home_team_id || !match.away_team_id);
+  // From the R32 on a match always produces a winner (extra time/penalties),
+  // so a draw pick is not allowed in the knockout rounds.
+  const noDraw = match.stage !== 'group' && !locked && !teamsTbd && home === away;
   const homeTeam = match.home_team_id ? teamsById[match.home_team_id] : undefined;
   const awayTeam = match.away_team_id ? teamsById[match.away_team_id] : undefined;
   const result = prediction ? scorePrediction(prediction, match) : null;
@@ -46,6 +52,7 @@ export function PredictionModal({ match, prediction, onClose }: Props) {
   };
 
   const save = () => {
+    if (teamsTbd || noDraw) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setPred.mutate(
       { matchId: match.id, homePred: home, awayPred: away },
@@ -67,7 +74,8 @@ export function PredictionModal({ match, prediction, onClose }: Props) {
               name={sideName(match.home_team_id, match.home_placeholder, language)}
               team={homeTeam}
               value={locked ? prediction?.home_pred ?? 0 : home}
-              locked={locked}
+              locked={locked || teamsTbd}
+              tbd={teamsTbd}
               onInc={() => step(setHome, home, 1)}
               onDec={() => step(setHome, home, -1)}
             />
@@ -76,7 +84,8 @@ export function PredictionModal({ match, prediction, onClose }: Props) {
               name={sideName(match.away_team_id, match.away_placeholder, language)}
               team={awayTeam}
               value={locked ? prediction?.away_pred ?? 0 : away}
-              locked={locked}
+              locked={locked || teamsTbd}
+              tbd={teamsTbd}
               onInc={() => step(setAway, away, 1)}
               onDec={() => step(setAway, away, -1)}
             />
@@ -109,12 +118,15 @@ export function PredictionModal({ match, prediction, onClose }: Props) {
 
           {locked ? (
             <Text style={styles.locked}>{t.predict.locked}</Text>
+          ) : teamsTbd ? (
+            <Text style={styles.locked}>{t.predict.teamsTbd}</Text>
           ) : (
             <>
+              {noDraw ? <Text style={styles.noDraw}>{t.predict.noDraw}</Text> : null}
               <Pressable
-                style={[styles.save, setPred.isPending && { opacity: 0.6 }]}
+                style={[styles.save, (setPred.isPending || noDraw) && { opacity: 0.5 }]}
                 onPress={save}
-                disabled={setPred.isPending}>
+                disabled={setPred.isPending || noDraw}>
                 <Text style={styles.saveText}>
                   {setPred.isPending ? '…' : t.predict.save}
                 </Text>
@@ -136,6 +148,7 @@ function Stepper({
   team,
   value,
   locked,
+  tbd,
   onInc,
   onDec,
 }: {
@@ -143,6 +156,8 @@ function Stepper({
   team?: import('@/lib/database.types').Team;
   value: number;
   locked: boolean;
+  /** Sides not decided yet — show a dash instead of a misleading 0. */
+  tbd?: boolean;
   onInc: () => void;
   onDec: () => void;
 }) {
@@ -152,7 +167,7 @@ function Stepper({
       <Text style={styles.stepperName} numberOfLines={1}>
         {name}
       </Text>
-      <Text style={styles.stepValue}>{value}</Text>
+      <Text style={styles.stepValue}>{tbd ? '–' : value}</Text>
       {!locked ? (
         <View style={styles.stepBtns}>
           <Pressable style={styles.stepBtn} onPress={onDec} hitSlop={6}>
@@ -222,6 +237,7 @@ const styles = StyleSheet.create({
   pillResult: { backgroundColor: 'rgba(99,153,34,0.15)', color: palette.success },
   pillMiss: { backgroundColor: palette.surface, color: palette.textSecondary },
   locked: { color: palette.textTertiary, fontSize: 13, textAlign: 'center', paddingVertical: 6 },
+  noDraw: { color: palette.gold, fontSize: 12.5, fontWeight: '700', textAlign: 'center' },
   save: {
     backgroundColor: palette.gold,
     borderRadius: radius.pill,
