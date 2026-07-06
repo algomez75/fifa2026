@@ -10,11 +10,10 @@ import { LocationPinIcon } from '@/components/icons';
 import { EmptyState, ErrorState, LoadingState } from '@/components/States';
 import type { Match } from '@/lib/database.types';
 import { dayKey, formatMatchDay } from '@/lib/format';
-import { resolveMatchTeams } from '@/lib/qualification';
 import { venuesById } from '@/lib/seed';
 import { palette, radius } from '@/lib/theme';
-import { useBracketQualifiers } from '@/hooks/useBracketQualifiers';
 import { useMatches } from '@/hooks/useMatches';
+import { useResolveMatch } from '@/hooks/useResolveMatch';
 import { usePredictions } from '@/hooks/usePredictions';
 import { useRequireAccount } from '@/hooks/useRequireAccount';
 import { type HostFilter, useAppStore, useTranslation } from '@/store/useAppStore';
@@ -30,9 +29,10 @@ export default function ScheduleScreen() {
   const { t, language } = useTranslation();
   const router = useRouter();
   const { data: matches, isLoading, isError, refetch } = useMatches();
-  // Live placeholder→team map (same source as the Bracket), so R32 slots fill
-  // with the securely-qualified teams in real time.
-  const qualifiers = useBracketQualifiers(matches ?? []);
+  // Same resolver as the Bracket: fills every undecided knockout side in real
+  // time — clinched group teams for R32 AND winner/loser progression for
+  // R16→Final — so Upcoming always shows the real teams the moment they're known.
+  const resolve = useResolveMatch();
 
   const onlyMyTeams = useAppStore((s) => s.onlyMyTeams);
   const setOnlyMyTeams = useAppStore((s) => s.setOnlyMyTeams);
@@ -65,12 +65,12 @@ export default function ScheduleScreen() {
         if (v?.country !== filterHost) return false;
       }
       if (onlyMyTeams && favorites.length) {
-        // Resolve knockout sides so a favorite that just clinched into an R32
-        // slot shows here too (matches the bracket).
-        const r = resolveMatchTeams(m, qualifiers);
+        // Resolve knockout sides so a favorite that just clinched/advanced into
+        // a knockout slot shows here too (matches the bracket).
+        const rm = resolve(m).match;
         if (
-          !favorites.includes(r.home.teamId ?? '') &&
-          !favorites.includes(r.away.teamId ?? '')
+          !favorites.includes(rm.home_team_id ?? '') &&
+          !favorites.includes(rm.away_team_id ?? '')
         )
           return false;
       }
@@ -90,27 +90,20 @@ export default function ScheduleScreen() {
       past: groupByDayDesc(pastM),
       pastCount: pastM.length,
     };
-  }, [matches, filterHost, onlyMyTeams, favorites, qualifiers]);
+  }, [matches, filterHost, onlyMyTeams, favorites, resolve]);
 
-  // Render a card with the knockout sides resolved through the qualifier map:
-  // `display` fills undecided R32 sides (flag + name); `qualMark` carries the
-  // bracket's locked/provisional marker. Prediction identity stays `match.id`.
+  // Render a card with the knockout sides resolved like the Bracket: `r.match`
+  // fills undecided sides (flag + name) in every round; `qualMark` carries the
+  // locked/provisional marker. Prediction identity stays `match.id`.
   const cardFor = (m: Match) => {
-    const r = resolveMatchTeams(m, qualifiers);
-    const display =
-      r.home.teamId === m.home_team_id && r.away.teamId === m.away_team_id
-        ? m
-        : { ...m, home_team_id: r.home.teamId, away_team_id: r.away.teamId };
+    const r = resolve(m);
     return (
       <MatchCard
         key={m.id}
-        match={display}
+        match={r.match}
         prediction={predictions?.[m.id] ?? null}
         onPress={openPrediction}
-        qualMark={{
-          home: { qualified: r.home.isQualified, locked: r.home.isLocked },
-          away: { qualified: r.away.isQualified, locked: r.away.isLocked },
-        }}
+        qualMark={{ home: r.home, away: r.away }}
       />
     );
   };

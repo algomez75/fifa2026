@@ -308,6 +308,29 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-05 — Schedule "Upcoming" fills knockout teams with full bracket progression (OTA)
+
+- **Ask:** the Schedule → Upcoming tab must show upcoming (knockout) matches
+  with their real teams updating in real time, exactly like the Bracket
+  already does.
+- **Gap:** `schedule.tsx` still used the older `resolveMatchTeams` +
+  `useBracketQualifiers` pair, which resolves only **group** slots ("Winner A" /
+  "Runner-up B") into R32 — fine during the group stage, but with the knockouts
+  underway, R16→Final fixtures ("Winner R32-3") sat on placeholders in the
+  Schedule while the Bracket (via `resolveBracket`: fixed-point winner/loser
+  progression, server ids first) showed the real teams.
+- **Fix:** Schedule now uses the shared **`useResolveMatch()`** — the exact
+  resolver the Bracket uses. Every live/upcoming card and the "only my teams"
+  favorites filter resolve through the full progression, so a just-decided
+  cross appears in Upcoming the same instant it appears in the Bracket
+  (realtime patch, hot poll, and the foreground refresh all recompute it).
+  Locked (solid dot) vs provisional (hollow ring) gold markers preserved;
+  prediction identity still keys off the unchanged `match.id`. Results tab
+  untouched (finished matches always carry real ids).
+- **JS-only → OTA** to `production` (iOS runtime `2c3aa583…` = live 1.0.1
+  build, Android `c50144db…`); real Supabase ref verified in `dist/`.
+  Typecheck + lint clean. File: `app/(tabs)/schedule.tsx`.
+
 ### 2026-07-05 — Always fresh on reopen: foreground refresh pipeline + Supabase token auto-refresh (OTA)
 
 - **Ask:** after being minimized the app took a while to update and sometimes
