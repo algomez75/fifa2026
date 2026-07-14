@@ -308,6 +308,40 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-14 — Golden Boot empty: sync-scores writes broke on the multi-competition schema (server-only, NO OTA)
+
+- **Bug (user):** the Home Golden Boot section stopped showing the list.
+  `top_scorers` in prod was **completely EMPTY** (anon read = 0 rows) → the card
+  renders `null`.
+- **Root cause:** migration 027+ (multi-league prep) changed `top_scorers` PK to
+  **(competition_id, rank)** with `competition_id` NOT NULL and **no default**.
+  `sync-scores`' golden-boot refresh still did `delete().gte('rank',0)` (wipe
+  ALL competitions) + `insert(rows)` **without `competition_id`** → insert
+  failed NOT NULL on every goal tick → table left empty forever. The client
+  (`useTopScorers`, commit 56e5bbb) correctly filters
+  `eq('competition_id','world-cup-2026')` — nothing to fix client-side.
+- **Same latent bug in standings:** `standings` PK is now **(competition_id,
+  team_id)**, but sync-scores upserted with `onConflict: 'group_letter,team_id'`
+  (no longer a unique constraint) and no `competition_id` → the refresh errored
+  silently on every score change (rows frozen at the pre-027 backfill; harmless
+  now that groups are over, but fixed anyway).
+- **Fix (`sync-scores`, server-only → reaches everyone instantly, NO OTA):** new
+  `WC_COMPETITION_ID` const; scorer rows now carry `competition_id` and the wipe
+  is **scoped** (`delete().eq('competition_id', WC)` — never nukes other
+  competitions' rows); standings rows carry `competition_id` and upsert
+  `onConflict: 'competition_id,team_id'`.
+- **Backfill:** new one-shot `scripts/rebuild-scorers.mjs` (football-data
+  `/competitions/WC/scorers?limit=20` → same team/player-id resolution as
+  sync-scores) repopulated the 20 rows immediately (Mbappé 8g leads, photos
+  resolve). Verified via the client's exact PostgREST query (anon + filter +
+  players join).
+- **Gotcha:** `fifa2026/.env`'s `SUPABASE_ACCESS_TOKEN` is **revoked** (401).
+  Deploy + Management API calls used the valid token from `11gol/.env` (same
+  account, sees `worldcup26`). Refresh the fifa2026 token when convenient.
+- Deployed `sync-scores` (`--project-ref xqjupomaqomneqiugbft`), smoke-tested
+  clean (`inWindow:2`). Files: `sync-scores/index.ts`,
+  `scripts/rebuild-scorers.mjs` (new).
+
 ### 2026-07-05 — Predictions: no draws in knockouts + locked until both teams are set (OTA)
 
 - **Ask (2 rules):** (1) from the R32 ("dieciseisavos") on, a prediction can

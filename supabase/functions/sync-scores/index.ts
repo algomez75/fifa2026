@@ -35,6 +35,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const TOKEN = Deno.env.get('FOOTBALLDATA_TOKEN') ?? '';
 const FD_BASE = 'https://api.football-data.org/v4';
+// The backend also hosts club-league rows (migration 027+): top_scorers PK is
+// (competition_id, rank) and standings PK is (competition_id, team_id), both
+// NOT NULL. Every write here must carry — and every wipe must be scoped to —
+// the WC competition, or inserts fail and other competitions' rows get nuked.
+const WC_COMPETITION_ID = 'world-cup-2026';
 
 // Detail-fetch floors: live matches refresh stats/cards faster than idle
 // (pre-kickoff lineups / post-finish stats finalization).
@@ -760,6 +765,7 @@ Deno.serve(async () => {
       const rows = list.map((s, i) => {
         const teamId = teamByFdId.get(s.team?.id) ?? null;
         return {
+          competition_id: WC_COMPETITION_ID,
           rank: i + 1,
           fd_player_id: s.player?.id ?? null,
           player_id: resolvePlayer(teamId, s.player?.name ?? null),
@@ -772,7 +778,11 @@ Deno.serve(async () => {
           updated_at: new Date().toISOString(),
         };
       });
-      const del = await supabase.from('top_scorers').delete().gte('rank', 0);
+      // Wipe ONLY the WC rows (never other competitions'), then reinsert.
+      const del = await supabase
+        .from('top_scorers')
+        .delete()
+        .eq('competition_id', WC_COMPETITION_ID);
       if (del.error) errors.push(`scorers clear: ${del.error.message}`);
       const ins = await supabase.from('top_scorers').insert(rows);
       if (ins.error) errors.push(`scorers insert: ${ins.error.message}`);
@@ -794,6 +804,7 @@ Deno.serve(async () => {
         const teamId = teamByFdId.get(r.team?.id) ?? null;
         if (!teamId) continue;
         rows.push({
+          competition_id: WC_COMPETITION_ID,
           group_letter: letter,
           team_id: teamId,
           position: r.position ?? 0,
@@ -811,9 +822,11 @@ Deno.serve(async () => {
       }
     }
     if (rows.length) {
+      // PK is (competition_id, team_id) since migration 027 — the old
+      // 'group_letter,team_id' target no longer matches a unique constraint.
       const { error } = await supabase
         .from('standings')
-        .upsert(rows, { onConflict: 'group_letter,team_id' });
+        .upsert(rows, { onConflict: 'competition_id,team_id' });
       if (error) errors.push(`standings: ${error.message}`);
       else standingsRows = rows.length;
     }
