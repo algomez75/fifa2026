@@ -897,6 +897,17 @@ h3 {
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
+.sec-head-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.boot-icon {
+  width: 66px;
+  height: 66px;
+  object-fit: contain;
+  display: block;
+}
 .livechip {
   display: flex;
   align-items: center;
