@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { MatchEventRow } from '@/lib/database.types';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-import { anyMatchHot, useMatches } from './useMatches';
+import { anyMatchHot, useMatches, WC_COMPETITION_ID } from './useMatches';
 
 export const matchEventsKey = ['match-events'] as const;
 
@@ -11,16 +11,24 @@ export type GoalEvent = MatchEventRow & { player_photo: string | null };
 
 async function fetchMatchEvents(): Promise<GoalEvent[]> {
   if (!isSupabaseConfigured) return [];
+  // The `matches!inner` join scopes events to WC matches only — the backend
+  // also hosts club-league rows, and an unfiltered read would both leak them
+  // and overflow PostgREST's 1000-row cap once leagues are seeded.
   const { data, error } = await supabase
     .from('match_events')
-    .select('*, player:players(photo_url)')
+    .select('*, player:players(photo_url), match:matches!inner(competition_id)')
+    .eq('match.competition_id', WC_COMPETITION_ID)
     .order('seq', { ascending: true });
   if (error) throw error;
   return (
     (data ?? []) as unknown as (MatchEventRow & {
       player: { photo_url: string | null } | null;
+      match: { competition_id: string | null } | null;
     })[]
-  ).map(({ player, ...row }) => ({ ...row, player_photo: player?.photo_url ?? null }));
+  ).map(({ player, match: _match, ...row }) => ({
+    ...row,
+    player_photo: player?.photo_url ?? null,
+  }));
 }
 
 /**

@@ -6,12 +6,26 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 export const matchesKey = ['matches'] as const;
 
+/** This app is World-Cup-only: the backend now also hosts club-league rows
+ *  (migration 027+), so every read must stay scoped to the WC competition. */
+export const WC_COMPETITION_ID = 'world-cup-2026';
+
 async function fetchMatches(): Promise<Match[]> {
   if (!isSupabaseConfigured) return seedSchedule;
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('matches')
     .select('*')
+    .eq('competition_id', WC_COMPETITION_ID)
     .order('kickoff_utc', { ascending: true });
+  if (error?.code === '42703') {
+    // Backend predates migration 027 (`competition_id` column missing).
+    // Every row there is a WC match, so retry unfiltered instead of dropping
+    // to the stale seed.
+    ({ data, error } = await supabase
+      .from('matches')
+      .select('*')
+      .order('kickoff_utc', { ascending: true }));
+  }
   if (error) throw error;
   // Fall back to bundled schedule if the table hasn't been seeded yet.
   return data && data.length ? (data as Match[]) : seedSchedule;

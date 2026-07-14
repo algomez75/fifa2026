@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-import { anyMatchHot, useMatches } from './useMatches';
+import { anyMatchHot, useMatches, WC_COMPETITION_ID } from './useMatches';
 
 /** One official group-standings row (synced from football-data by sync-scores). */
 export interface OfficialStanding {
@@ -26,6 +26,7 @@ async function fetchStandings(): Promise<OfficialStanding[]> {
     .select(
       'group_letter, team_id, position, played, won, draw, lost, goals_for, goals_against, goal_difference, points, form',
     )
+    .eq('competition_id', WC_COMPETITION_ID)
     .order('group_letter', { ascending: true })
     .order('position', { ascending: true });
   if (error) throw error;

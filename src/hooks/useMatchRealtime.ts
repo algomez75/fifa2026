@@ -75,6 +75,10 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
     const onMatchUpdate = (payload: { new: unknown }) => {
       const next = payload.new as Match;
       const prev = findMatch(next.id);
+      // The realtime channel carries EVERY competition's matches (club leagues
+      // share the table since migration 027) — ignore anything outside the
+      // WC-filtered cache so foreign matches never patch or celebrate here.
+      if (!prev) return;
 
       qc.setQueryData<Match[]>(matchesKey, (old) =>
         (old ?? []).map((m) => (m.id === next.id ? { ...m, ...next } : m)),
@@ -110,6 +114,10 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
 
     const onEventInsert = (payload: { new: unknown }) => {
       const ev = payload.new as MatchEventRow;
+      // Events also flow in for club-league matches — only WC matches live in
+      // the (competition-filtered) cache, so skip anything we don't know.
+      const match = findMatch(ev.match_id);
+      if (!match) return;
 
       // Keep the shared events cache (goals + cards) fresh for match cards
       // (the photo joins in on the next refetch; initials show until then).
@@ -120,8 +128,6 @@ export function useMatchRealtime({ onGoal, onResult }: MatchRealtimeHandlers = {
       );
 
       if (ev.type !== 'goal') return; // celebrations are goal-only
-      const match = findMatch(ev.match_id);
-      if (!match) return;
       const scoreKey = `${ev.match_id}:${ev.score_home ?? 0}-${ev.score_away ?? 0}`;
       const pending = pendingFallbacks.get(scoreKey);
       if (pending) {

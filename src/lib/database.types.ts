@@ -42,6 +42,10 @@ export type Venue = {
 
 export type Match = {
   id: string;
+  /** Owning competition (migration 027) — the backend also hosts club-league
+   *  rows, so every read filters on 'world-cup-2026'. Optional: seed rows
+   *  predate the column. */
+  competition_id?: string | null;
   stage: Stage;
   group_letter: string | null;
   match_number: number | null;
@@ -82,6 +86,8 @@ export type Match = {
 
 /** Tournament golden-boot row, replaced wholesale by sync-scores. */
 export type TopScorerRow = {
+  /** Owning competition (migration 027) — reads filter on 'world-cup-2026'. */
+  competition_id?: string | null;
   rank: number;
   fd_player_id: number | null;
   player_id: number | null;

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { WC_COMPETITION_ID } from './useMatches';
 
 export interface TopScorer {
   rank: number;
@@ -18,6 +19,7 @@ async function fetchTopScorers(): Promise<TopScorer[]> {
   const { data, error } = await supabase
     .from('top_scorers')
     .select('rank, player_name, team_id, goals, assists, penalties, played, player:players(photo_url)')
+    .eq('competition_id', WC_COMPETITION_ID)
     .order('rank', { ascending: true });
   if (error) throw error;
   return (
