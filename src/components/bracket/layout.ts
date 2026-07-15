@@ -81,3 +81,93 @@ export function bracketLayout(): BracketLayout {
 
   return { cells, knockoutHeight: R32_ORDER.length * ROW };
 }
+
+/** Number of horizontal snap anchors (GS+R32 · R32+R16 · R16+QF · QF+SF · SF+F). */
+export const SNAP_COUNT = 5;
+/** Gap between the Final cell and the 3rd-place box (px). */
+export const THIRD_GAP = 44;
+/** 3rd-place box title height incl. margin (px) — used for canvas extents. */
+export const THIRD_TITLE_H = 22;
+
+export interface AnchorLayouts {
+  /** matchId → vertical center (px, before V_PAD) at each snap anchor 0..4. */
+  tracks: Map<string, number[]>;
+  /** Full canvas height (px, incl. V_PAD × 2) at each snap anchor. */
+  heights: number[];
+}
+
+/**
+ * Fit-to-screen morph geometry: one layout per horizontal snap anchor. At each
+ * anchor the leftmost visible knockout round spreads its matches evenly across
+ * the visible height (`fitH`) when they fit — else it keeps the natural compact
+ * pitch and the canvas stays vertically scrollable. Later rounds sit at their
+ * feeders' midpoints; already-passed rounds tuck each pair in around the match
+ * it feeds (midpoint invariant kept, so connectors stay clean elbows while the
+ * cells interpolate between anchors with the horizontal scroll).
+ */
+export function bracketAnchorLayouts(fitH: number, groupsH: number): AnchorLayouts {
+  const base = bracketLayout();
+
+  // Knockout column ids in tree (top→bottom) order; index 0 = R32 … 4 = Final.
+  const colIds: string[][] = Array.from({ length: 5 }, () => []);
+  for (const [id, pos] of base.cells) colIds[pos.col - 1].push(id);
+  for (const ids of colIds)
+    ids.sort((x, y) => base.cells.get(x)!.cy - base.cells.get(y)!.cy);
+
+  const tracks = new Map<string, number[]>();
+  for (const id of base.cells.keys()) tracks.set(id, []);
+  const heights: number[] = [];
+
+  // Leftmost visible knockout column per anchor (anchor 0 shows GS + R32).
+  const ANCHOR_COL = [1, 1, 2, 3, 4];
+
+  for (let a = 0; a < SNAP_COUNT; a++) {
+    const cy = new Map<string, number>();
+    const anchorCol = ANCHOR_COL[a];
+    const ids = colIds[anchorCol - 1];
+    const n = ids.length;
+    const fits = n * ROW <= fitH;
+    const span = fits ? fitH : n * ROW;
+    const pitch = fits ? fitH / n : ROW;
+    ids.forEach((id, i) =>
+      cy.set(id, fits ? pitch * (i + 0.5) : i * ROW + CELL_H / 2),
+    );
+
+    // Later rounds: each match at the midpoint of its two feeders.
+    for (let c = anchorCol + 1; c <= 5; c++) {
+      for (const id of colIds[c - 1]) {
+        const f = base.cells.get(id)!.feeders!;
+        cy.set(id, (cy.get(f[0])! + cy.get(f[1])!) / 2);
+      }
+    }
+
+    // Passed rounds: each feeder pair tucks in around the match it feeds
+    // (separation halves per step back so exiting columns visibly regroup).
+    // Clamped inside the canvas; the tiny midpoint bend (≤ sep/4) keeps the
+    // parent stub within the connector bar, so elbows still read connected.
+    let sep = pitch / 2;
+    for (let c = anchorCol - 1; c >= 1; c--) {
+      for (const id of colIds[c]) {
+        // parents live in column c+1 (= colIds[c]); their feeders in column c
+        const f = base.cells.get(id)!.feeders!;
+        const p = cy.get(id)!;
+        const clamp = (v: number) =>
+          Math.min(Math.max(v, CELL_H / 2), span - CELL_H / 2);
+        cy.set(f[0], clamp(p - sep / 2));
+        cy.set(f[1], clamp(p + sep / 2));
+      }
+      sep = Math.max(8, sep / 2);
+    }
+
+    for (const [id, arr] of tracks) arr.push(cy.get(id)!);
+
+    // Canvas extent: the spread span, the 3rd-place box below the Final, and
+    // (anchor 0 only) the group-standings column.
+    const thirdBottom =
+      cy.get('FINAL-1')! + CELL_H / 2 + THIRD_GAP + THIRD_TITLE_H + CELL_H;
+    const ko = Math.max(span, thirdBottom);
+    heights.push((a === 0 ? Math.max(ko, groupsH) : ko) + V_PAD * 2);
+  }
+
+  return { tracks, heights };
+}

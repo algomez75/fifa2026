@@ -308,6 +308,49 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-14 — Bracket: rounds regroup to FIT the visible screen as you swipe (OTA)
+
+- **Ask:** in Groups → Bracket, as the tree scrolls left the incoming matches
+  should **group themselves into whatever fits the visible screen height**
+  (detect the real viewport), and only keep the vertical scroll when a round
+  genuinely doesn't fit (R32; R16 on short screens). Everything else — snapping,
+  navigator, cells, GS column — stays exactly as it was.
+- **Before:** one static layout — the R32 column (16·`ROW` ≈ 1376px) fixed the
+  canvas height for every page, so QF/SF/F floated sparse in a huge empty canvas
+  and needed vertical scrolling to see both SF cells.
+- **Fit-to-screen morph (`bracketAnchorLayouts` in `bracket/layout.ts`, pure):**
+  one layout per horizontal snap anchor (5: GS+R32 · R32+R16 · R16+QF · QF+SF ·
+  SF+F). At each anchor the leftmost visible round spreads its matches evenly
+  across the measured fit height when they fit (else keeps the compact pitch →
+  canvas stays scrollable); later rounds sit at their feeders' midpoints;
+  already-passed rounds tuck each pair in around the match they feed (separation
+  halves per step back), clamped inside the canvas. The **midpoint invariant**
+  holds at every anchor (and is preserved by linear interpolation), so connector
+  elbows stay clean mid-swipe; anchor 0 ≡ anchor 1 ≡ the old static layout, so
+  the GS page is pixel-identical to before.
+- **`BracketTree`:** measures the vertical scroll window (`onLayout` −
+  tab-bar clearance `insets.bottom + 88`); every cell/3rd-place box renders in a
+  `MorphingBox` (absolute `top:0` + `translateY` interpolated over the 5 snap
+  offsets — `FadeInDown` kept on an inner wrapper so it composes); the canvas
+  **height animates** with the same interpolation (applied to the horizontal
+  `Animated.ScrollView` + inner canvas), and a `useAnimatedReaction` **rides the
+  vertical offset up** (`scrollTo` clamp on the UI thread) as the canvas
+  compresses so content never scrolls out of reach. `BracketConnectors` rewritten
+  to animated segments: static x geometry, `translateY` (+ `height` for the
+  vertical bar) interpolated per anchor — [top, bottom] feeder order is stable so
+  bar spans stay positive. Navigator/snap/jumpTo untouched.
+- **Validated:** new scratch geometry suite (15 checks: connector invariant at
+  every anchor, feeder order, anchor0==static==anchor1, R32/R16 keep scroll at
+  560px fit, QF/SF+F == fit height, QF even spread, Final centered, 3rd-place box
+  inside, all cells inside canvas, tall-screen R16 fits+spreads) ALL PASS;
+  `qualification.test.ts` (46) ALL PASS; typecheck + lint clean.
+- **JS-only → OTA** to `production` (iOS runtime `2c3aa583…` = live 1.0.1 build,
+  Android `c50144db…`); real Supabase ref verified in the compiled `dist/`
+  bundles (no placeholder). Files: `components/bracket/layout.ts`
+  (+`bracketAnchorLayouts`/`SNAP_COUNT`/`THIRD_GAP`/`THIRD_TITLE_H`),
+  `components/bracket/BracketConnectors.tsx` (animated rewrite),
+  `components/BracketTree.tsx` (morph wiring).
+
 ### 2026-07-14 — Golden Boot empty: sync-scores writes broke on the multi-competition schema (server-only, NO OTA)
 
 - **Bug (user):** the Home Golden Boot section stopped showing the list.

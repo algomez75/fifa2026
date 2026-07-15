@@ -1,11 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
+  Extrapolation,
   FadeInDown,
+  interpolate,
   scrollTo,
+  type SharedValue,
+  useAnimatedReaction,
   useAnimatedRef,
+  useAnimatedStyle,
   useScrollOffset,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnUI } from 'react-native-worklets';
 
 import type { Match } from '@/lib/database.types';
@@ -18,23 +24,41 @@ import { BracketCell } from './bracket/BracketCell';
 import { BracketConnectors } from './bracket/BracketConnectors';
 import { BracketGroupsColumn } from './bracket/BracketGroupsColumn';
 import { BracketNavigator } from './bracket/BracketNavigator';
-import { CELL_H, COL, COL_GAP, H_PAD, NUM_COLS, V_PAD, bracketLayout } from './bracket/layout';
+import {
+  CELL_H,
+  COL,
+  COL_GAP,
+  H_PAD,
+  NUM_COLS,
+  SNAP_COUNT,
+  THIRD_GAP,
+  V_PAD,
+  bracketAnchorLayouts,
+  bracketLayout,
+} from './bracket/layout';
 
 interface Props {
   matches: Match[];
 }
+
+/** Vertical space the floating glass tab bar covers at the bottom of the canvas
+ *  (bar ≈ 62 + 10 gap + safe-area inset added at runtime). */
+const TAB_BAR_CLEARANCE = 88;
 
 /**
  * Apple-Sports-style knockout bracket: a 2D-scrollable tree. Each match sits
  * vertically centered between the two matches that feed it (real WC26 feeding
  * graph), with connector lines; finished feeders advance their winner into the
  * next slot in real time. Horizontally it snaps one stage at a time (past rounds
- * slide off left, upcoming rounds reveal right) with a synced GS→F navigator;
- * vertically it pans (the GS column holds all 12 group tables).
+ * slide off left, upcoming rounds reveal right) with a synced GS→F navigator.
+ * As later rounds take the screen, the visible round regroups to FIT the
+ * measured viewport height (cells morph with the scroll); a round that can't
+ * fit (R32, R16 on small screens) keeps its compact pitch and vertical scroll.
  */
 export function BracketTree({ matches }: Props) {
   const { t, language } = useTranslation();
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const COL_W = Math.round((screenW - H_PAD * 2) / 2); // exactly 2 stages fit
   const cellW = COL_W - COL_GAP;
@@ -42,19 +66,52 @@ export function BracketTree({ matches }: Props) {
 
   const qualifiers = useBracketQualifiers(matches);
   const resolved = useMemo(() => resolveBracket(matches, qualifiers), [matches, qualifiers]);
-  const { cells, knockoutHeight } = useMemo(() => bracketLayout(), []);
+  const { cells } = useMemo(() => bracketLayout(), []);
   const byId = useMemo(() => {
     const m = new Map<string, Match>();
     for (const x of matches) m.set(x.id, x);
     return m;
   }, [matches]);
 
-  // GS column height drives the canvas (it's taller than the knockout columns).
+  // GS column height drives the anchor-0 canvas (taller than the R32 column).
   const [groupsH, setGroupsH] = useState(2100);
-  const canvasH = Math.max(knockoutHeight, groupsH) + V_PAD * 2;
+  // Measured height of the vertical scroll window (the visible canvas area).
+  const [viewH, setViewH] = useState(0);
+  const windowH = viewH || screenH - 300; // pre-measure estimate, corrected on layout
+  // Height a round must fit in to drop its vertical scroll: the visible window
+  // minus the floating tab bar and the canvas padding.
+  const fitH = Math.max(320, windowH - (insets.bottom + TAB_BAR_CLEARANCE) - V_PAD * 2);
+
+  const { tracks, heights } = useMemo(
+    () => bracketAnchorLayouts(fitH, groupsH),
+    [fitH, groupsH],
+  );
+  // Snap offsets — the interpolation input range shared by every morphing piece.
+  const xs = useMemo(
+    () => Array.from({ length: SNAP_COUNT }, (_, i) => i * COL_W),
+    [COL_W],
+  );
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollX = useScrollOffset(scrollRef);
+  const vScrollRef = useAnimatedRef<Animated.ScrollView>();
+  const vOffset = useScrollOffset(vScrollRef);
+
+  // Canvas height follows the anchor the scroll is at/between, so vertical
+  // scrollability shrinks away as rounds start fitting the screen.
+  const heightStyle = useAnimatedStyle(() => ({
+    height: interpolate(scrollX.value, xs, heights, Extrapolation.CLAMP),
+  }));
+
+  // As the canvas compresses (moving into later rounds), ride the vertical
+  // offset up so the content never scrolls out of reach.
+  useAnimatedReaction(
+    () => interpolate(scrollX.value, xs, heights, Extrapolation.CLAMP),
+    (h) => {
+      const maxY = Math.max(0, h - windowH);
+      if (vOffset.value > maxY) scrollTo(vScrollRef, 0, maxY, false);
+    },
+  );
 
   const jumpTo = useCallback(
     (i: number) => {
@@ -67,14 +124,18 @@ export function BracketTree({ matches }: Props) {
     [COL_W, scrollRef],
   );
 
-  const finalPos = cells.get('FINAL-1');
+  const finalTrack = tracks.get('FINAL-1');
   const thirdMatch = byId.get('3RD-1');
   const thirdResolved = resolved.get('3RD-1');
 
   return (
     <View style={{ flex: 1 }}>
       <BracketNavigator scrollX={scrollX} colW={COL_W} onJump={jumpTo} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+      <Animated.ScrollView
+        ref={vScrollRef}
+        showsVerticalScrollIndicator={false}
+        onLayout={(e) => setViewH(e.nativeEvent.layout.height)}
+        contentContainerStyle={{ flexGrow: 1 }}>
         <Animated.ScrollView
           ref={scrollRef}
           horizontal
@@ -84,11 +145,19 @@ export function BracketTree({ matches }: Props) {
           disableIntervalMomentum
           decelerationRate="fast"
           scrollEventThrottle={16}
-          style={{ height: canvasH }}
+          style={heightStyle}
           contentContainerStyle={{ width: canvasW + H_PAD * 2, paddingHorizontal: H_PAD }}>
-          <View style={{ width: canvasW, height: canvasH }}>
+          <Animated.View style={[{ width: canvasW }, heightStyle]}>
             {/* connectors behind the cells */}
-            <BracketConnectors cells={cells} colW={COL_W} cellW={cellW} vPad={V_PAD} />
+            <BracketConnectors
+              cells={cells}
+              tracks={tracks}
+              xs={xs}
+              scrollX={scrollX}
+              colW={COL_W}
+              cellW={cellW}
+              vPad={V_PAD}
+            />
 
             {/* col 0 — group standings (vertically scrollable) */}
             <View
@@ -97,21 +166,20 @@ export function BracketTree({ matches }: Props) {
               <BracketGroupsColumn matches={matches} width={cellW} />
             </View>
 
-            {/* knockout cells, positioned by the tree layout */}
+            {/* knockout cells — morph between the per-anchor layouts */}
             {[...cells.entries()].map(([id, pos]) => {
               const m = byId.get(id);
               const r = resolved.get(id);
-              if (!m || !r) return null;
+              const track = tracks.get(id);
+              if (!m || !r || !track) return null;
               return (
-                <Animated.View
+                <MorphingBox
                   key={id}
-                  entering={FadeInDown.duration(260)}
-                  style={{
-                    position: 'absolute',
-                    left: pos.col * COL_W,
-                    top: pos.cy - CELL_H / 2 + V_PAD,
-                    width: cellW,
-                  }}>
+                  left={pos.col * COL_W}
+                  width={cellW}
+                  tops={track.map((cy) => cy - CELL_H / 2 + V_PAD)}
+                  xs={xs}
+                  scrollX={scrollX}>
                   <BracketCell
                     match={m}
                     resolved={r}
@@ -120,19 +188,18 @@ export function BracketTree({ matches }: Props) {
                     width={cellW}
                     isFinal={id === 'FINAL-1'}
                   />
-                </Animated.View>
+                </MorphingBox>
               );
             })}
 
             {/* third-place box, below the Final */}
-            {thirdMatch && thirdResolved && finalPos ? (
-              <View
-                style={{
-                  position: 'absolute',
-                  left: COL.final * COL_W,
-                  top: finalPos.cy + CELL_H / 2 + 44 + V_PAD,
-                  width: cellW,
-                }}>
+            {thirdMatch && thirdResolved && finalTrack ? (
+              <MorphingBox
+                left={COL.final * COL_W}
+                width={cellW}
+                tops={finalTrack.map((cy) => cy + CELL_H / 2 + THIRD_GAP + V_PAD)}
+                xs={xs}
+                scrollX={scrollX}>
                 <Text style={styles.thirdTitle}>
                   {language === 'es' ? stageMeta.third.labelEs : stageMeta.third.label}
                 </Text>
@@ -143,12 +210,42 @@ export function BracketTree({ matches }: Props) {
                   t={t}
                   width={cellW}
                 />
-              </View>
+              </MorphingBox>
             ) : null}
-          </View>
+          </Animated.View>
         </Animated.ScrollView>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
+  );
+}
+
+/** Absolutely-positioned box whose vertical position interpolates between the
+ *  per-anchor layouts with the horizontal scroll. */
+function MorphingBox({
+  left,
+  width,
+  tops,
+  xs,
+  scrollX,
+  children,
+}: {
+  left: number;
+  width: number;
+  tops: number[];
+  xs: number[];
+  scrollX: SharedValue<number>;
+  children: React.ReactNode;
+}) {
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(scrollX.value, xs, tops, Extrapolation.CLAMP) },
+    ],
+  }));
+  return (
+    <Animated.View style={[{ position: 'absolute', top: 0, left, width }, style]}>
+      {/* entering animation on an inner wrapper so it composes with the morph */}
+      <Animated.View entering={FadeInDown.duration(260)}>{children}</Animated.View>
+    </Animated.View>
   );
 }
 
