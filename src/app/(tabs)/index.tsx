@@ -156,7 +156,7 @@ export default function HomeScreen() {
         </Section>
 
         {/* Golden boot */}
-        <Section title={`👟 ${t.home.topScorers}`}>
+        <Section title={`👟 ${t.home.topScorers}`} titleColor={palette.gold}>
           <TopScorersCard limit={5} />
         </Section>
       </ScrollView>
@@ -189,10 +189,18 @@ function ScreenFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  titleColor,
+}: {
+  title: string;
+  children: React.ReactNode;
+  titleColor?: string;
+}) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={[styles.sectionTitle, titleColor ? { color: titleColor } : null]}>{title}</Text>
       <View style={{ gap: 10 }}>{children}</View>
     </View>
   );

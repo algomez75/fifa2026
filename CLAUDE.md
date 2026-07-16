@@ -308,6 +308,25 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-16 — Golden Boot branding: gold titles in-app + original landing icon (OTA + landing)
+
+- **App (OTA):** the "👟 Golden Boot / Bota de Oro" title is now **gold**
+  (`palette.gold`) in both places it appears — the Home section header
+  (`Section` gained an optional `titleColor` prop) and the `TopScorersCard`
+  bottom-sheet title. Emoji kept (user request: color only, same emoji).
+  Published to `production` (iOS runtime `2c3aa583…` = live 1.0.1 build,
+  Android `c50144db…`); real Supabase ref verified in both `dist/` bundles.
+- **Landing:** replaced the Golden Boot section icon — it was hotlinking the
+  **adidas trophy photo** via `../assets/images/fifaimages/gboot2026.png`, a
+  path OUTSIDE the flat-deployed `landing/` folder (likely broken live) and a
+  trademark/copyright risk. New **original hand-drawn SVG** (`landing/gboot.svg`,
+  referenced as `src="gboot.svg"`): stylized gold boot with back-swept collar,
+  vamp folds, studs + pedestal, brand gold `#D4AF37` gradient — no adidas
+  stripes/logo/photo. Iterated via sharp renders on the dark bg at full + 66px
+  icon size. Landing needs re-upload (index.html + gboot.svg) to go live.
+  Files: `app/(tabs)/index.tsx`, `components/TopScorersCard.tsx`,
+  `landing/index.html`, `landing/gboot.svg` (new).
+
 ### 2026-07-16 — Golden Boot order matches FIFA (assists tiebreak, server-only, NO OTA)
 
 - **Bug (user, with FIFA screenshot):** the Home Golden Boot showed Mbappé 1st;

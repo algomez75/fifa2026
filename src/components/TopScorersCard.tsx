@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: palette.border2,
   },
-  title: { color: palette.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  title: { color: palette.gold, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   list: { flexShrink: 1 },
   listContent: { gap: 12, paddingBottom: 4 },
   cancel: { alignItems: 'center', paddingTop: 16 },
