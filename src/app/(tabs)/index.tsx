@@ -194,7 +194,7 @@ function Section({
   children,
   titleColor,
 }: {
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   titleColor?: string;
 }) {

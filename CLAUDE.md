@@ -312,10 +312,17 @@ development-simulator / preview / production profiles).
 
 - **App (OTA):** the "👟 Golden Boot / Bota de Oro" title is now **gold**
   (`palette.gold`) in both places it appears — the Home section header
-  (`Section` gained an optional `titleColor` prop) and the `TopScorersCard`
-  bottom-sheet title. Emoji kept (user request: color only, same emoji).
-  Published to `production` (iOS runtime `2c3aa583…` = live 1.0.1 build,
-  Android `c50144db…`); real Supabase ref verified in both `dist/` bundles.
+  (`Section` gained an optional `titleColor` prop, `title` widened to
+  ReactNode) and the `TopScorersCard` bottom-sheet title. The emoji stays
+  full-color. **Emoji-tint attempt reverted:** the transparent-glyph +
+  zero-offset text-shadow silhouette trick (a `GoldEmoji` component) rendered
+  the emoji INVISIBLE on the device (Fabric doesn't draw the text shadow for
+  a transparent glyph) — component deleted, plain 👟 restored via a follow-up
+  OTA. JS-only emoji tinting isn't viable on this stack (masked-view needs a
+  native module → new build); a gold boot would need an SVG/image icon
+  instead of the emoji. Published to `production` (iOS runtime `2c3aa583…` =
+  live 1.0.1 build, Android `c50144db…`); real Supabase ref + the 👟 glyph
+  (UTF-16 search — .hbc strings aren't UTF-8) verified in the `dist/` bundles.
 - **Landing:** replaced the Golden Boot section icon — it was hotlinking the
   **adidas trophy photo** via `../assets/images/fifaimages/gboot2026.png`, a
   path OUTSIDE the flat-deployed `landing/` folder (likely broken live) and a
