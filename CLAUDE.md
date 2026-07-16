@@ -308,6 +308,25 @@ development-simulator / preview / production profiles).
 
 > Newest first. Keep this updated when shipping features or schema changes.
 
+### 2026-07-16 — Golden Boot order matches FIFA (assists tiebreak, server-only, NO OTA)
+
+- **Bug (user, with FIFA screenshot):** the Home Golden Boot showed Mbappé 1st;
+  FIFA's official standings have **Messi 1st** (both 8 goals, Messi wins on
+  assists 4 > Mbappé's).
+- **Root cause:** `top_scorers.rank` blindly copies **football-data's array
+  order** (`rank = i + 1` in both `sync-scores` and `rebuild-scorers.mjs`), and
+  football-data ranks a goals tie WITHOUT the assists tiebreak (it returned
+  Mbappé 8g/2a above Messi 8g/4a). The client just orders by `rank` — correct.
+- **Fix:** both writers now **re-rank with the official Golden Boot tiebreak**
+  before assigning ranks: goals ↓ → assists ↓ (null=0) → fewer matches played.
+  Note football-data also under-counts Mbappé's assists (2 vs FIFA's 3) —
+  provider data we can't change, but irrelevant to the order here.
+- **Shipped:** `rebuild-scorers.mjs` re-run (Messi 1st live, verified via
+  PostgREST) + `sync-scores` deployed (`--project-ref xqjupomaqomneqiugbft`,
+  token from `11gol/.env` — fifa2026's is still revoked), smoke-tested clean.
+  Server-only → reaches everyone instantly, NO OTA. Files:
+  `sync-scores/index.ts`, `scripts/rebuild-scorers.mjs`.
+
 ### 2026-07-14 — Bracket: rounds regroup to FIT the visible screen as you swipe (OTA)
 
 - **Ask:** in Groups → Bracket, as the tree scrolls left the incoming matches

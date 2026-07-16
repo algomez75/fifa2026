@@ -761,6 +761,15 @@ Deno.serve(async () => {
   if (events > 0) {
     const scorers = await fd('/competitions/WC/scorers?limit=20');
     const list = (scorers?.scorers ?? []) as any[];
+    // football-data's array order ignores assists on a goals tie (it ranked
+    // Mbappé 8g/2a above Messi 8g/4a); re-rank with the official Golden Boot
+    // tiebreak: goals → assists → fewer matches played.
+    list.sort(
+      (a, b) =>
+        (b.goals ?? 0) - (a.goals ?? 0) ||
+        (b.assists ?? 0) - (a.assists ?? 0) ||
+        (a.playedMatches ?? 99) - (b.playedMatches ?? 99),
+    );
     if (list.length) {
       const rows = list.map((s, i) => {
         const teamId = teamByFdId.get(s.team?.id) ?? null;

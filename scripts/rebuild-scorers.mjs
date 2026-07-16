@@ -65,6 +65,15 @@ const json = await res.json();
 const list = json.scorers ?? [];
 if (!list.length) { console.error('football-data returned no scorers:', JSON.stringify(json).slice(0, 200)); process.exit(1); }
 
+// Official Golden Boot tiebreak (football-data's own order ignores assists):
+// goals → assists → fewer matches played.
+list.sort(
+  (a, b) =>
+    (b.goals ?? 0) - (a.goals ?? 0) ||
+    (b.assists ?? 0) - (a.assists ?? 0) ||
+    (a.playedMatches ?? 99) - (b.playedMatches ?? 99),
+);
+
 const rows = list.map((s, i) => {
   const teamId = byFd.get(s.team?.id) ?? null;
   return {
