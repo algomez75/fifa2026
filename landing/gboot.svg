@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 130">
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd75e" stop-opacity="0.4"/>
+      <stop offset="0.6" stop-color="#d4af37" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#d4af37" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0.1" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#ffedb0"/>
+      <stop offset="0.35" stop-color="#f6c944"/>
+      <stop offset="0.65" stop-color="#d4af37"/>
+      <stop offset="0.88" stop-color="#a97e12"/>
+      <stop offset="1" stop-color="#8a6208"/>
+    </linearGradient>
+    <linearGradient id="goldSole" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8bf45"/>
+      <stop offset="1" stop-color="#8a6208"/>
+    </linearGradient>
+  </defs>
+
+  <!-- soft glow behind -->
+  <ellipse cx="80" cy="62" rx="74" ry="54" fill="url(#glow)"/>
+
+  <!-- pedestal (trophy stand) -->
+  <rect x="82" y="94" width="30" height="20" rx="3" fill="#7a5406"/>
+  <rect x="82" y="94" width="30" height="5" rx="2.5" fill="#a97e12"/>
+  <ellipse cx="97" cy="114" rx="15" ry="4" fill="#4a3203"/>
+
+  <!-- studs -->
+  <g fill="url(#goldSole)">
+    <path d="M46 90 h12 l-1.5 10 a4.5 4.5 0 0 1 -9 0 z"/>
+    <path d="M66 92 h12 l-1.5 10 a4.5 4.5 0 0 1 -9 0 z"/>
+    <path d="M118 92 h12 l-1.5 10 a4.5 4.5 0 0 1 -9 0 z"/>
+    <path d="M132 88 h11 l-1.5 9 a4 4 0 0 1 -8 0 z"/>
+  </g>
+
+  <!-- boot body -->
+  <path fill="url(#gold)" d="
+    M24 8
+    C 36 13, 46 23, 51 35
+    C 54 42, 58 46, 65 48
+    C 82 51, 100 52, 114 56
+    C 130 60, 142 68, 145 78
+    C 147 85, 142 90, 132 91
+    C 102 92.5, 70 92, 48 91
+    C 40 90.5, 36 86, 35 78
+    C 33 60, 36 44, 33 28
+    C 31 18, 27 12, 24 8
+    Z"/>
+
+  <!-- heel/back shade -->
+  <path fill="#a97e12" opacity="0.5" d="
+    M24 8
+    C 32 16, 38 25, 39 35
+    C 41 52, 39 66, 41 78
+    C 42 85, 46 89, 53 91
+    L 48 91
+    C 40 90.5, 36 86, 35 78
+    C 33 60, 36 44, 33 28
+    C 31 18, 27 12, 24 8
+    Z"/>
+
+  <!-- collar opening -->
+  <path fill="#7a5406" opacity="0.7" d="
+    M49 33
+    C 53 39, 57 44, 64 47
+    C 58 47.5, 52 44, 49 38
+    C 48 36, 48 34, 49 33
+    Z"/>
+
+  <!-- vamp fold lines -->
+  <g fill="none" stroke="#8a6208" stroke-opacity="0.5" stroke-width="2.5" stroke-linecap="round">
+    <path d="M70 54 C 88 56, 106 60, 122 66"/>
+    <path d="M64 62 C 80 66, 98 71, 114 78"/>
+    <path d="M58 70 C 70 75, 84 80, 98 83"/>
+  </g>
+
+  <!-- sole line -->
+  <path fill="url(#goldSole)" d="
+    M36 80
+    C 62 86, 104 88, 141 81
+    C 145 84, 141 90, 132 91
+    C 102 92.5, 70 92, 48 91
+    C 41 90.5, 37 86, 36 80
+    Z"/>
+
+  <!-- top highlight along the instep -->
+  <path fill="#fff6d0" opacity="0.6" d="
+    M27 12
+    C 36 18, 43 27, 48 37
+    C 52 44, 57 47, 64 49
+    C 82 52, 100 53.5, 114 57.5
+    C 100 55.5, 82 54, 64 51.5
+    C 55 50, 49 45, 45 37
+    C 41 28, 34 18, 27 12
+    Z"/>
+</svg>
