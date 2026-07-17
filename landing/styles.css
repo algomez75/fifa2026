@@ -900,13 +900,19 @@ h3 {
 .sec-head-with-icon {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 .boot-icon {
-  width: 66px;
-  height: 66px;
-  object-fit: contain;
+  width: 82px;
+  height: 54px;
+  object-fit: cover;
+  object-position: center;
   display: block;
+  border-radius: 12px;
+  background: #050505;
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.22),
+    0 10px 24px rgba(0, 0, 0, 0.28);
 }
 .livechip {
   display: flex;
@@ -1006,6 +1012,13 @@ h3 {
   border-radius: 3px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
   flex: none;
+}
+.fl-crest {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 0;
+  box-shadow: none;
 }
 .fl-img.sm {
   width: 18px;

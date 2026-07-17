@@ -287,23 +287,65 @@
   function esc(t) {
     return (t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
   }
+  function escAttr(t) {
+    return esc(t).replace(/"/g, "&quot;");
+  }
 
-  // Real flag image via flagcdn (by ISO-3166 code); falls back to emoji.
-  function flag(team) {
+  function flagCdnUrl(team, width) {
     const iso = team && team.iso2;
-    if (iso)
+    return iso
+      ? "https://flagcdn.com/w" +
+          width +
+          "/" +
+          encodeURIComponent(iso.toLowerCase()) +
+          ".png"
+      : "";
+  }
+
+  function handleTeamImageError(e) {
+    const img = e.currentTarget;
+    const fallbackSrc = img.getAttribute("data-fallback-src");
+
+    if (fallbackSrc) {
+      img.removeAttribute("srcset");
+      img.removeAttribute("data-fallback-src");
+      img.src = fallbackSrc;
+      return;
+    }
+
+    const fallback = document.createElement("span");
+    fallback.className = "fl";
+    fallback.textContent = img.getAttribute("data-emoji") || "🏳️";
+    img.replaceWith(fallback);
+  }
+
+  function activateTeamImages(root) {
+    root.querySelectorAll(".fl-img").forEach(function (img) {
+      img.addEventListener("error", handleTeamImageError);
+    });
+  }
+
+  // Real team crest when available, then flagcdn, then emoji.
+  function flag(team) {
+    const emoji = (team && team.flag_emoji) || "🏳️";
+    const crest = team && team.crest_url;
+    const flagSrc = flagCdnUrl(team, 40);
+    const flag2x = flagCdnUrl(team, 80);
+    const src = crest || flagSrc;
+    if (src)
       return (
-        '<img class="fl-img" loading="lazy" alt="" ' +
-        'src="https://flagcdn.com/w40/' +
-        iso.toLowerCase() +
-        '.png" ' +
-        'srcset="https://flagcdn.com/w80/' +
-        iso.toLowerCase() +
-        '.png 2x">'
+        '<img class="fl-img' +
+        (crest ? " fl-crest" : "") +
+        '" loading="lazy" alt="" src="' +
+        escAttr(src) +
+        '"' +
+        (crest && flagSrc ? ' data-fallback-src="' + escAttr(flagSrc) + '"' : "") +
+        (!crest && flag2x ? ' srcset="' + escAttr(flag2x) + ' 2x"' : "") +
+        ' data-emoji="' +
+        escAttr(emoji) +
+        '">'
       );
-    return (
-      '<span class="fl">' + ((team && team.flag_emoji) || "🏳️") + "</span>"
-    );
+    return '<span class="fl">' + esc(emoji) + "</span>";
   }
 
   function renderMatches(list) {
@@ -370,13 +412,14 @@
         );
       })
       .join("");
+    activateTeamImages(box);
   }
 
   function loadMatches() {
     // Live matches first (with score + minute), then the next kickoffs.
     const q =
       "/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,status,minute,home_score,away_score," +
-      "home:teams!home_team_id(name,flag_emoji,iso2),away:teams!away_team_id(name,flag_emoji,iso2)," +
+      "home:teams!home_team_id(name,flag_emoji,iso2,crest_url),away:teams!away_team_id(name,flag_emoji,iso2,crest_url)," +
       "venue:venues(name,city)&status=in.(live,scheduled)&order=kickoff_utc.asc&limit=6";
     fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
       .then(function (r) {
@@ -479,12 +522,13 @@
         );
       })
       .join("");
+    activateTeamImages(box);
   }
 
   function loadResults() {
     const q =
       "/rest/v1/matches?select=id,kickoff_utc,stage,group_letter,home_score,away_score," +
-      "home:teams!home_team_id(name,flag_emoji,iso2),away:teams!away_team_id(name,flag_emoji,iso2)" +
+      "home:teams!home_team_id(name,flag_emoji,iso2,crest_url),away:teams!away_team_id(name,flag_emoji,iso2,crest_url)" +
       "&status=eq.finished&order=kickoff_utc.desc&limit=6";
     fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
       .then(function (r) {
@@ -529,7 +573,7 @@
   // ── golden boot ──────────────────────────────────────────────────────────
   function loadScorers() {
     const q =
-      "/rest/v1/top_scorers?select=rank,player_name,goals,team:teams(name,flag_emoji,iso2),player:players(photo_url)&order=rank.asc&limit=5";
+      "/rest/v1/top_scorers?select=rank,player_name,goals,team:teams(name,flag_emoji,iso2,crest_url),player:players(photo_url)&order=rank.asc&limit=5";
     fetch(SB_URL + q, { headers: { apikey: SB_ANON } })
       .then(function (r) {
         return r.ok ? r.json() : [];
@@ -571,6 +615,7 @@
             );
           })
           .join("");
+        activateTeamImages(box);
       })
       .catch(function () {});
   }
